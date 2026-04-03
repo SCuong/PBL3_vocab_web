@@ -1,0 +1,141 @@
+@model LearningDashboardViewModel
+
+@{
+    ViewData["Title"] = "Learning";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="mb-1">Learning Topics</h2>
+        <p class="text-muted mb-0">Choose a parent topic, then open a child topic to learn the next 10 words and take a minitest.</p>
+    </div>
+    <a asp-controller="Vocabulary" asp-action="Index" class="btn btn-outline-secondary">Vocabulary List</a>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (TempData["InfoMessage"] is string infoMessage)
+{
+    <div class="alert alert-info">@infoMessage</div>
+}
+
+@if (!Model.HasParentTopics)
+{
+    <div class="alert alert-info">
+        There are no parent topics yet.
+        @if (User.IsInRole(UserRoles.Admin))
+        {
+            <a asp-controller="Topic" asp-action="Create" class="alert-link">Create topics in admin first.</a>
+        }
+    </div>
+}
+else
+{
+    <div class="row g-4 learning-topic-layout">
+        <div class="col-xl-8">
+            <div class="card learning-parent-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                        <div>
+                            <div class="text-uppercase text-muted small mb-2">Selected Parent Topic</div>
+                            <h3 class="mb-1">@Model.SelectedParentTopicName</h3>
+                            <p class="text-muted mb-0">@Model.SelectedParentDescription</p>
+                        </div>
+                        <div class="text-md-end">
+                            <div class="badge text-bg-light border text-dark fs-6">@Model.SelectedParentChildTopicCount child topics</div>
+                            <div class="mt-2 text-primary fw-semibold">@Model.SelectedParentLearnedPercent% learned</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!Model.ChildTopics.Any())
+            {
+                <div class="alert alert-info">This parent topic does not have child topics yet.</div>
+            }
+            else
+            {
+                <div class="d-grid gap-3">
+                    @foreach (var topic in Model.ChildTopics)
+                    {
+                        <div class="card learning-child-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="learning-child-icon">@topic.TopicId</span>
+                                            <h4 class="mb-0">@topic.Name</h4>
+                                        </div>
+
+                                        <p class="text-muted mb-3">@topic.Description</p>
+
+                                        <div class="progress learning-progress mb-2" role="progressbar" aria-valuenow="@topic.ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                                            <div class="progress-bar" style="width: @topic.ProgressPercent%;"></div>
+                                        </div>
+
+                                        <div class="d-flex flex-wrap gap-3 small text-muted">
+                                            <span>@topic.LearnedWords/@topic.TotalWords learned</span>
+                                            <span>@topic.RemainingWords new words left</span>
+                                            <span>@topic.DueReviewCount due for review</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-md-end">
+                                        @if (topic.CanStartSession)
+                                        {
+                                            <a asp-action="Study" asp-route-topicId="@topic.TopicId" class="btn btn-primary">@topic.ActionText</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-success">Completed</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card learning-parent-list-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="learning-section-mark">#</span>
+                        <h4 class="mb-0">Parent Topic Cards</h4>
+                    </div>
+
+                    <div class="list-group learning-parent-list">
+                        @foreach (var parentTopic in Model.ParentTopics)
+                        {
+                            var itemClass = parentTopic.IsSelected
+                                ? "list-group-item list-group-item-action active"
+                                : "list-group-item list-group-item-action";
+
+                            <a asp-action="Index"
+                               asp-route-parentTopicId="@parentTopic.TopicId"
+                               class="@itemClass">
+                                <div class="d-flex justify-content-between align-items-center gap-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="learning-parent-order">@parentTopic.TopicId</span>
+                                        <span>@parentTopic.Name</span>
+                                    </div>
+                                    <small>@parentTopic.ChildTopicCount topics</small>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,54 @@
+@model IEnumerable<VocabLearning.Models.Progress>
+
+@{
+    ViewData["Title"] = "Progress";
+    var userNames = ViewBag.UserNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+    var vocabularyNames = ViewBag.VocabularyNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Progress</h2>
+    <div>
+        <a asp-action="Create" class="btn btn-primary">Add Progress</a>
+        <a asp-controller="Admin" asp-action="Index" class="btn btn-secondary">Back to Admin</a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">There are no progress records yet.</div>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Vocabulary</th>
+                <th>Last Review</th>
+                <th>Next Review</th>
+                <th style="width: 170px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@(userNames.TryGetValue(item.UserId, out var userName) ? userName : $"ID {item.UserId}")</td>
+                <td>@(vocabularyNames.TryGetValue(item.VocabId, out var word) ? word : $"ID {item.VocabId}")</td>
+                <td>@item.LastReviewDate?.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@item.NextReviewDate?.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-userId="@item.UserId" asp-route-vocabId="@item.VocabId" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <a asp-action="Delete" asp-route-userId="@item.UserId" asp-route-vocabId="@item.VocabId" class="btn btn-sm btn-outline-danger">Delete</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

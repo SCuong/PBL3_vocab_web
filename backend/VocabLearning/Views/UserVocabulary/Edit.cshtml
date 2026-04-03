@@ -1,0 +1,51 @@
+@model UserVocabularyFormViewModel
+
+@{
+    ViewData["Title"] = "Edit User Vocabulary";
+}
+
+<h2>Edit User Vocabulary Record</h2>
+
+<form asp-action="Edit" method="post">
+    <input asp-for="OriginalUserId" type="hidden" />
+    <input asp-for="OriginalVocabId" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label asp-for="UserId" class="form-label"></label>
+        <select asp-for="UserId" asp-items="Model.UserOptions" class="form-select"></select>
+        <span asp-validation-for="UserId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="VocabId" class="form-label"></label>
+        <select asp-for="VocabId" asp-items="Model.VocabularyOptions" class="form-select"></select>
+        <span asp-validation-for="VocabId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Status" class="form-label"></label>
+        <input asp-for="Status" class="form-control" />
+        <span asp-validation-for="Status" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Note" class="form-label"></label>
+        <textarea asp-for="Note" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Note" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="FirstLearnedDate" class="form-label"></label>
+        <input asp-for="FirstLearnedDate" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" class="form-control" />
+        <span asp-validation-for="FirstLearnedDate" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

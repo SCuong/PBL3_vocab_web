@@ -1,0 +1,16 @@
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<h2 class="mb-4">Admin Management</h2>
+
+<div class="list-group">
+    <a asp-action="Users" class="list-group-item list-group-item-action">Users</a>
+    <a asp-controller="Topic" asp-action="Index" class="list-group-item list-group-item-action">Topics</a>
+    <a asp-controller="Vocabulary" asp-action="Index" class="list-group-item list-group-item-action">Vocabulary</a>
+    <a asp-controller="Exercise" asp-action="Index" class="list-group-item list-group-item-action">Exercises</a>
+    <a asp-controller="ExerciseResult" asp-action="Index" class="list-group-item list-group-item-action">Exercise Results</a>
+    <a asp-controller="UserVocabulary" asp-action="Index" class="list-group-item list-group-item-action">User Vocabulary</a>
+    <a asp-controller="Progress" asp-action="Index" class="list-group-item list-group-item-action">Progress</a>
+    <a asp-controller="LearningLog" asp-action="Index" class="list-group-item list-group-item-action">Learning Logs</a>
+</div>

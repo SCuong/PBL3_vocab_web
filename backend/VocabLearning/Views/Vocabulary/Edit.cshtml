@@ -1,0 +1,56 @@
+@model VocabularyFormViewModel
+
+@{
+    ViewData["Title"] = "Edit Vocabulary";
+}
+
+<h2>Edit Vocabulary</h2>
+
+<form asp-action="Edit" method="post">
+    <input asp-for="VocabId" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label asp-for="Word" class="form-label"></label>
+        <input asp-for="Word" class="form-control" />
+        <span asp-validation-for="Word" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Ipa" class="form-label"></label>
+        <input asp-for="Ipa" class="form-control" />
+        <span asp-validation-for="Ipa" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="AudioUrl" class="form-label"></label>
+        <input asp-for="AudioUrl" class="form-control" />
+        <span asp-validation-for="AudioUrl" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Level" class="form-label"></label>
+        <select asp-for="Level" asp-items="Model.LevelOptions" class="form-select"></select>
+        <span asp-validation-for="Level" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="MeaningVi" class="form-label"></label>
+        <textarea asp-for="MeaningVi" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="MeaningVi" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="TopicId" class="form-label"></label>
+        <select asp-for="TopicId" asp-items="Model.TopicOptions" class="form-select"></select>
+        <span asp-validation-for="TopicId" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,62 @@
+@model LearningMinitestViewModel
+
+@{
+    ViewData["Title"] = "Minitest";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+        <h2 class="mb-1">@Model.TopicName</h2>
+        <p class="text-muted mb-0">@Model.SessionModeDisplay &middot; @Model.Questions.Count questions</p>
+    </div>
+    <a asp-action="Study" asp-route-topicId="@Model.TopicId" asp-route-ids="@Model.BatchVocabularyIds" asp-route-index="0" class="btn btn-outline-secondary">Back to Words</a>
+</div>
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<form asp-action="Minitest" method="post" class="d-grid gap-3">
+    @Html.AntiForgeryToken()
+    <input asp-for="TopicId" type="hidden" />
+    <input asp-for="ParentTopicId" type="hidden" />
+    <input asp-for="TopicName" type="hidden" />
+    <input asp-for="BatchVocabularyIds" type="hidden" />
+    <input asp-for="SessionMode" type="hidden" />
+
+    @for (var i = 0; i < Model.Questions.Count; i++)
+    {
+        <input asp-for="Questions[i].VocabId" type="hidden" />
+        <input asp-for="Questions[i].Word" type="hidden" />
+
+        <div class="card learning-quiz-card">
+            <div class="card-body">
+                <div class="text-uppercase small text-muted mb-2">Question @(i + 1)</div>
+                <h4 class="mb-3">@Model.Questions[i].Word</h4>
+
+                <div class="d-grid gap-2">
+                    @for (var j = 0; j < Model.Questions[i].Options.Count; j++)
+                    {
+                        var option = Model.Questions[i].Options[j];
+                        var radioId = $"question_{i}_option_{j}";
+
+                        <div class="form-check learning-quiz-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   id="@radioId"
+                                   name="Questions[@i].SelectedAnswer"
+                                   value="@option"
+                                   @(Model.Questions[i].SelectedAnswer == option ? "checked" : null) />
+                            <label class="form-check-label" for="@radioId">@option</label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-success">Submit Minitest</button>
+    </div>
+</form>

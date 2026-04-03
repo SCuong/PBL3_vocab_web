@@ -1,0 +1,34 @@
+@model VocabLearning.Models.UserVocabulary
+
+@{
+    ViewData["Title"] = "Delete User Vocabulary";
+    var userNames = ViewBag.UserNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+    var vocabularyNames = ViewBag.VocabularyNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+}
+
+<h2>Delete User Vocabulary Record</h2>
+
+<div class="alert alert-warning">
+    This action will remove the selected user-vocabulary record.
+</div>
+
+<dl class="row">
+    <dt class="col-sm-2">User</dt>
+    <dd class="col-sm-10">@(userNames.TryGetValue(Model.UserId, out var userName) ? userName : $"ID {Model.UserId}")</dd>
+
+    <dt class="col-sm-2">Vocabulary</dt>
+    <dd class="col-sm-10">@(vocabularyNames.TryGetValue(Model.VocabId, out var word) ? word : $"ID {Model.VocabId}")</dd>
+
+    <dt class="col-sm-2">Status</dt>
+    <dd class="col-sm-10">@Model.Status</dd>
+
+    <dt class="col-sm-2">Note</dt>
+    <dd class="col-sm-10">@Model.Note</dd>
+</dl>
+
+<form asp-action="Delete" method="post">
+    <input type="hidden" name="userId" value="@Model.UserId" />
+    <input type="hidden" name="vocabId" value="@Model.VocabId" />
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

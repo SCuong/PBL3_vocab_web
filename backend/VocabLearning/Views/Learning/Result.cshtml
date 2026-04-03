@@ -1,0 +1,70 @@
+@model LearningMinitestResultViewModel
+
+@{
+    ViewData["Title"] = "Minitest Result";
+}
+
+<div class="card learning-result-card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <div class="text-uppercase small text-muted mb-2">Minitest Result</div>
+                <h2 class="mb-1">@Model.TopicName</h2>
+                <p class="text-muted mb-0">You answered @Model.Score / @Model.TotalQuestions correctly.</p>
+            </div>
+            <div class="learning-score-pill">
+                <span>@Model.Score</span>
+                <small>/ @Model.TotalQuestions</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h4 class="mb-3">Question Review</h4>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Word</th>
+                        <th>Your Answer</th>
+                        <th>Correct Answer</th>
+                        <th>Result</th>
+                        <th>Next Review</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var question in Model.Questions)
+                {
+                    <tr>
+                        <td>@question.Word</td>
+                        <td>@question.SelectedAnswer</td>
+                        <td>@question.CorrectAnswer</td>
+                        <td>
+                            @if (question.IsCorrect)
+                            {
+                                <span class="badge text-bg-success">Correct</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger">Incorrect</span>
+                            }
+                        </td>
+                        <td>@question.NextReviewDate.ToString("dd/MM/yyyy HH:mm")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <a asp-action="Index" asp-route-parentTopicId="@Model.ParentTopicId" class="btn btn-outline-secondary">Back to Topics</a>
+
+    @if (Model.HasMoreWords)
+    {
+        <a asp-action="Study" asp-route-topicId="@Model.TopicId" class="btn btn-primary">Continue Topic</a>
+    }
+}

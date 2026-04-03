@@ -1,0 +1,28 @@
+@{
+    ViewData["Title"] = "Home Page";
+    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+    var isAdmin = User.IsInRole(UserRoles.Admin);
+}
+
+<div class="text-center py-5">
+    <h1 class="display-4">VocabLearning</h1>
+    <p class="lead">Manage vocabulary in admin and study it with a simple spaced-review flow.</p>
+
+    <div class="d-flex justify-content-center flex-wrap gap-2 mt-4">
+        @if (isAuthenticated)
+        {
+            <a asp-controller="Learning" asp-action="Index" class="btn btn-primary">Go to Learning</a>
+            <a asp-controller="Vocabulary" asp-action="Index" class="btn btn-outline-secondary">Browse Vocabulary</a>
+
+            @if (isAdmin)
+            {
+                <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-dark">Admin</a>
+            }
+        }
+        else
+        {
+            <a asp-controller="Account" asp-action="Login" class="btn btn-primary">Login</a>
+            <a asp-controller="Account" asp-action="Register" class="btn btn-outline-secondary">Register</a>
+        }
+    </div>
+</div>
