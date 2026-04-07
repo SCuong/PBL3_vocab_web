@@ -44,7 +44,7 @@ PBL3 – Basic English vocabulary learning web application
 
 
 
-&#x20;  Open `database/ImportVocabularyPBL3/ImportVocabularyPBL3.sln` in Visual Studio.
+&#x20;  Open `database/ImportVocabularyPBL3/ImportVocabularyPBL3.sln` in Visual Studio 2026.
 
 
 
