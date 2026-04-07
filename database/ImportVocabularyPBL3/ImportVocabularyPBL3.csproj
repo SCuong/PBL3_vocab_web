@@ -63,6 +63,7 @@
     <Compile Include="VocabImportService.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Scripts\PBL3.exercise.migration.sql" />
     <None Include="App.config" />
     <Content Include="Data\vocab.xlsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
