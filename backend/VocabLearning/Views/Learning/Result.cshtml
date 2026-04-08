@@ -10,11 +10,13 @@
             <div>
                 <div class="text-uppercase small text-muted mb-2">Minitest Result</div>
                 <h2 class="mb-1">@Model.TopicName</h2>
-                <p class="text-muted mb-0">You answered @Model.Score / @Model.TotalQuestions correctly.</p>
+                <p class="text-muted mb-1">You answered @Model.CorrectCount / @Model.TotalQuestions correctly.</p>
+                <p class="text-muted mb-1">Score: @Model.Score.ToString("0.##")%</p>
+                <p class="text-muted mb-0">Recorded as @Model.ExerciseType attempts at @Model.SubmittedAt.ToString("dd/MM/yyyy HH:mm").</p>
             </div>
             <div class="learning-score-pill">
-                <span>@Model.Score</span>
-                <small>/ @Model.TotalQuestions</small>
+                <span>@Model.Score.ToString("0")%</span>
+                <small>@Model.CorrectCount / @Model.TotalQuestions</small>
             </div>
         </div>
     </div>
@@ -51,7 +53,11 @@
                                 <span class="badge text-bg-danger">Incorrect</span>
                             }
                         </td>
-                        <td>@question.NextReviewDate.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @(question.NextReviewDate.HasValue
+                                ? question.NextReviewDate.Value.ToString("dd/MM/yyyy HH:mm")
+                                : "-")
+                        </td>
                     </tr>
                 }
                 </tbody>
@@ -68,3 +74,4 @@
         <a asp-action="Study" asp-route-topicId="@Model.TopicId" class="btn btn-primary">Continue Topic</a>
     }
 }
+

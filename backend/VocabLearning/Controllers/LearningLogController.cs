@@ -23,6 +23,7 @@ namespace VocabLearning.Controllers
             var items = _adminDataService.GetLearningLogs();
             ViewBag.UserNames = _adminDataService.GetUsers()
                 .ToDictionary(user => user.UserId, user => user.Username);
+            ViewBag.SessionNames = _adminDataService.GetExerciseSessionLabels();
 
             return View(items);
         }
@@ -37,7 +38,7 @@ namespace VocabLearning.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Create(LearningLogFormViewModel model)
         {
-            PopulateUserOptions(model);
+            PopulateFormOptions(model);
 
             if (!ModelState.IsValid)
             {
@@ -47,8 +48,10 @@ namespace VocabLearning.Controllers
             var result = _adminDataService.CreateLearningLog(new LearningLog
             {
                 UserId = model.UserId,
+                SessionId = model.SessionId,
                 Date = model.Date,
                 ActivityType = model.ActivityType.Trim(),
+                WordsStudied = model.WordsStudied,
                 Score = model.Score
             });
 
@@ -79,7 +82,7 @@ namespace VocabLearning.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Edit(LearningLogFormViewModel model)
         {
-            PopulateUserOptions(model);
+            PopulateFormOptions(model);
 
             if (!ModelState.IsValid)
             {
@@ -90,8 +93,10 @@ namespace VocabLearning.Controllers
             {
                 LogId = model.LogId,
                 UserId = model.UserId,
+                SessionId = model.SessionId,
                 Date = model.Date,
                 ActivityType = model.ActivityType.Trim(),
+                WordsStudied = model.WordsStudied,
                 Score = model.Score
             });
 
@@ -117,6 +122,7 @@ namespace VocabLearning.Controllers
 
             ViewBag.UserNames = _adminDataService.GetUsers()
                 .ToDictionary(user => user.UserId, user => user.Username);
+            ViewBag.SessionNames = _adminDataService.GetExerciseSessionLabels();
 
             return View(item);
         }
@@ -139,7 +145,7 @@ namespace VocabLearning.Controllers
         private LearningLogFormViewModel BuildFormModel()
         {
             var model = new LearningLogFormViewModel();
-            PopulateUserOptions(model);
+            PopulateFormOptions(model);
             return model;
         }
 
@@ -149,19 +155,29 @@ namespace VocabLearning.Controllers
             {
                 LogId = item.LogId,
                 UserId = item.UserId,
+                SessionId = item.SessionId,
                 Date = item.Date,
                 ActivityType = item.ActivityType,
+                WordsStudied = item.WordsStudied,
                 Score = item.Score
             };
 
-            PopulateUserOptions(model);
+            PopulateFormOptions(model);
             return model;
         }
 
-        private void PopulateUserOptions(LearningLogFormViewModel model)
+        private void PopulateFormOptions(LearningLogFormViewModel model)
         {
             model.UserOptions = _adminDataService.GetUsers()
                 .Select(user => new SelectListItem(user.Username, user.UserId.ToString(), model.UserId == user.UserId))
+                .ToList();
+
+            var sessionLabels = _adminDataService.GetExerciseSessionLabels();
+            model.SessionOptions = _adminDataService.GetExerciseSessions()
+                .Select(session => new SelectListItem(
+                    sessionLabels.TryGetValue(session.SessionId, out var label) ? label : $"ID {session.SessionId}",
+                    session.SessionId.ToString(),
+                    model.SessionId == session.SessionId))
                 .ToList();
         }
     }

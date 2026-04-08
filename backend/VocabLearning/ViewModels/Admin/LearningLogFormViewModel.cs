@@ -19,7 +19,16 @@ namespace VocabLearning.ViewModels.Admin
         [StringLength(100, ErrorMessage = "Activity type cannot exceed 100 characters.")]
         public string ActivityType { get; set; } = string.Empty;
 
-        public int? Score { get; set; }
+        [Display(Name = "Session")]
+        [Required(ErrorMessage = "Session is required.")]
+        public long SessionId { get; set; }
+
+        [Display(Name = "Words Studied")]
+        public int WordsStudied { get; set; }
+
+        public float Score { get; set; }
+
+        public IReadOnlyList<SelectListItem> SessionOptions { get; set; } = Array.Empty<SelectListItem>();
 
         public IReadOnlyList<SelectListItem> UserOptions { get; set; } = Array.Empty<SelectListItem>();
     }

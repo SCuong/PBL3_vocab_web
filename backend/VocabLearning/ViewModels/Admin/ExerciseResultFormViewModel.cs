@@ -7,12 +7,16 @@ namespace VocabLearning.ViewModels.Admin
     {
         public long ResultId { get; set; }
 
+        [Display(Name = "Session")]
+        [Range(1, long.MaxValue, ErrorMessage = "Session is required.")]
+        public long SessionId { get; set; }
+
         [Display(Name = "Exercise")]
-        [Required(ErrorMessage = "Exercise is required.")]
+        [Range(1, long.MaxValue, ErrorMessage = "Exercise is required.")]
         public long ExerciseId { get; set; }
 
         [Display(Name = "User")]
-        [Required(ErrorMessage = "User is required.")]
+        [Range(1, long.MaxValue, ErrorMessage = "User is required.")]
         public long UserId { get; set; }
 
         [Display(Name = "Is Correct")]
@@ -23,6 +27,8 @@ namespace VocabLearning.ViewModels.Admin
         public DateTime AnsweredAt { get; set; } = DateTime.Now;
 
         public IReadOnlyList<SelectListItem> ExerciseOptions { get; set; } = Array.Empty<SelectListItem>();
+
+        public IReadOnlyList<SelectListItem> SessionOptions { get; set; } = Array.Empty<SelectListItem>();
 
         public IReadOnlyList<SelectListItem> UserOptions { get; set; } = Array.Empty<SelectListItem>();
     }

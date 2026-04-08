@@ -38,6 +38,23 @@ namespace VocabLearning.ViewModels.Learning
             : "Learning Session";
     }
 
+    public class LearningExerciseSelectionViewModel
+    {
+        public long TopicId { get; set; }
+
+        public long? ParentTopicId { get; set; }
+
+        public string TopicName { get; set; } = string.Empty;
+
+        public string BatchVocabularyIds { get; set; } = string.Empty;
+
+        public int WordCount { get; set; }
+
+        public int LearnedWordsCount { get; set; }
+
+        public bool HasLearnedWords => LearnedWordsCount > 0;
+    }
+
     public class LearningStudyWordViewModel
     {
         public long VocabId { get; set; }
@@ -78,6 +95,8 @@ namespace VocabLearning.ViewModels.Learning
 
         public string SessionMode { get; set; } = string.Empty;
 
+        public DateTime SessionStartedAt { get; set; } = DateTime.Now;
+
         public List<LearningMinitestQuestionViewModel> Questions { get; set; } = new();
 
         public string SessionModeDisplay => string.Equals(SessionMode, "REVIEW", StringComparison.OrdinalIgnoreCase)
@@ -91,9 +110,30 @@ namespace VocabLearning.ViewModels.Learning
 
         public string Word { get; set; } = string.Empty;
 
+        public string ExerciseType { get; set; } = string.Empty;
+
+        public string? MatchMode { get; set; }
+
+        public string Ipa { get; set; } = string.Empty;
+
+        public string Meaning { get; set; } = string.Empty;
+
+        public bool IsMatchingQuestion { get; set; }
+
+        public string MatchPrompt { get; set; } = string.Empty;
+
+        public string FillingSentence { get; set; } = string.Empty;
+
         public string? SelectedAnswer { get; set; }
 
-        public List<string> Options { get; set; } = new();
+        public List<LearningMinitestAnswerOptionViewModel> Options { get; set; } = new();
+    }
+
+    public class LearningMinitestAnswerOptionViewModel
+    {
+        public string DisplayText { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
     }
 
     public class LearningMinitestResultViewModel
@@ -104,11 +144,17 @@ namespace VocabLearning.ViewModels.Learning
 
         public string TopicName { get; set; } = string.Empty;
 
-        public int Score { get; set; }
+        public int CorrectCount { get; set; }
+
+        public float Score { get; set; }
 
         public int TotalQuestions { get; set; }
 
         public bool HasMoreWords { get; set; }
+
+        public DateTime SubmittedAt { get; set; }
+
+        public string ExerciseType { get; set; } = string.Empty;
 
         public List<LearningMinitestQuestionResultViewModel> Questions { get; set; } = new();
     }
@@ -117,12 +163,16 @@ namespace VocabLearning.ViewModels.Learning
     {
         public string Word { get; set; } = string.Empty;
 
+        public string ExerciseType { get; set; } = string.Empty;
+
+        public string? MatchMode { get; set; }
+
         public string SelectedAnswer { get; set; } = string.Empty;
 
         public string CorrectAnswer { get; set; } = string.Empty;
 
         public bool IsCorrect { get; set; }
 
-        public DateTime NextReviewDate { get; set; }
+        public DateTime? NextReviewDate { get; set; }
     }
 }

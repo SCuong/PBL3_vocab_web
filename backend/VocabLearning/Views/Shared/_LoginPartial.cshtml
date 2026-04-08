@@ -16,6 +16,9 @@
     <li class="nav-item ms-auto">
         <span class="nav-link text-dark">Hello @displayName</span>
     </li>
+    <li class="nav-item">
+        <a class="nav-link text-dark" asp-controller="Account" asp-action="Profile">Profile</a>
+    </li>
     @if (hasLocalPassword)
     {
         <li class="nav-item">

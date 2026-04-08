@@ -99,6 +99,17 @@ body {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
+.learning-exercise-mode-card {
+  border: 1px solid #dce6f5;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.learning-exercise-mode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
 .learning-progress {
   height: 0.7rem;
   background-color: #e9edf7;
@@ -112,13 +123,6 @@ body {
 .learning-result-card {
   border: 1px solid #e4e8f1;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-}
-
-.learning-quiz-option {
-  border: 1px solid #e6ebf4;
-  border-radius: 0.85rem;
-  padding: 0.85rem 1rem 0.85rem 2.25rem;
-  background: #fbfcff;
 }
 
 .learning-score-pill {
@@ -135,6 +139,107 @@ body {
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.learning-score-meta {
+  display: inline-flex;
+  gap: 1rem;
+  font-weight: 600;
+}
+
+.learning-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  background: #f4f6ff;
+  color: #25407d;
+}
+
+.learning-match-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.learning-match-item {
+  text-align: left;
+  border: 1px solid #dbe4f2;
+  background: #fbfcff;
+  color: #27334d;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.learning-match-item.is-selected {
+  border-color: #5a95ff;
+  background: #e8f1ff;
+}
+
+.learning-match-item.is-matched {
+  border-color: #3aa36c;
+  background: #dff4e6;
+  color: #1f5b3a;
+  animation: learningFadeIn 0.35s ease;
+}
+
+.learning-match-item.is-wrong {
+  border-color: #d9534f;
+  background: #fde7e6;
+  animation: learningShake 0.5s ease;
+}
+
+.learning-fill-option {
+  border: 1px solid #dbe4f2;
+  background: #fbfcff;
+  border-radius: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.learning-fill-option.is-correct {
+  border-color: #3aa36c;
+  background: #dff4e6;
+  color: #1f5b3a;
+}
+
+.learning-fill-option.is-wrong {
+  border-color: #d9534f;
+  background: #fde7e6;
+  color: #7a2422;
+}
+
+.learning-fill-icon {
+  min-width: 1.25rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+@keyframes learningShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes learningFadeIn {
+  from {
+    opacity: 0.4;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {

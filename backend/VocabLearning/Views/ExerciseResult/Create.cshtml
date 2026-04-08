@@ -10,6 +10,12 @@
     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
     <div class="mb-3">
+        <label asp-for="SessionId" class="form-label"></label>
+        <select asp-for="SessionId" asp-items="Model.SessionOptions" class="form-select"></select>
+        <span asp-validation-for="SessionId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
         <label asp-for="ExerciseId" class="form-label"></label>
         <select asp-for="ExerciseId" asp-items="Model.ExerciseOptions" class="form-select"></select>
         <span asp-validation-for="ExerciseId" class="text-danger"></span>

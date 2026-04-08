@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Delete Learning Log";
     var userNames = ViewBag.UserNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+    var sessionNames = ViewBag.SessionNames as IDictionary<long, string> ?? new Dictionary<long, string>();
 }
 
 <h2>Delete Learning Log</h2>
@@ -21,8 +22,14 @@
     <dt class="col-sm-2">Activity Type</dt>
     <dd class="col-sm-10">@Model.ActivityType</dd>
 
+    <dt class="col-sm-2">Session</dt>
+    <dd class="col-sm-10">@(sessionNames.TryGetValue(Model.SessionId, out var sessionName) ? sessionName : $"ID {Model.SessionId}")</dd>
+
+    <dt class="col-sm-2">Words</dt>
+    <dd class="col-sm-10">@Model.WordsStudied</dd>
+
     <dt class="col-sm-2">Score</dt>
-    <dd class="col-sm-10">@Model.Score</dd>
+    <dd class="col-sm-10">@Model.Score.ToString("0.##")%</dd>
 </dl>
 
 <form asp-action="Delete" method="post">

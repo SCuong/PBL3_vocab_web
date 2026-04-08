@@ -11,16 +11,132 @@ namespace VocabLearning.Controllers
     public class AdminController : Controller
     {
         private readonly CustomAuthenticationService _authenticationService;
+        private readonly AdminDataService _adminDataService;
 
-        public AdminController(CustomAuthenticationService authenticationService)
+        public AdminController(
+            CustomAuthenticationService authenticationService,
+            AdminDataService adminDataService)
         {
             _authenticationService = authenticationService;
+            _adminDataService = adminDataService;
         }
 
         [HttpGet]
         public IActionResult Index()
         {
             return View();
+        }
+
+        [HttpGet]
+        public IActionResult LearningOverview(
+            long? userId,
+            long? topicId,
+            DateTime? fromDate,
+            DateTime? toDate,
+            string? sortBy,
+            string? sortDirection,
+            int page = 1,
+            int pageSize = 20)
+        {
+            var users = _adminDataService.GetUsers();
+            var topics = _adminDataService.GetTopics();
+            var rows = _adminDataService.GetLearningOverviewRows(userId, topicId, fromDate, toDate);
+
+            var normalizedSortBy = NormalizeSortBy(sortBy);
+            var normalizedSortDirection = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase)
+                ? "asc"
+                : "desc";
+
+            var sortedRows = SortRows(rows, normalizedSortBy, normalizedSortDirection);
+            var safePageSize = pageSize <= 0 ? 20 : pageSize;
+            var safePage = page <= 0 ? 1 : page;
+            var totalRows = sortedRows.Count;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalRows / (double)safePageSize));
+            if (safePage > totalPages)
+            {
+                safePage = totalPages;
+            }
+
+            var pagedRows = sortedRows
+                .Skip((safePage - 1) * safePageSize)
+                .Take(safePageSize)
+                .ToList();
+
+            var model = new LearningOverviewViewModel
+            {
+                SelectedUserId = userId,
+                SelectedTopicId = topicId,
+                FromDate = fromDate?.Date,
+                ToDate = toDate?.Date,
+                UserOptions = users
+                    .Select(user => new SelectListItem(user.Username, user.UserId.ToString(), userId == user.UserId))
+                    .ToList(),
+                TopicOptions = topics
+                    .Select(topic => new SelectListItem(topic.Name, topic.TopicId.ToString(), topicId == topic.TopicId))
+                    .ToList(),
+                Rows = rows,
+                PagedRows = pagedRows,
+                SortBy = normalizedSortBy,
+                SortDirection = normalizedSortDirection,
+                Page = safePage,
+                PageSize = safePageSize,
+                TotalRows = totalRows
+            };
+
+            return View(model);
+        }
+
+        private static string NormalizeSortBy(string? sortBy)
+        {
+            return sortBy?.Trim().ToLowerInvariant() switch
+            {
+                "user" => "user",
+                "topic" => "topic",
+                "sessions" => "sessions",
+                "words" => "words",
+                "activeminutes" => "activeminutes",
+                "firstactivity" => "firstactivity",
+                "lastactivity" => "lastactivity",
+                _ => "lastactivity"
+            };
+        }
+
+        private static List<LearningOverviewRowViewModel> SortRows(
+            List<LearningOverviewRowViewModel> rows,
+            string sortBy,
+            string sortDirection)
+        {
+            var isAsc = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+
+            IOrderedEnumerable<LearningOverviewRowViewModel> ordered = sortBy switch
+            {
+                "user" => isAsc
+                    ? rows.OrderBy(item => item.Username, StringComparer.OrdinalIgnoreCase)
+                    : rows.OrderByDescending(item => item.Username, StringComparer.OrdinalIgnoreCase),
+                "topic" => isAsc
+                    ? rows.OrderBy(item => item.TopicName, StringComparer.OrdinalIgnoreCase)
+                    : rows.OrderByDescending(item => item.TopicName, StringComparer.OrdinalIgnoreCase),
+                "sessions" => isAsc
+                    ? rows.OrderBy(item => item.SessionCount)
+                    : rows.OrderByDescending(item => item.SessionCount),
+                "words" => isAsc
+                    ? rows.OrderBy(item => item.WordsStudied)
+                    : rows.OrderByDescending(item => item.WordsStudied),
+                "activeminutes" => isAsc
+                    ? rows.OrderBy(item => item.ActiveMinutes)
+                    : rows.OrderByDescending(item => item.ActiveMinutes),
+                "firstactivity" => isAsc
+                    ? rows.OrderBy(item => item.FirstActivityAt)
+                    : rows.OrderByDescending(item => item.FirstActivityAt),
+                _ => isAsc
+                    ? rows.OrderBy(item => item.LastActivityAt)
+                    : rows.OrderByDescending(item => item.LastActivityAt)
+            };
+
+            return ordered
+                .ThenBy(item => item.Username, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.TopicName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         [HttpGet]
@@ -182,26 +298,17 @@ namespace VocabLearning.Controllers
 
         private static void PopulateFormOptions(AdminUserFormViewModel model)
         {
-            model.AvailableRoles = BuildRoleOptions(model.Role);
-            model.AvailableStatuses = BuildStatusOptions(model.Status);
-        }
+            model.AvailableRoles = new List<SelectListItem>
+            {
+                new(UserRoles.Admin, UserRoles.Admin, string.Equals(model.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase)),
+                new(UserRoles.Learner, UserRoles.Learner, string.Equals(model.Role, UserRoles.Learner, StringComparison.OrdinalIgnoreCase))
+            };
 
-        private static IReadOnlyList<SelectListItem> BuildRoleOptions(string? selectedRole)
-        {
-            return
-            [
-                new SelectListItem(UserRoles.Admin, UserRoles.Admin, string.Equals(selectedRole, UserRoles.Admin, StringComparison.OrdinalIgnoreCase)),
-                new SelectListItem(UserRoles.Learner, UserRoles.Learner, string.Equals(selectedRole, UserRoles.Learner, StringComparison.OrdinalIgnoreCase))
-            ];
-        }
-
-        private static IReadOnlyList<SelectListItem> BuildStatusOptions(string? selectedStatus)
-        {
-            return
-            [
-                new SelectListItem(UserStatuses.Active, UserStatuses.Active, string.Equals(selectedStatus, UserStatuses.Active, StringComparison.OrdinalIgnoreCase)),
-                new SelectListItem(UserStatuses.Inactive, UserStatuses.Inactive, string.Equals(selectedStatus, UserStatuses.Inactive, StringComparison.OrdinalIgnoreCase))
-            ];
+            model.AvailableStatuses = new List<SelectListItem>
+            {
+                new(UserStatuses.Active, UserStatuses.Active, string.Equals(model.Status, UserStatuses.Active, StringComparison.OrdinalIgnoreCase)),
+                new(UserStatuses.Inactive, UserStatuses.Inactive, string.Equals(model.Status, UserStatuses.Inactive, StringComparison.OrdinalIgnoreCase))
+            };
         }
 
         private async Task<long?> GetCurrentUserIdAsync(CancellationToken cancellationToken)

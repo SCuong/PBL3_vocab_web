@@ -18,6 +18,12 @@
     </div>
 
     <div class="mb-3">
+        <label asp-for="SessionId" class="form-label"></label>
+        <select asp-for="SessionId" asp-items="Model.SessionOptions" class="form-select"></select>
+        <span asp-validation-for="SessionId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
         <label asp-for="Date" class="form-label"></label>
         <input asp-for="Date" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" class="form-control" />
         <span asp-validation-for="Date" class="text-danger"></span>
@@ -27,6 +33,12 @@
         <label asp-for="ActivityType" class="form-label"></label>
         <input asp-for="ActivityType" class="form-control" />
         <span asp-validation-for="ActivityType" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="WordsStudied" class="form-label"></label>
+        <input asp-for="WordsStudied" class="form-control" />
+        <span asp-validation-for="WordsStudied" class="text-danger"></span>
     </div>
 
     <div class="mb-3">

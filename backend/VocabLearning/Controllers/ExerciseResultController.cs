@@ -44,6 +44,7 @@ namespace VocabLearning.Controllers
 
             var result = _adminDataService.CreateExerciseResult(new ExerciseResult
             {
+                SessionId = model.SessionId,
                 ExerciseId = model.ExerciseId,
                 UserId = model.UserId,
                 IsCorrect = model.IsCorrect,
@@ -87,6 +88,7 @@ namespace VocabLearning.Controllers
             var result = _adminDataService.UpdateExerciseResult(new ExerciseResult
             {
                 ResultId = model.ResultId,
+                SessionId = model.SessionId,
                 ExerciseId = model.ExerciseId,
                 UserId = model.UserId,
                 IsCorrect = model.IsCorrect,
@@ -148,6 +150,7 @@ namespace VocabLearning.Controllers
             var model = new ExerciseResultFormViewModel
             {
                 ResultId = item.ResultId,
+                SessionId = item.SessionId,
                 ExerciseId = item.ExerciseId,
                 UserId = item.UserId,
                 IsCorrect = item.IsCorrect,
@@ -160,12 +163,33 @@ namespace VocabLearning.Controllers
 
         private void PopulateFormOptions(ExerciseResultFormViewModel model)
         {
-            model.ExerciseOptions = _adminDataService.GetExercises()
-                .Select(exercise => new SelectListItem($"#{exercise.ExerciseId} - {exercise.Type}", exercise.ExerciseId.ToString(), model.ExerciseId == exercise.ExerciseId))
+            var exerciseLabels = _adminDataService.GetExerciseLabels();
+            model.ExerciseOptions = new[]
+            {
+                new SelectListItem("Select exercise", string.Empty, model.ExerciseId <= 0)
+            }.Concat(_adminDataService.GetExercises()
+                .Select(exercise => new SelectListItem(
+                    exerciseLabels.TryGetValue(exercise.ExerciseId, out var label) ? label : $"ID {exercise.ExerciseId}",
+                    exercise.ExerciseId.ToString(),
+                    model.ExerciseId == exercise.ExerciseId)))
                 .ToList();
 
-            model.UserOptions = _adminDataService.GetUsers()
-                .Select(user => new SelectListItem(user.Username, user.UserId.ToString(), model.UserId == user.UserId))
+            model.UserOptions = new[]
+            {
+                new SelectListItem("Select user", string.Empty, model.UserId <= 0)
+            }.Concat(_adminDataService.GetUsers()
+                .Select(user => new SelectListItem(user.Username, user.UserId.ToString(), model.UserId == user.UserId)))
+                .ToList();
+
+            var sessionLabels = _adminDataService.GetExerciseSessionLabels();
+            model.SessionOptions = new[]
+            {
+                new SelectListItem("Select session", string.Empty, model.SessionId <= 0)
+            }.Concat(_adminDataService.GetExerciseSessions()
+                .Select(session => new SelectListItem(
+                    sessionLabels.TryGetValue(session.SessionId, out var label) ? label : $"ID {session.SessionId}",
+                    session.SessionId.ToString(),
+                    model.SessionId == session.SessionId)))
                 .ToList();
         }
 
@@ -174,8 +198,8 @@ namespace VocabLearning.Controllers
             ViewBag.UserNames = _adminDataService.GetUsers()
                 .ToDictionary(user => user.UserId, user => user.Username);
 
-            ViewBag.ExerciseNames = _adminDataService.GetExercises()
-                .ToDictionary(exercise => exercise.ExerciseId, exercise => exercise.Type);
+            ViewBag.ExerciseNames = _adminDataService.GetExerciseLabels();
+            ViewBag.SessionNames = _adminDataService.GetExerciseSessionLabels();
         }
     }
 }

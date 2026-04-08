@@ -53,7 +53,13 @@ namespace VocabLearning.ViewModels.Learning
 
         public int ProgressPercent { get; set; }
 
+        public string NextBatchVocabularyIds { get; set; } = string.Empty;
+
+        public List<LearningChildTopicVocabularyPreviewViewModel> VocabularyPreview { get; set; } = new();
+
         public bool HasWords => TotalWords > 0;
+
+        public bool CanStartExercise => !string.IsNullOrWhiteSpace(NextBatchVocabularyIds);
 
         public bool CanStartSession => RemainingWords > 0 || DueReviewCount > 0;
 
@@ -92,5 +98,14 @@ namespace VocabLearning.ViewModels.Learning
                 return "Completed";
             }
         }
+    }
+
+    public class LearningChildTopicVocabularyPreviewViewModel
+    {
+        public string Word { get; set; } = string.Empty;
+
+        public string MeaningVi { get; set; } = string.Empty;
+
+        public string Ipa { get; set; } = string.Empty;
     }
 }

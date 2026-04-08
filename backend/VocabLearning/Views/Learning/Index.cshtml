@@ -66,13 +66,22 @@ else
                 <div class="d-grid gap-3">
                     @foreach (var topic in Model.ChildTopics)
                     {
+                        var collapseId = $"topic-preview-{topic.TopicId}";
+
                         <div class="card learning-child-card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                                     <div class="flex-grow-1">
                                         <div class="d-flex align-items-center gap-2 mb-2">
                                             <span class="learning-child-icon">@topic.TopicId</span>
-                                            <h4 class="mb-0">@topic.Name</h4>
+                                            <button type="button"
+                                                    class="btn btn-link p-0 text-decoration-none text-start"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#@collapseId"
+                                                    aria-expanded="false"
+                                                    aria-controls="@collapseId">
+                                                <span class="h4 mb-0">@topic.Name</span>
+                                            </button>
                                         </div>
 
                                         <p class="text-muted mb-3">@topic.Description</p>
@@ -96,6 +105,57 @@ else
                                         else
                                         {
                                             <span class="badge text-bg-success">Completed</span>
+                                        }
+
+                                        @if (topic.CanStartExercise)
+                                        {
+                                            <a asp-action="Exercise"
+                                               asp-route-topicId="@topic.TopicId"
+                                               asp-route-ids="@topic.NextBatchVocabularyIds"
+                                               class="btn btn-outline-success mt-2">
+                                                Exercise
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-outline-secondary mt-2" disabled>Exercise</button>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div id="@collapseId" class="collapse mt-3">
+                                    <hr class="my-3" />
+
+                                    <div>
+                                        <h6 class="mb-2">Vocabulary Preview</h6>
+
+                                        @if (!topic.VocabularyPreview.Any())
+                                        {
+                                            <p class="text-muted mb-0 small">No vocabulary in this topic yet.</p>
+                                        }
+                                        else
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 30%;">Word</th>
+                                                            <th style="width: 20%;">IPA</th>
+                                                            <th>Meaning</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var vocabulary in topic.VocabularyPreview)
+                                                        {
+                                                            <tr>
+                                                                <td>@vocabulary.Word</td>
+                                                                <td class="text-muted">@vocabulary.Ipa</td>
+                                                                <td>@vocabulary.MeaningVi</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         }
                                     </div>
                                 </div>

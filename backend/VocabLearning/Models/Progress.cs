@@ -1,20 +1,19 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-
 namespace VocabLearning.Models
 {
-    [Table("progress")]
     public class Progress
     {
-        [Column("user_id")]
         public long UserId { get; set; }
 
-        [Column("vocab_id")]
         public long VocabId { get; set; }
 
-        [Column("last_review_date")]
+        public double EaseFactor { get; set; } = 2.5d;
+
+        public int IntervalDays { get; set; } = 1;
+
+        public int Repetitions { get; set; }
+
         public DateTime? LastReviewDate { get; set; }
 
-        [Column("next_review_date")]
         public DateTime? NextReviewDate { get; set; }
     }
 }

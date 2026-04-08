@@ -48,6 +48,7 @@ namespace VocabLearning.Controllers
             {
                 VocabId = model.VocabId,
                 Type = model.Type.Trim(),
+                MatchMode = model.MatchMode?.Trim(),
                 CreatedAt = model.CreatedAt
             });
 
@@ -90,6 +91,7 @@ namespace VocabLearning.Controllers
                 ExerciseId = model.ExerciseId,
                 VocabId = model.VocabId,
                 Type = model.Type.Trim(),
+                MatchMode = model.MatchMode?.Trim(),
                 CreatedAt = model.CreatedAt
             });
 
@@ -148,6 +150,7 @@ namespace VocabLearning.Controllers
                 ExerciseId = exercise.ExerciseId,
                 VocabId = exercise.VocabId,
                 Type = exercise.Type,
+                MatchMode = exercise.MatchMode,
                 CreatedAt = exercise.CreatedAt
             };
 
@@ -157,8 +160,27 @@ namespace VocabLearning.Controllers
 
         private void PopulateFormOptions(ExerciseFormViewModel model)
         {
-            model.VocabularyOptions = _adminDataService.GetVocabularies()
-                .Select(vocabulary => new SelectListItem(vocabulary.Word, vocabulary.VocabId.ToString(), model.VocabId == vocabulary.VocabId))
+            model.VocabularyOptions = new[]
+            {
+                new SelectListItem("Select vocabulary", string.Empty, model.VocabId <= 0)
+            }.Concat(_adminDataService.GetVocabularies()
+                .Select(vocabulary => new SelectListItem(
+                    string.IsNullOrWhiteSpace(vocabulary.MeaningVi)
+                        ? vocabulary.Word
+                        : $"{vocabulary.Word} ({vocabulary.MeaningVi})",
+                    vocabulary.VocabId.ToString(),
+                    model.VocabId == vocabulary.VocabId)))
+                .ToList();
+
+            model.TypeOptions = _adminDataService.GetExerciseTypeSuggestions()
+                .Select(type => new SelectListItem(type, type, string.Equals(model.Type, type, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            model.MatchModeOptions = new[]
+            {
+                new SelectListItem("None", string.Empty, string.IsNullOrWhiteSpace(model.MatchMode))
+            }.Concat(_adminDataService.GetExerciseMatchModeSuggestions()
+                .Select(mode => new SelectListItem(mode, mode, string.Equals(model.MatchMode, mode, StringComparison.OrdinalIgnoreCase))))
                 .ToList();
         }
     }

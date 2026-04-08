@@ -37,17 +37,11 @@ namespace VocabLearning.Services
             var cleanUsername = username.Trim();
             var cleanEmail = email.Trim();
 
-            var userWithSameUsername = await dbContext.Users
-                .SingleOrDefaultAsync(user => user.Username == cleanUsername, cancellationToken);
+            var usernameExists = await dbContext.Users
+                .AnyAsync(user => user.Username == cleanUsername, cancellationToken);
 
-            if (userWithSameUsername is not null)
+            if (usernameExists)
             {
-                var (samePassword, _) = VerifyPassword(userWithSameUsername, password);
-                if (samePassword)
-                {
-                    return (false, "User already exists.", null);
-                }
-
                 return (false, "User already exists.", null);
             }
 
@@ -195,6 +189,59 @@ namespace VocabLearning.Services
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return (true, null);
+        }
+
+        public async Task<(bool Succeeded, string? ErrorMessage, Users? User)> UpdateProfileAsync(
+            long userId,
+            string username,
+            string email,
+            CancellationToken cancellationToken = default)
+        {
+            var cleanUsername = username.Trim();
+            var cleanEmail = email.Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanUsername))
+            {
+                return (false, "Username is required.", null);
+            }
+
+            if (string.IsNullOrWhiteSpace(cleanEmail))
+            {
+                return (false, "Email is required.", null);
+            }
+
+            var user = await dbContext.Users
+                .SingleOrDefaultAsync(
+                    item => item.UserId == userId && item.Status.ToUpper() == UserStatuses.Active,
+                    cancellationToken);
+
+            if (user is null)
+            {
+                return (false, "User account was not found.", null);
+            }
+
+            var usernameExists = await dbContext.Users
+                .AnyAsync(item => item.UserId != userId && item.Username == cleanUsername, cancellationToken);
+
+            if (usernameExists)
+            {
+                return (false, "Username is already taken.", null);
+            }
+
+            var normalizedEmail = NormalizeEmail(cleanEmail);
+            var emailExists = await dbContext.Users
+                .AnyAsync(item => item.UserId != userId && item.Email.ToUpper() == normalizedEmail, cancellationToken);
+
+            if (emailExists)
+            {
+                return (false, "Email is already registered.", null);
+            }
+
+            user.Username = cleanUsername;
+            user.Email = cleanEmail;
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (true, null, user);
         }
 
         public Task<List<Users>> GetUsersAsync(CancellationToken cancellationToken = default)
