@@ -1,0 +1,178 @@
+@model VocabLearning.ViewModels.Account.ProfileViewModel
+
+@{
+    ViewData["Title"] = "Profile";
+    var max7 = Model.Chart7Days
+        .Select(point => point.LearnedWords + point.ReviewedWords)
+        .DefaultIfEmpty(1)
+        .Max();
+    var max30 = Model.Chart30Days
+        .Select(point => point.LearnedWords + point.ReviewedWords)
+        .DefaultIfEmpty(1)
+        .Max();
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-semibold"
+                             style="width: 56px; height: 56px; font-size: 1.1rem;">
+                            @Model.AvatarText
+                        </div>
+                        <h2 class="mb-1">Profile</h2>
+                        <div>
+                            <p class="text-muted mb-0">@Model.DisplayName</p>
+                            <small class="text-muted">
+                                Last studied:
+                                @(Model.LastStudiedAt.HasValue ? Model.LastStudiedAt.Value.ToString("yyyy-MM-dd HH:mm") : "No activity yet")
+                            </small>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a asp-controller="Account" asp-action="LearningLog" class="btn btn-outline-primary">View learning history</a>
+                        @if (Model.HasLocalPassword)
+                        {
+                            <a asp-controller="Account" asp-action="ChangePassword" class="btn btn-outline-secondary">Change Password</a>
+                        }
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted d-block">Total learned</small>
+                            <div class="h4 mb-0">@Model.TotalLearnedWords</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted d-block">Due today</small>
+                            <div class="h4 mb-0">@Model.DueReviewTodayCount</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted d-block">Streak</small>
+                            <div class="h4 mb-0">@Model.LearningStreakDays day(s)</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100">
+                            <small class="text-muted d-block">Accuracy (7 days)</small>
+                            <div class="h4 mb-0">@Model.AccuracyLast7Days.ToString("0.#")%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100">
+                            <h6 class="mb-3">Mini chart (7 days)</h6>
+                            @foreach (var point in Model.Chart7Days)
+                            {
+                                var total = point.LearnedWords + point.ReviewedWords;
+                                var width = max7 == 0 ? 0 : (int)Math.Round(total * 100d / max7);
+
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span>@point.Label</span>
+                                        <span>L @point.LearnedWords / R @point.ReviewedWords</span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-primary" style="width: @width%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100">
+                            <h6 class="mb-3">Mini chart (30 days)</h6>
+                            @foreach (var point in Model.Chart30Days.Where((_, index) => index % 3 == 0))
+                            {
+                                var total = point.LearnedWords + point.ReviewedWords;
+                                var width = max30 == 0 ? 0 : (int)Math.Round(total * 100d / max30);
+
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span>@point.Label</span>
+                                        <span>L @point.LearnedWords / R @point.ReviewedWords</span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-info" style="width: @width%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @if (TempData["SuccessMessage"] is string successMessage)
+                {
+                    <div class="alert alert-success">@successMessage</div>
+                }
+
+                @if (TempData["ErrorMessage"] is string errorMessage)
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <form asp-action="Profile" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="Username" class="form-label"></label>
+                            <input asp-for="Username" class="form-control" />
+                            <span asp-validation-for="Username" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Role" class="form-label"></label>
+                            <input asp-for="Role" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Status" class="form-label"></label>
+                            <input asp-for="Status" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CreatedAt" class="form-label"></label>
+                            <input value="@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="HasGoogleLogin" class="form-label"></label>
+                            <input value="@(Model.HasGoogleLogin ? "Yes" : "No")" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="HasLocalPassword" class="form-label"></label>
+                            <input value="@(Model.HasLocalPassword ? "Yes" : "No")" class="form-control" readonly />
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">Back to Home</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial.cshtml");
+    }
+}

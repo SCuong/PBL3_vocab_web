@@ -1,0 +1,72 @@
+﻿@model VocabLearning.ViewModels.Account.RegisterViewModel
+
+@{
+    ViewData["Title"] = "Register";
+    Layout = "~/Views/Shared/_AccountLayout.cshtml";
+}
+
+<div class="account-container">
+    <div class="account-box">
+
+        <h2 class="text-center mb-4">Register</h2>
+
+        @if (TempData["ErrorMessage"] is string errorMessage)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <form asp-action="Register" method="post">
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ConfirmPassword" class="form-label"></label>
+                <input asp-for="ConfirmPassword" class="form-control" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+            <input type="submit" value="Register" class="btn btn-success w-100 p-2" />
+        </form>
+
+        <div class="text-center my-3 text-muted">or</div>
+        <form asp-action="GoogleLogin" asp-route-source="Register" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-dark w-100 p-2">Register with Google</button>
+        </form>
+
+        @if ((bool?)ViewData["GoogleLoginEnabled"] != true)
+        {
+            <div class="alert alert-secondary mt-3 mb-0">
+                Google registration needs `Authentication:Google:ClientId` and `ClientSecret` to be configured before it can complete.
+            </div>
+        }
+
+        <div class="text-center mt-3">
+            <p class="mb-1">
+                Already have an account?
+                <a asp-controller="Account" asp-action="Login">Login</a>
+            </p>
+            <a asp-controller="Home" asp-action="Index">Back to Home</a>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial.cshtml");
+    }
+}

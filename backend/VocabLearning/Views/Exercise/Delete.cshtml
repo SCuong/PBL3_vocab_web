@@ -1,0 +1,43 @@
+@model VocabLearning.Models.Exercise
+
+@{
+    ViewData["Title"] = "Delete Exercise";
+    var vocabularyNames = ViewBag.VocabularyNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="mb-3">Delete Exercise</h2>
+
+                <div class="alert alert-warning">
+                    This action will remove the exercise and all exercise results using it.
+                </div>
+
+                <dl class="row mb-4">
+                    <dt class="col-sm-3">Exercise</dt>
+                    <dd class="col-sm-9">#@Model.ExerciseId</dd>
+
+                    <dt class="col-sm-3">Vocabulary</dt>
+                    <dd class="col-sm-9">@(vocabularyNames.TryGetValue(Model.VocabId, out var word) ? word : $"ID {Model.VocabId}")</dd>
+
+                    <dt class="col-sm-3">Type</dt>
+                    <dd class="col-sm-9"><span class="badge rounded-pill text-bg-secondary">@Model.Type</span></dd>
+
+                    <dt class="col-sm-3">Match mode</dt>
+                    <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.MatchMode) ? "-" : Model.MatchMode)</dd>
+
+                    <dt class="col-sm-3">Created At</dt>
+                    <dd class="col-sm-9">@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+                </dl>
+
+                <form asp-action="Delete" method="post" class="d-flex gap-2">
+                    <input type="hidden" name="id" value="@Model.ExerciseId" />
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,110 @@
+@model VocabLearning.Models.Vocabulary
+
+@{
+    ViewData["Title"] = "Vocabulary Detail";
+    var isAdmin = User.IsInRole(UserRoles.Admin);
+    var vocabularyAudioUrl = (Model.AudioUrl ?? string.Empty).Trim()
+        .Replace("&amp;", "&", StringComparison.OrdinalIgnoreCase)
+        .Replace("andclient=", "&client=", StringComparison.OrdinalIgnoreCase)
+        .Replace("andtl=", "&tl=", StringComparison.OrdinalIgnoreCase)
+        .Replace("andq=", "&q=", StringComparison.OrdinalIgnoreCase)
+        .Replace("translate.google.com/translate_tts", "translate.googleapis.com/translate_tts", StringComparison.OrdinalIgnoreCase);
+}
+
+<h2>@Model.Word</h2>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<p><b>IPA:</b> @Model.Ipa</p>
+<p><b>Level:</b> @Model.Level</p>
+<p><b>Meaning (VI):</b> @Model.MeaningVi</p>
+<p><b>Topic:</b> @(Model.Topic?.Name ?? "No topic")</p>
+
+@if (!string.IsNullOrWhiteSpace(vocabularyAudioUrl))
+{
+    <audio controls preload="metadata">
+        <source src="@vocabularyAudioUrl" type="audio/mpeg" />
+    </audio>
+}
+else
+{
+    <p><b>Audio:</b> No audio.</p>
+}
+
+<div class="mb-3 mt-3">
+    @if (isAdmin)
+    {
+        <a asp-action="Edit" asp-route-id="@Model.VocabId" class="btn btn-warning">Edit Vocabulary</a>
+        <a asp-action="Delete" asp-route-id="@Model.VocabId" class="btn btn-danger">Delete Vocabulary</a>
+    }
+    <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+    <h3 class="mb-0">Examples</h3>
+    @if (isAdmin)
+    {
+        <a asp-controller="Example" asp-action="Create" asp-route-vocabId="@Model.VocabId" class="btn btn-sm btn-primary">Add Example</a>
+    }
+</div>
+
+@if (Model.Examples.Any())
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Sentence</th>
+                <th>Translation</th>
+                <th>Audio</th>
+                @if (isAdmin)
+                {
+                    <th style="width: 180px;">Actions</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var example in Model.Examples.OrderBy(item => item.ExampleId))
+        {
+            var audioUrl = (example.AudioUrl ?? string.Empty).Trim()
+                .Replace("&amp;", "&", StringComparison.OrdinalIgnoreCase)
+                .Replace("andclient=", "&client=", StringComparison.OrdinalIgnoreCase)
+                .Replace("andtl=", "&tl=", StringComparison.OrdinalIgnoreCase)
+                .Replace("andq=", "&q=", StringComparison.OrdinalIgnoreCase)
+                .Replace("translate.google.com/translate_tts", "translate.googleapis.com/translate_tts", StringComparison.OrdinalIgnoreCase);
+            <tr>
+                <td>@example.ExampleEn</td>
+                <td>@example.ExampleVi</td>
+                <td>
+                    @if (!string.IsNullOrWhiteSpace(audioUrl))
+                    {
+                        <div>
+                            <a href="@audioUrl" target="_blank" rel="noopener noreferrer">Open audio</a>
+                        </div>
+                    }
+                    else
+                    {
+                        <span>No audio</span>
+                    }
+                </td>
+                @if (isAdmin)
+                {
+                    <td>
+                        <a asp-controller="Example" asp-action="Edit" asp-route-id="@example.ExampleId" class="btn btn-sm btn-outline-warning">Edit</a>
+                        <a asp-controller="Example" asp-action="Delete" asp-route-id="@example.ExampleId" class="btn btn-sm btn-outline-danger">Delete</a>
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+else
+{
+    <p>No examples yet.</p>
+}
+
+<h3 class="mt-4">Topics</h3>
+<p>@(Model.Topic?.Name ?? "No topic yet.")</p>

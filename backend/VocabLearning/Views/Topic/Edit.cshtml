@@ -1,0 +1,38 @@
+@model TopicFormViewModel
+
+@{
+    ViewData["Title"] = "Edit Topic";
+}
+
+<h2>Edit Topic</h2>
+
+<form asp-action="Edit" method="post">
+    <input asp-for="TopicId" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label"></label>
+        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ParentTopicId" class="form-label"></label>
+        <select asp-for="ParentTopicId" asp-items="Model.ParentTopicOptions" class="form-select"></select>
+        <span asp-validation-for="ParentTopicId" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

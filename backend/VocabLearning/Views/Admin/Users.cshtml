@@ -1,0 +1,57 @@
+@model IEnumerable<VocabLearning.Models.Users>
+
+@{
+    ViewData["Title"] = "Admin Users";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">User Management</h2>
+    <div>
+        <a asp-action="CreateUser" class="btn btn-primary">Create User</a>
+        <a asp-action="Index" class="btn btn-secondary">Back to Admin</a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">There are no users yet.</div>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th style="width: 190px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.Username</td>
+                <td>@user.Email</td>
+                <td>@user.Role</td>
+                <td>@user.Status</td>
+                <td>
+                    <a asp-action="EditUser" asp-route-id="@user.UserId" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <a asp-action="DeleteUser" asp-route-id="@user.UserId" class="btn btn-sm btn-outline-danger">Delete</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

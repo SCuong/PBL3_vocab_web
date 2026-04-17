@@ -1,0 +1,56 @@
+@model IEnumerable<VocabLearning.Models.UserVocabulary>
+
+@{
+    ViewData["Title"] = "User Vocabulary";
+    var userNames = ViewBag.UserNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+    var vocabularyNames = ViewBag.VocabularyNames as IDictionary<long, string> ?? new Dictionary<long, string>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">User Vocabulary</h2>
+    <div>
+        <a asp-action="Create" class="btn btn-primary">Add Record</a>
+        <a asp-controller="Admin" asp-action="Index" class="btn btn-secondary">Back to Admin</a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">There are no user-vocabulary records yet.</div>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Vocabulary</th>
+                <th>Status</th>
+                <th>Note</th>
+                <th>First Learned</th>
+                <th style="width: 170px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@(userNames.TryGetValue(item.UserId, out var userName) ? userName : $"ID {item.UserId}")</td>
+                <td>@(vocabularyNames.TryGetValue(item.VocabId, out var word) ? word : $"ID {item.VocabId}")</td>
+                <td>@item.Status</td>
+                <td>@item.Note</td>
+                <td>@item.FirstLearnedDate?.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-userId="@item.UserId" asp-route-vocabId="@item.VocabId" class="btn btn-sm btn-outline-primary">Edit</a>
+                    <a asp-action="Delete" asp-route-userId="@item.UserId" asp-route-vocabId="@item.VocabId" class="btn btn-sm btn-outline-danger">Delete</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

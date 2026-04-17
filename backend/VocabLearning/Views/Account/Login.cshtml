@@ -1,0 +1,77 @@
+@model VocabLearning.ViewModels.Account.LoginViewModel
+
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_AccountLayout.cshtml";
+}
+
+<div class="account-container">
+    <div class="account-box">
+
+        <h2 class="text-center mb-4">Login</h2>
+
+        @if (TempData["InfoMessage"] is string infoMessage)
+        {
+            <div class="alert alert-info">@infoMessage</div>
+        }
+
+        @if (TempData["ErrorMessage"] is string errorMessage)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <form asp-action="Login" asp-route-returnUrl="@(ViewData["ReturnUrl"])" method="post">
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="UsernameOrEmail" class="form-label"></label>
+                <input asp-for="UsernameOrEmail" class="form-control" />
+                <span asp-validation-for="UsernameOrEmail" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <div class="form-check mb-3">
+                <input asp-for="RememberMe" class="form-check-input" />
+                <label class="form-check-label">
+                    @Html.DisplayNameFor(a => a.RememberMe)
+                </label>
+            </div>
+
+            <input type="submit" value="Login" class="btn btn-success w-100 p-2" />
+        </form>
+
+        <div class="text-center my-3 text-muted">or</div>
+        <form asp-action="GoogleLogin" asp-route-returnUrl="@(ViewData["ReturnUrl"])" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-dark w-100 p-2">Continue with Google</button>
+        </form>
+
+        @if ((bool?)ViewData["GoogleLoginEnabled"] != true)
+        {
+            <div class="alert alert-secondary mt-3 mb-0">
+                Google sign-in needs `Authentication:Google:ClientId` and `ClientSecret` to be configured before it can complete.
+            </div>
+        }
+
+        <div class="text-center mt-3">
+            <p class="mb-1">
+                Don't have an account?
+                <a asp-controller="Account" asp-action="Register">Register</a>
+            </p>
+            <a asp-controller="Home" asp-action="Index">Back to Home</a>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial.cshtml");
+    }
+}

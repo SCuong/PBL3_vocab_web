@@ -1,0 +1,49 @@
+@model ExerciseResultFormViewModel
+
+@{
+    ViewData["Title"] = "Edit Exercise Result";
+}
+
+<h2>Edit Exercise Result</h2>
+
+<form asp-action="Edit" method="post">
+    <input asp-for="ResultId" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="mb-3">
+        <label asp-for="SessionId" class="form-label"></label>
+        <select asp-for="SessionId" asp-items="Model.SessionOptions" class="form-select"></select>
+        <span asp-validation-for="SessionId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ExerciseId" class="form-label"></label>
+        <select asp-for="ExerciseId" asp-items="Model.ExerciseOptions" class="form-select"></select>
+        <span asp-validation-for="ExerciseId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="UserId" class="form-label"></label>
+        <select asp-for="UserId" asp-items="Model.UserOptions" class="form-select"></select>
+        <span asp-validation-for="UserId" class="text-danger"></span>
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="IsCorrect" class="form-check-input" />
+        <label asp-for="IsCorrect" class="form-check-label"></label>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="AnsweredAt" class="form-label"></label>
+        <input asp-for="AnsweredAt" type="datetime-local" asp-format="{0:yyyy-MM-ddTHH:mm}" class="form-control" />
+        <span asp-validation-for="AnsweredAt" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
