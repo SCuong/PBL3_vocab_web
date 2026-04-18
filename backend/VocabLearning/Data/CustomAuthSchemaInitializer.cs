@@ -238,9 +238,29 @@ BEGIN
 END;"
             };
 
-            foreach (var command in commands)
+            for (var i = 0; i < commands.Length; i++)
             {
-                await dbContext.Database.ExecuteSqlRawAsync(command);
+                var command = commands[i];
+
+                try
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(command);
+                }
+                catch (Exception ex)
+                {
+                    var previewLine = command
+                        .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .FirstOrDefault() ?? "Unknown SQL command";
+                    var rootCause = ex;
+                    while (rootCause.InnerException is not null)
+                    {
+                        rootCause = rootCause.InnerException;
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Custom auth schema initialization failed at command #{i + 1}: {previewLine}. Root cause: {rootCause.Message}",
+                        ex);
+                }
             }
         }
         private static string BuildSqlInList(IEnumerable<string> values)

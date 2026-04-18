@@ -272,6 +272,262 @@ namespace VocabLearning.Services
             return GetExercise(userId, topicId, batchVocabularyIds, ExerciseModeMatching);
         }
 
+        public LearningProgressStateViewModel GetLearningProgressState(long userId)
+        {
+            var now = DateTime.Now;
+
+            var learnedPairs = _context.UserVocabularies
+                .Where(item => item.UserId == userId)
+                .Join(
+                    _context.Vocabularies.Where(vocabulary => vocabulary.TopicId.HasValue),
+                    userVocabulary => userVocabulary.VocabId,
+                    vocabulary => vocabulary.VocabId,
+                    (userVocabulary, vocabulary) => new
+                    {
+                        TopicId = vocabulary.TopicId!.Value,
+                        vocabulary.VocabId
+                    })
+                .Distinct()
+                .ToList();
+
+            var reviewPairs = _context.Progresses
+                .Where(progress =>
+                    progress.UserId == userId
+                    && progress.NextReviewDate.HasValue
+                    && progress.NextReviewDate.Value <= now)
+                .Join(
+                    _context.Vocabularies.Where(vocabulary => vocabulary.TopicId.HasValue),
+                    progress => progress.VocabId,
+                    vocabulary => vocabulary.VocabId,
+                    (progress, vocabulary) => new
+                    {
+                        TopicId = vocabulary.TopicId!.Value,
+                        vocabulary.VocabId
+                    })
+                .Distinct()
+                .ToList();
+
+            var learnedByTopic = learnedPairs
+                .GroupBy(item => item.TopicId)
+                .ToDictionary(group => group.Key, group => group.Select(item => item.VocabId).Distinct().OrderBy(id => id).ToList());
+
+            var reviewByTopic = reviewPairs
+                .GroupBy(item => item.TopicId)
+                .ToDictionary(group => group.Key, group => group.Select(item => item.VocabId).Distinct().OrderBy(id => id).ToList());
+
+            var topicIds = learnedByTopic.Keys
+                .Concat(reviewByTopic.Keys)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+
+            var model = new LearningProgressStateViewModel();
+            foreach (var topicId in topicIds)
+            {
+                model.Topics.Add(new LearningProgressTopicStateViewModel
+                {
+                    TopicId = topicId,
+                    LearnedWordIds = learnedByTopic.TryGetValue(topicId, out var learnedWordIds) ? learnedWordIds : new List<long>(),
+                    ReviewWordIds = reviewByTopic.TryGetValue(topicId, out var reviewWordIds) ? reviewWordIds : new List<long>()
+                });
+            }
+
+            return model;
+        }
+
+        public LearningProgressStateViewModel MarkWordsLearned(long userId, long topicId, IReadOnlyCollection<long> wordIds)
+        {
+            if (topicId <= 0 || wordIds.Count == 0)
+            {
+                return GetLearningProgressState(userId);
+            }
+
+            var now = DateTime.Now;
+            var validVocabularyIds = _context.Vocabularies
+                .Where(vocabulary => vocabulary.TopicId == topicId && wordIds.Contains(vocabulary.VocabId))
+                .Select(vocabulary => vocabulary.VocabId)
+                .Distinct()
+                .ToList();
+
+            if (validVocabularyIds.Count == 0)
+            {
+                return GetLearningProgressState(userId);
+            }
+
+            var existingUserVocabularies = _context.UserVocabularies
+                .Where(item => item.UserId == userId && validVocabularyIds.Contains(item.VocabId))
+                .ToList();
+
+            foreach (var duplicateGroup in existingUserVocabularies.GroupBy(item => item.VocabId))
+            {
+                foreach (var duplicate in duplicateGroup.Skip(1))
+                {
+                    _context.UserVocabularies.Remove(duplicate);
+                }
+            }
+
+            var userVocabularyByVocabId = existingUserVocabularies
+                .GroupBy(item => item.VocabId)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            var existingProgresses = _context.Progresses
+                .Where(item => item.UserId == userId && validVocabularyIds.Contains(item.VocabId))
+                .ToList();
+
+            foreach (var duplicateGroup in existingProgresses.GroupBy(item => item.VocabId))
+            {
+                foreach (var duplicate in duplicateGroup.Skip(1))
+                {
+                    _context.Progresses.Remove(duplicate);
+                }
+            }
+
+            var progressByVocabId = existingProgresses
+                .GroupBy(item => item.VocabId)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            foreach (var vocabularyId in validVocabularyIds)
+            {
+                if (!userVocabularyByVocabId.TryGetValue(vocabularyId, out var userVocabulary))
+                {
+                    userVocabulary = new UserVocabulary
+                    {
+                        UserId = userId,
+                        VocabId = vocabularyId,
+                        Status = UserVocabularyStatuses.Learning,
+                        Note = string.Empty,
+                        FirstLearnedDate = now
+                    };
+
+                    _context.UserVocabularies.Add(userVocabulary);
+                    userVocabularyByVocabId[vocabularyId] = userVocabulary;
+                }
+                else
+                {
+                    userVocabulary.Status = UserVocabularyStatuses.Learning;
+                    userVocabulary.FirstLearnedDate ??= now;
+                }
+
+                if (!progressByVocabId.TryGetValue(vocabularyId, out var progress))
+                {
+                    progress = new Progress
+                    {
+                        UserId = userId,
+                        VocabId = vocabularyId,
+                        EaseFactor = 2.5d,
+                        IntervalDays = 1,
+                        Repetitions = 0
+                    };
+
+                    _context.Progresses.Add(progress);
+                    progressByVocabId[vocabularyId] = progress;
+                }
+
+                progress.LastReviewDate = now;
+                progress.NextReviewDate = now.AddDays(1);
+            }
+
+            _context.SaveChanges();
+            return GetLearningProgressState(userId);
+        }
+
+        public LearningProgressStateViewModel MarkWordsReviewed(long userId, long topicId, IReadOnlyCollection<long> wordIds)
+        {
+            if (topicId <= 0 || wordIds.Count == 0)
+            {
+                return GetLearningProgressState(userId);
+            }
+
+            var now = DateTime.Now;
+            var validVocabularyIds = _context.Vocabularies
+                .Where(vocabulary => vocabulary.TopicId == topicId && wordIds.Contains(vocabulary.VocabId))
+                .Select(vocabulary => vocabulary.VocabId)
+                .Distinct()
+                .ToList();
+
+            if (validVocabularyIds.Count == 0)
+            {
+                return GetLearningProgressState(userId);
+            }
+
+            var existingUserVocabularies = _context.UserVocabularies
+                .Where(item => item.UserId == userId && validVocabularyIds.Contains(item.VocabId))
+                .ToList();
+
+            foreach (var duplicateGroup in existingUserVocabularies.GroupBy(item => item.VocabId))
+            {
+                foreach (var duplicate in duplicateGroup.Skip(1))
+                {
+                    _context.UserVocabularies.Remove(duplicate);
+                }
+            }
+
+            var userVocabularyByVocabId = existingUserVocabularies
+                .GroupBy(item => item.VocabId)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            var existingProgresses = _context.Progresses
+                .Where(item => item.UserId == userId && validVocabularyIds.Contains(item.VocabId))
+                .ToList();
+
+            foreach (var duplicateGroup in existingProgresses.GroupBy(item => item.VocabId))
+            {
+                foreach (var duplicate in duplicateGroup.Skip(1))
+                {
+                    _context.Progresses.Remove(duplicate);
+                }
+            }
+
+            var progressByVocabId = existingProgresses
+                .GroupBy(item => item.VocabId)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            foreach (var vocabularyId in validVocabularyIds)
+            {
+                if (!userVocabularyByVocabId.TryGetValue(vocabularyId, out var userVocabulary))
+                {
+                    userVocabulary = new UserVocabulary
+                    {
+                        UserId = userId,
+                        VocabId = vocabularyId,
+                        Status = UserVocabularyStatuses.Learning,
+                        Note = string.Empty,
+                        FirstLearnedDate = now
+                    };
+
+                    _context.UserVocabularies.Add(userVocabulary);
+                    userVocabularyByVocabId[vocabularyId] = userVocabulary;
+                }
+                else
+                {
+                    userVocabulary.FirstLearnedDate ??= now;
+                }
+
+                if (!progressByVocabId.TryGetValue(vocabularyId, out var progress))
+                {
+                    progress = new Progress
+                    {
+                        UserId = userId,
+                        VocabId = vocabularyId,
+                        EaseFactor = 2.5d,
+                        IntervalDays = 1,
+                        Repetitions = 0
+                    };
+
+                    _context.Progresses.Add(progress);
+                    progressByVocabId[vocabularyId] = progress;
+                }
+
+                var (nextReviewDate, status) = BuildReviewPlan(progress, true, now);
+                userVocabulary.Status = status;
+                progress.LastReviewDate = now;
+                progress.NextReviewDate = nextReviewDate;
+            }
+
+            _context.SaveChanges();
+            return GetLearningProgressState(userId);
+        }
+
         public LearningExerciseSelectionViewModel? GetExerciseSelection(long userId, long topicId, string batchVocabularyIds)
         {
             var topic = _context.Topics.FirstOrDefault(item => item.TopicId == topicId);

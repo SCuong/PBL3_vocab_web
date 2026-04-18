@@ -39,6 +39,27 @@ namespace VocabLearning.Controllers
             return View(new LoginViewModel());
         }
 
+        [HttpGet("/api/auth/me")]
+        [AllowAnonymous]
+        public async Task<ActionResult<AuthApiResponse>> GetCurrentUserApi(CancellationToken cancellationToken)
+        {
+            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (user is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Not authenticated."
+                });
+            }
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                User = MapAuthenticatedUser(user)
+            });
+        }
+
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
@@ -65,6 +86,51 @@ namespace VocabLearning.Controllers
 
             await customAuthenticationService.SignInAsync(HttpContext, user, model.RememberMe);
             return RedirectToLocal(returnUrl);
+        }
+
+        [HttpPost("/api/auth/login")]
+        [AllowAnonymous]
+        public async Task<ActionResult<AuthApiResponse>> LoginApi(
+            [FromBody] LoginApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Request body is required."
+                });
+            }
+
+            var usernameOrEmail = request.UsernameOrEmail?.Trim() ?? string.Empty;
+            var password = request.Password ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(usernameOrEmail) || string.IsNullOrWhiteSpace(password))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Username/email and password are required."
+                });
+            }
+
+            var user = await customAuthenticationService.AuthenticateAsync(usernameOrEmail, password, cancellationToken);
+            if (user is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Username/email or password is incorrect."
+                });
+            }
+
+            await customAuthenticationService.SignInAsync(HttpContext, user, request.RememberMe);
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                User = MapAuthenticatedUser(user)
+            });
         }
 
         [HttpPost]
@@ -152,6 +218,54 @@ namespace VocabLearning.Controllers
 
             PopulateExternalAuthViewData();
             return View(new RegisterViewModel());
+        }
+
+        [HttpPost("/api/auth/register")]
+        [AllowAnonymous]
+        public async Task<ActionResult<AuthApiResponse>> RegisterApi(
+            [FromBody] RegisterApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Request body is required."
+                });
+            }
+
+            var name = request.Name?.Trim() ?? string.Empty;
+            var email = request.Email?.Trim() ?? string.Empty;
+            var password = request.Password ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(name)
+                || string.IsNullOrWhiteSpace(email)
+                || string.IsNullOrWhiteSpace(password))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Name, email, and password are required."
+                });
+            }
+
+            var result = await customAuthenticationService.RegisterAsync(name, email, password, cancellationToken);
+            if (!result.Succeeded || result.User is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = result.ErrorMessage ?? "Registration failed."
+                });
+            }
+
+            await customAuthenticationService.SignInAsync(HttpContext, result.User, false);
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                User = MapAuthenticatedUser(result.User)
+            });
         }
 
         [HttpPost]
@@ -313,6 +427,18 @@ namespace VocabLearning.Controllers
         {
             await customAuthenticationService.SignOutAsync(HttpContext);
             return RedirectToAction("Index", "Home");
+        }
+
+        [HttpPost("/api/auth/logout")]
+        [Authorize]
+        public async Task<ActionResult<AuthApiResponse>> LogoutApi()
+        {
+            await customAuthenticationService.SignOutAsync(HttpContext);
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = "Signed out successfully."
+            });
         }
 
         private IActionResult RedirectToLocal(string? returnUrl)
@@ -543,6 +669,20 @@ namespace VocabLearning.Controllers
             }
 
             return username.Trim()[0].ToString().ToUpperInvariant();
+        }
+
+        private static AuthenticatedUserViewModel MapAuthenticatedUser(Models.Users user)
+        {
+            return new AuthenticatedUserViewModel
+            {
+                UserId = user.UserId,
+                Username = user.Username,
+                Email = user.Email,
+                Role = user.Role,
+                Status = user.Status,
+                HasGoogleLogin = !string.IsNullOrWhiteSpace(user.GoogleSubject),
+                HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
+            };
         }
 
         private sealed class LearningLogSnapshotItem

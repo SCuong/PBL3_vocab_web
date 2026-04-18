@@ -23,6 +23,75 @@ namespace VocabLearning.Controllers
             return View(list);
         }
 
+        [HttpGet("/api/vocabulary")]
+        public ActionResult<IEnumerable<VocabularyListItemViewModel>> GetVocabularyApi()
+        {
+            var items = _service.GetVocabularyList()
+                .Select(vocabulary => new VocabularyListItemViewModel
+                {
+                    Id = vocabulary.VocabId,
+                    Word = vocabulary.Word ?? string.Empty,
+                    Ipa = vocabulary.Ipa ?? string.Empty,
+                    Meaning = vocabulary.MeaningVi ?? string.Empty,
+                    Cefr = vocabulary.Level ?? string.Empty,
+                    TopicId = vocabulary.TopicId,
+                    TopicName = vocabulary.Topic?.Name ?? string.Empty,
+                    AudioUrl = vocabulary.AudioUrl ?? string.Empty
+                })
+                .ToList();
+
+            return Ok(items);
+        }
+
+        [HttpGet("/api/vocabulary/topics")]
+        public ActionResult<IEnumerable<VocabularyTopicFilterItemViewModel>> GetVocabularyTopicsApi()
+        {
+            var items = _service.GetTopicsForFilter()
+                .Select(topic => new VocabularyTopicFilterItemViewModel
+                {
+                    TopicId = topic.TopicId,
+                    Name = topic.Name,
+                    Description = topic.Description,
+                    ParentTopicId = topic.ParentTopicId
+                })
+                .ToList();
+
+            return Ok(items);
+        }
+
+        [HttpGet("/api/learning/topics/{topicId:long}/vocabulary")]
+        public ActionResult<IEnumerable<VocabularyLearningItemViewModel>> GetLearningVocabularyByTopicApi(long topicId)
+        {
+            var topic = _service.GetTopicsForFilter().FirstOrDefault(item => item.TopicId == topicId);
+            if (topic == null)
+            {
+                return NotFound();
+            }
+
+            var items = _service.GetVocabularyByTopicId(topicId)
+                .Select(vocabulary =>
+                {
+                    var firstExample = _service.GetFirstExampleByVocabularyId(vocabulary.VocabId);
+
+                    return new VocabularyLearningItemViewModel
+                    {
+                        Id = vocabulary.VocabId,
+                        Word = vocabulary.Word ?? string.Empty,
+                        Ipa = vocabulary.Ipa ?? string.Empty,
+                        Meaning = vocabulary.MeaningVi ?? string.Empty,
+                        Cefr = vocabulary.Level ?? string.Empty,
+                        TopicId = vocabulary.TopicId,
+                        TopicName = topic.Name,
+                        AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                        Example = firstExample?.ExampleEn ?? string.Empty,
+                        ExampleAudioUrl = firstExample?.AudioUrl ?? string.Empty
+                    };
+                })
+                .ToList();
+
+            return Ok(items);
+        }
+
         public IActionResult Detail(long id)
         {
             var vocab = _service.GetVocabularyDetail(id);
@@ -33,6 +102,37 @@ namespace VocabLearning.Controllers
             }
 
             return View(vocab);
+        }
+
+        [HttpGet("/api/vocabulary/{id:long}")]
+        public ActionResult<VocabularyDetailViewModel> GetVocabularyDetailApi(long id)
+        {
+            var vocabulary = _service.GetVocabularyDetail(id);
+            if (vocabulary is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new VocabularyDetailViewModel
+            {
+                Id = vocabulary.VocabId,
+                Word = vocabulary.Word ?? string.Empty,
+                Ipa = vocabulary.Ipa ?? string.Empty,
+                Meaning = vocabulary.MeaningVi ?? string.Empty,
+                Cefr = vocabulary.Level ?? string.Empty,
+                TopicId = vocabulary.TopicId,
+                TopicName = vocabulary.Topic?.Name ?? string.Empty,
+                AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                Examples = vocabulary.Examples
+                    .Select(example => new VocabularyExampleViewModel
+                    {
+                        Id = example.ExampleId,
+                        ExampleEn = example.ExampleEn,
+                        ExampleVi = example.ExampleVi,
+                        AudioUrl = example.AudioUrl ?? string.Empty
+                    })
+                    .ToList()
+            });
         }
 
         [Authorize(Roles = UserRoles.Admin)]

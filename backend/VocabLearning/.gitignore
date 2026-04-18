@@ -21,6 +21,8 @@ publish/
 .nuget/
 .nuget-packages/
 .appdata/
+.npm-cache/
+**/node_modules/
 
 # ASP.NET Core local settings
 appsettings.Development.json

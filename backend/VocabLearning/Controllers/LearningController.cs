@@ -36,6 +36,121 @@ namespace VocabLearning.Controllers
             return View(model);
         }
 
+        [HttpGet("/api/learning/progress")]
+        public async Task<ActionResult<LearningProgressStateViewModel>> GetLearningProgressApi(CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new
+                {
+                    succeeded = false,
+                    message = "Not authenticated."
+                });
+            }
+
+            try
+            {
+                return Ok(_learningService.GetLearningProgressState(currentUser.UserId));
+            }
+            catch (Exception exception)
+            {
+                return BadRequest(new
+                {
+                    succeeded = false,
+                    message = exception.Message
+                });
+            }
+        }
+
+        [HttpPost("/api/learning/progress/learn")]
+        public async Task<ActionResult<LearningProgressStateViewModel>> MarkWordsLearnedApi(
+            [FromBody] LearningProgressUpdateRequest? request,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new
+                {
+                    succeeded = false,
+                    message = "Not authenticated."
+                });
+            }
+
+            if (request == null)
+            {
+                return BadRequest(new
+                {
+                    succeeded = false,
+                    message = "Request body is required."
+                });
+            }
+
+            var topicId = request.TopicId;
+            var wordIds = request.WordIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            try
+            {
+                return Ok(_learningService.MarkWordsLearned(currentUser.UserId, topicId, wordIds));
+            }
+            catch (Exception exception)
+            {
+                return BadRequest(new
+                {
+                    succeeded = false,
+                    message = exception.Message
+                });
+            }
+        }
+
+        [HttpPost("/api/learning/progress/review")]
+        public async Task<ActionResult<LearningProgressStateViewModel>> MarkWordsReviewedApi(
+            [FromBody] LearningProgressUpdateRequest? request,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new
+                {
+                    succeeded = false,
+                    message = "Not authenticated."
+                });
+            }
+
+            if (request == null)
+            {
+                return BadRequest(new
+                {
+                    succeeded = false,
+                    message = "Request body is required."
+                });
+            }
+
+            var topicId = request.TopicId;
+            var wordIds = request.WordIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            try
+            {
+                return Ok(_learningService.MarkWordsReviewed(currentUser.UserId, topicId, wordIds));
+            }
+            catch (Exception exception)
+            {
+                return BadRequest(new
+                {
+                    succeeded = false,
+                    message = exception.Message
+                });
+            }
+        }
+
         [HttpGet]
         public async Task<IActionResult> Exercise(long topicId, string ids, string? mode = null, CancellationToken cancellationToken = default)
         {

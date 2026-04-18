@@ -28,6 +28,45 @@ namespace VocabLearning.Services
                 .ToList();
         }
 
+        public List<Topic> GetTopicsForFilter()
+        {
+            return _context.Topics
+                .OrderBy(topic => topic.ParentTopicId.HasValue)
+                .ThenBy(topic => topic.ParentTopicId)
+                .ThenBy(topic => topic.Name)
+                .ToList();
+        }
+
+        public List<Vocabulary> GetVocabularyByTopicId(long topicId)
+        {
+            var items = _context.Vocabularies
+                .Where(vocabulary => vocabulary.TopicId == topicId)
+                .OrderBy(vocabulary => vocabulary.Word)
+                .ToList();
+
+            foreach (var item in items)
+            {
+                item.AudioUrl = NormalizeAudioUrl(item.AudioUrl);
+            }
+
+            return items;
+        }
+
+        public Example? GetFirstExampleByVocabularyId(long vocabId)
+        {
+            var example = _context.Examples
+                .Where(example => example.VocabId == vocabId)
+                .OrderBy(example => example.ExampleId)
+                .FirstOrDefault();
+
+            if (example != null)
+            {
+                example.AudioUrl = NormalizeAudioUrl(example.AudioUrl);
+            }
+
+            return example;
+        }
+
         public Vocabulary? GetVocabularyById(long id)
         {
             return _context.Vocabularies.FirstOrDefault(vocabulary => vocabulary.VocabId == id);
