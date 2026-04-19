@@ -116,11 +116,34 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseStaticFiles(new StaticFileOptions
+
+var configuredAvatarPath = builder.Configuration["Frontend:AvatarPath"];
+var avatarDirectoryCandidates = new[]
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "FE", "Avatar")),
-    RequestPath = "/avatars"
-});
+    configuredAvatarPath,
+    Path.Combine(app.Environment.ContentRootPath, "FE", "Avatar"),
+    Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend", "Avatar")),
+    Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "FE", "Avatar"))
+};
+
+var avatarDirectory = avatarDirectoryCandidates
+    .Where(path => !string.IsNullOrWhiteSpace(path))
+    .Select(path => Path.GetFullPath(path!))
+    .FirstOrDefault(Directory.Exists);
+
+if (!string.IsNullOrWhiteSpace(avatarDirectory))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(avatarDirectory),
+        RequestPath = "/avatars"
+    });
+}
+else
+{
+    app.Logger.LogWarning("Avatar directory not found. Static avatar files will not be served.");
+}
+
 app.UseRouting();
 app.UseCors("FrontendClient");
 
