@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
@@ -115,6 +116,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "FE", "Avatar")),
+    RequestPath = "/avatars"
+});
 app.UseRouting();
 app.UseCors("FrontendClient");
 

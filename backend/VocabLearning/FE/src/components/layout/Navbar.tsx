@@ -55,7 +55,10 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                         <Button variant="ghost" className="hidden sm:flex" onClick={onLogout}><LogOut size={18} /></Button>
                     </div>
                 ) : (
-                    <Button variant="primary" onClick={() => onNavigate('auth')}>Login</Button>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={() => onNavigate('auth')}>Login</Button>
+                        <Button variant="primary" onClick={() => onNavigate('register')}>Register</Button>
+                    </div>
                 )}
             </div>
         </nav>

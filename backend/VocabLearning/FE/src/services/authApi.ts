@@ -64,6 +64,36 @@ export const authApi = {
         return data.user;
     },
 
+    updateProfile: async (payload: { username: string; email: string }) => {
+        const response = await fetch('/api/account/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded || !data.user) {
+            throw new Error(data.message || 'Cập nhật hồ sơ thất bại.');
+        }
+
+        return data.user;
+    },
+
+    changePassword: async (payload: { currentPassword: string; newPassword: string; confirmNewPassword: string }) => {
+        const response = await fetch('/api/account/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Đổi mật khẩu thất bại.');
+        }
+    },
+
     logout: async () => {
         await fetch('/api/auth/logout', {
             method: 'POST',

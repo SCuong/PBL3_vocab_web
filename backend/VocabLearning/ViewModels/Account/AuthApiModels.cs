@@ -18,6 +18,22 @@ namespace VocabLearning.ViewModels.Account
         public string Password { get; set; } = string.Empty;
     }
 
+    public sealed class UpdateProfileApiRequest
+    {
+        public string Username { get; set; } = string.Empty;
+
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public sealed class ChangePasswordApiRequest
+    {
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        public string NewPassword { get; set; } = string.Empty;
+
+        public string ConfirmNewPassword { get; set; } = string.Empty;
+    }
+
     public sealed class AuthenticatedUserViewModel
     {
         public long UserId { get; set; }

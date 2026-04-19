@@ -619,16 +619,27 @@ namespace VocabLearning.Services
                 return (false, false);
             }
 
-            if (TryVerifyCustomHash(password, user.PasswordHash))
+            if (user.PasswordHash.StartsWith($"{CustomHashPrefix}$", StringComparison.Ordinal))
             {
-                return (true, false);
+                return (TryVerifyCustomHash(password, user.PasswordHash), false);
             }
 
-            var result = LegacyPasswordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-            return result == PasswordVerificationResult.Success
-                || result == PasswordVerificationResult.SuccessRehashNeeded
-                ? (true, true)
-                : (false, false);
+            try
+            {
+                var result = LegacyPasswordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+                return result == PasswordVerificationResult.Success
+                    || result == PasswordVerificationResult.SuccessRehashNeeded
+                    ? (true, true)
+                    : (false, false);
+            }
+            catch (FormatException)
+            {
+                return (false, false);
+            }
+            catch (ArgumentException)
+            {
+                return (false, false);
+            }
         }
 
         private static bool TryVerifyCustomHash(string password, string storedHash)

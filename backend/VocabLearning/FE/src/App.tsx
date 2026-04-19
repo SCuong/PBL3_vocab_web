@@ -49,7 +49,7 @@ const LearningTopics = ({ onStartStudy, currentUser, onNavigate, topicGroups }: 
                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">✨</div>
                         <p className="font-bold">Bạn đang xem chế độ khách. Đăng ký để mở khóa toàn bộ 44 chủ đề!</p>
                     </div>
-                    <Button variant="ghost" className="bg-white/20 border-white/40 text-white" onClick={() => onNavigate('auth')}>Đăng ký miễn phí →</Button>
+                    <Button variant="ghost" className="bg-white/20 border-white/40 text-white" onClick={() => onNavigate('register')}>Đăng ký miễn phí →</Button>
                 </div>
             )}
 
@@ -195,7 +195,7 @@ const LearningTopics = ({ onStartStudy, currentUser, onNavigate, topicGroups }: 
                                 <p className="text-text-secondary">Theo dõi tiến trình học tập và nhận ngay 100 XP thưởng! 🔥</p>
                             </div>
                         </div>
-                        <Button variant="primary" className="px-10 py-4 text-lg ml-auto" onClick={() => onNavigate('auth')}>Đăng ký miễn phí →</Button>
+                        <Button variant="primary" className="px-10 py-4 text-lg ml-auto" onClick={() => onNavigate('register')}>Đăng ký miễn phí →</Button>
                     </motion.div>
                 </div>
             )}
@@ -822,6 +822,10 @@ export default function App() {
         }
     };
 
+    const handleUserUpdated = useCallback((updatedUser: AuthenticatedUser) => {
+        setCurrentUser(prev => (prev ? { ...prev, ...updatedUser } : updatedUser));
+    }, []);
+
     useEffect(() => {
         if (!currentUser?.userId) {
             return;
@@ -892,6 +896,7 @@ export default function App() {
                             testResult={testResult}
                             handleLogout={handleLogout}
                             onOpenStreak={() => setShowStreakModal(true)}
+                            onUserUpdated={handleUserUpdated}
                             LearningTopicsComponent={LearningTopics}
                             StudySessionComponent={StudySession}
                         />

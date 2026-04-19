@@ -1,5 +1,6 @@
 import React from 'react';
 import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, Profile, Vocabulary, VocabDetail } from './pages';
+import type { AuthenticatedUser } from './services/authApi';
 
 type AppRoutesProps = {
     currentPage: string;
@@ -25,6 +26,7 @@ type AppRoutesProps = {
     testResult: { score: number; total: number; detail?: any } | null;
     handleLogout: () => void;
     onOpenStreak: () => void;
+    onUserUpdated: (user: AuthenticatedUser) => void;
     LearningTopicsComponent: any;
     StudySessionComponent: any;
 };
@@ -53,6 +55,7 @@ export const AppRoutes = ({
     testResult,
     handleLogout,
     onOpenStreak,
+    onUserUpdated,
     LearningTopicsComponent,
     StudySessionComponent
 }: AppRoutesProps) => {
@@ -64,10 +67,14 @@ export const AppRoutes = ({
             syncUserGameData(u);
             setCurrentPage('home');
         }} onAddToast={addToast} />,
+        register: <Auth onLogin={(u: any) => {
+            syncUserGameData(u);
+            setCurrentPage('home');
+        }} onAddToast={addToast} initialMode="register" />,
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
         'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
-        profile: <Profile user={{ ...currentUser, ...gameData.currentUser }} onLogout={handleLogout} gameData={gameData} onFreezeStreak={() => { }} onOpenStreak={onOpenStreak} />,
+        profile: <Profile user={{ ...currentUser, ...gameData.currentUser }} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
         leaderboard: <Leaderboard gameData={gameData} />,
         admin: <AdminDashboard />
     };

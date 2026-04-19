@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authApi } from '../services/authApi';
 import { Button } from '../components/ui';
 
-const Auth = ({ onLogin, onAddToast }: any) => {
-    const [isLogin, setIsLogin] = useState(true);
+type AuthMode = 'login' | 'register';
+
+type AuthProps = {
+    onLogin: (user: any) => void;
+    onAddToast?: (message: string, type?: string) => void;
+    initialMode?: AuthMode;
+};
+
+const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
+    const [isLogin, setIsLogin] = useState(initialMode !== 'register');
     const [name, setName] = useState('');
     const [usernameOrEmail, setUsernameOrEmail] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        setIsLogin(initialMode !== 'register');
+        setErrorMessage('');
+    }, [initialMode]);
 
     const handleSubmit = async () => {
         if (isSubmitting) {

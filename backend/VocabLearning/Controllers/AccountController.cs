@@ -268,6 +268,149 @@ namespace VocabLearning.Controllers
             });
         }
 
+        [HttpPut("/api/account/profile")]
+        [Authorize]
+        public async Task<ActionResult<AuthApiResponse>> UpdateProfileApi(
+            [FromBody] UpdateProfileApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Request body is required."
+                });
+            }
+
+            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (user is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Not authenticated."
+                });
+            }
+
+            var result = await customAuthenticationService.UpdateProfileAsync(
+                user.UserId,
+                request.Username,
+                request.Email,
+                cancellationToken);
+
+            if (!result.Succeeded || result.User is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = result.ErrorMessage ?? "Profile could not be updated."
+                });
+            }
+
+            var currentSession = await HttpContext.AuthenticateAsync(AuthenticationSchemeNames.Application);
+            var authenticationMethod = User.FindFirstValue(ClaimTypes.AuthenticationMethod) ?? "Password";
+
+            await customAuthenticationService.SignInAsync(
+                HttpContext,
+                result.User,
+                currentSession.Properties?.IsPersistent ?? false,
+                authenticationMethod,
+                currentSession.Properties?.GetTokens());
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = "Profile updated successfully.",
+                User = MapAuthenticatedUser(result.User)
+            });
+        }
+
+        [HttpPost("/api/account/change-password")]
+        [Authorize]
+        public async Task<ActionResult<AuthApiResponse>> ChangePasswordApi(
+            [FromBody] ChangePasswordApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Request body is required."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword)
+                || string.IsNullOrWhiteSpace(request.NewPassword)
+                || string.IsNullOrWhiteSpace(request.ConfirmNewPassword))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Current password, new password, and confirmation are required."
+                });
+            }
+
+            if (!string.Equals(request.NewPassword, request.ConfirmNewPassword, StringComparison.Ordinal))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password confirmation does not match."
+                });
+            }
+
+            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (user is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Not authenticated."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password is not available for this account."
+                });
+            }
+
+            if (string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "New password must be different from the current password."
+                });
+            }
+
+            var result = await customAuthenticationService.ChangePasswordAsync(
+                user.UserId,
+                request.CurrentPassword,
+                request.NewPassword,
+                cancellationToken);
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = result.ErrorMessage ?? "Password could not be changed."
+                });
+            }
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = "Password changed successfully."
+            });
+        }
+
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
