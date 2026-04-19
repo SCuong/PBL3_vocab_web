@@ -38,13 +38,15 @@ const LearningTopics = ({
   topicGroups,
 }: any) => {
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
+  const [hasInitializedAccordion, setHasInitializedAccordion] = useState(false);
   const isGuest = !currentUser;
 
   useEffect(() => {
-    if (!expandedCat && topicGroups.length > 0) {
+    if (!hasInitializedAccordion && !expandedCat && topicGroups.length > 0) {
       setExpandedCat(topicGroups[0].id);
+      setHasInitializedAccordion(true);
     }
-  }, [expandedCat, topicGroups]);
+  }, [expandedCat, hasInitializedAccordion, topicGroups]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12 relative">
@@ -661,6 +663,23 @@ const Minitest = ({ topicId, learnedWords, onFinish }: any) => {
   );
 };
 
+const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+const getCefrRank = (cefr?: string) => {
+  const normalized = (cefr || "").toUpperCase();
+  const rank = CEFR_ORDER.indexOf(normalized);
+  return rank === -1 ? CEFR_ORDER.length : rank;
+};
+
+const sortByCefrThenWord = (a: any, b: any) => {
+  const cefrDiff = getCefrRank(a.cefr) - getCefrRank(b.cefr);
+  if (cefrDiff !== 0) {
+    return cefrDiff;
+  }
+
+  return (a.word || "").localeCompare(b.word || "");
+};
+
 const StudySession = ({
   topicId,
   studyWords,
@@ -676,6 +695,8 @@ const StudySession = ({
     "flashcard",
   );
   const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
+  const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
+  const [customTab, setCustomTab] = useState<"new" | "review">("new");
   const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -707,9 +728,71 @@ const StudySession = ({
   const topicTitle = currentTopic?.title ?? topic?.title ?? "Học từ vựng";
   const topicStats = currentTopic?.stats ?? topic?.stats;
 
+  const topicProgress = useMemo(
+    () => learningProgressState?.topics?.find((t: any) => t.topicId === topicId),
+    [learningProgressState?.topics, topicId],
+  );
+
+  const learnedWordIdSet = useMemo(() => {
+    if (!topicId || !learningProgressState?.topics) {
+      return new Set<number>();
+    }
+
+    return new Set<number>(topicProgress?.learnedWordIds ?? []);
+  }, [learningProgressState?.topics, topicId, topicProgress]);
+
+  const reviewWordIdSet = useMemo(
+    () => new Set<number>(topicProgress?.reviewWordIds ?? []),
+    [topicProgress],
+  );
+
+  const newWords = useMemo(
+    () =>
+      words
+        .filter((w: any) => !learnedWordIdSet.has(w.id))
+        .sort(sortByCefrThenWord),
+    [words, learnedWordIdSet],
+  );
+
+  const reviewWords = useMemo(
+    () => words.filter((w: any) => reviewWordIdSet.has(w.id)).sort(sortByCefrThenWord),
+    [words, reviewWordIdSet],
+  );
+
+  const wordMapById = useMemo(
+    () => new Map(words.map((w: any) => [w.id, w])),
+    [words],
+  );
+
   const selectedWords = useMemo(
-    () => words.filter((w) => selectedWordIds.includes(w.id)),
-    [words, selectedWordIds],
+    () =>
+      selectedWordIds
+        .map((id) => wordMapById.get(id))
+        .filter((w): w is any => Boolean(w)),
+    [selectedWordIds, wordMapById],
+  );
+  const selectedReviewCount = useMemo(
+    () => selectedWords.filter((w: any) => learnedWordIdSet.has(w.id)).length,
+    [selectedWords, learnedWordIdSet],
+  );
+  const selectedNewCount = selectedWords.length - selectedReviewCount;
+  const customNewWords = useMemo(
+    () =>
+      words
+        .filter((w: any) => !learnedWordIdSet.has(w.id))
+        .sort(sortByCefrThenWord),
+    [words, learnedWordIdSet],
+  );
+  const customReviewWords = useMemo(
+    () =>
+      words
+        .filter((w: any) => learnedWordIdSet.has(w.id))
+        .sort(sortByCefrThenWord),
+    [words, learnedWordIdSet],
+  );
+  const customSelectableWords = useMemo(
+    () => (customTab === "new" ? customNewWords : customReviewWords),
+    [customTab, customNewWords, customReviewWords],
   );
   const learnedWordsForMinitest = useMemo(() => {
     if (!topicId || !learningProgressState?.topics) {
@@ -751,6 +834,24 @@ const StudySession = ({
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [tab, learnStep, words.length, selectedWords.length]);
+
+  const addMoreNewWords = useCallback((count: number) => {
+    setSelectedWordIds((prev) => {
+      const remainingNewIds = newWords
+        .map((w: any) => w.id)
+        .filter((id: number) => !prev.includes(id));
+
+      return [...prev, ...remainingNewIds.slice(0, count)];
+    });
+  }, [newWords]);
+
+  const applySmartPreset = useCallback((newWordCount: number) => {
+    const presetIds = [
+      ...reviewWords.map((w: any) => w.id),
+      ...newWords.slice(0, newWordCount).map((w: any) => w.id),
+    ];
+    setSelectedWordIds(presetIds);
+  }, [reviewWords, newWords]);
 
   const handleFinishMatching = async (
     correct: number,
@@ -1001,61 +1102,247 @@ const StudySession = ({
 
             {learnStep === 1 && (
               <div className="max-w-4xl mx-auto">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-2xl font-bold">
-                    {selectedWordIds.length} từ đã chọn
-                  </h3>
-                  <div className="flex gap-3">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSelectedWordIds(words.map((w) => w.id))}
-                    >
-                      Chọn tất cả
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setSelectedWordIds([])}
-                    >
-                      Bỏ chọn
-                    </Button>
-                  </div>
+                <div className="grid sm:grid-cols-2 gap-4 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setLearnMode("smart")}
+                    className={`text-left glass-card p-5 border-2 transition-all ${learnMode === "smart" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
+                  >
+                    <div className="font-bold text-lg mb-1">⚡ Smart</div>
+                    <p className="text-sm text-text-muted">
+                      Tự động chọn gói học nhanh 5/10/15 từ để bắt đầu ngay.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLearnMode("custom")}
+                    className={`text-left glass-card p-5 border-2 transition-all ${learnMode === "custom" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
+                  >
+                    <div className="font-bold text-lg mb-1">🛠️ Custom</div>
+                    <p className="text-sm text-text-muted">
+                      Tự chọn từng từ vựng để học theo nhu cầu của learner.
+                    </p>
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-16">
-                  {words.map((w) => {
-                    const isSel = selectedWordIds.includes(w.id);
-                    return (
-                      <div
-                        key={w.id}
-                        onClick={() =>
-                          setSelectedWordIds((p) =>
-                            isSel
-                              ? p.filter((id) => id !== w.id)
-                              : [...p, w.id],
-                          )
-                        }
-                        className={`glass-card p-6 cursor-pointer relative transition-all border-4 ${isSel ? "border-green-500 bg-green-50 scale-105" : "border-transparent hover:border-primary/20"}`}
-                      >
-                        <div className="text-2xl font-bold mb-1">{w.word}</div>
-                        <div className="text-xs text-text-muted font-mono">
-                          {w.transcription}
+
+                {learnMode === "custom" ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-2xl font-bold">
+                        {selectedWordIds.length} từ đã chọn
+                      </h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={customTab === "new" ? "primary" : "ghost"}
+                          onClick={() => setCustomTab("new")}
+                        >
+                          🆕 New
+                        </Button>
+                        <Button
+                          variant={customTab === "review" ? "secondary" : "ghost"}
+                          onClick={() => setCustomTab("review")}
+                        >
+                          🔔 Review
+                        </Button>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          variant="primary"
+                          disabled={selectedWordIds.length === 0}
+                          onClick={() => {
+                            setLearnStep(2);
+                            setCurrentIndex(0);
+                          }}
+                        >
+                          Bắt đầu học →
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() =>
+                            setSelectedWordIds((prev) =>
+                              Array.from(
+                                new Set([
+                                  ...prev,
+                                  ...customSelectableWords.map((w: any) => w.id),
+                                ]),
+                              ),
+                            )
+                          }
+                        >
+                          Chọn tất cả
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setSelectedWordIds([])}
+                        >
+                          Bỏ chọn
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-16">
+                      {customSelectableWords.map((w: any) => {
+                        const isSel = selectedWordIds.includes(w.id);
+
+                        return (
+                          <div
+                            key={w.id}
+                            onClick={() =>
+                              setSelectedWordIds((p) =>
+                                isSel
+                                  ? p.filter((id) => id !== w.id)
+                                  : [...p, w.id],
+                              )
+                            }
+                            className={`glass-card p-6 cursor-pointer relative transition-all border-4 ${isSel ? "border-green-500 bg-green-50 scale-105" : "border-transparent hover:border-primary/20"}`}
+                          >
+                            <div className="text-2xl font-bold mb-1">{w.word}</div>
+                            <div className="text-xs text-text-muted font-mono">
+                              {w.transcription}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {customSelectableWords.length === 0 && (
+                      <div className="glass-card p-6 text-sm text-text-muted text-center mb-16">
+                        {customTab === "new"
+                          ? "Không còn từ mới trong chủ đề này."
+                          : "Chưa có từ đã học để ôn tập."}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid lg:grid-cols-[1fr_320px] gap-6 mb-16 items-start">
+                    <div className="space-y-6">
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-bold text-lg">🆕 New</h4>
+                            <span className="text-sm text-text-muted">
+                              {newWords.length} từ
+                            </span>
+                          </div>
+                          <div className="grid gap-4">
+                            {newWords.map((w: any) => {
+                              const isSel = selectedWordIds.includes(w.id);
+
+                              return (
+                                <div
+                                  key={w.id}
+                                  className={`glass-card p-5 transition-all border-4 cursor-not-allowed opacity-60 ${isSel ? "border-green-500 bg-green-50" : "border-transparent hover:border-primary/20"}`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-xl font-bold">{w.word}</div>
+                                    <Badge
+                                      variant="cyan"
+                                      className="text-[10px]"
+                                    >
+                                      {w.cefr || "-"}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-xs text-text-muted font-mono mt-1">
+                                    {w.transcription}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-bold text-lg">🔔 Review</h4>
+                            <span className="text-sm text-text-muted">
+                              {reviewWords.length} từ
+                            </span>
+                          </div>
+                          {reviewWords.length > 0 ? (
+                            <div className="grid gap-4">
+                              {reviewWords.map((w: any) => {
+                                const isSel = selectedWordIds.includes(w.id);
+
+                                return (
+                                  <div
+                                    key={w.id}
+                                    className={`glass-card p-5 transition-all border-4 cursor-not-allowed opacity-60 ${isSel ? "border-purple-500 bg-purple-50" : "border-transparent hover:border-primary/20"}`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="text-xl font-bold">{w.word}</div>
+                                      <Badge
+                                        variant="purple"
+                                        className="text-[10px]"
+                                      >
+                                        {w.cefr || "-"}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-xs text-text-muted font-mono mt-1">
+                                      {w.transcription}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="glass-card p-6 text-sm text-text-muted text-center">
+                              Hiện chưa có từ đến hạn ôn.
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-                <div className="flex justify-center">
-                  <Button
-                    variant="primary"
-                    className="px-16 py-5 text-xl"
-                    disabled={selectedWordIds.length === 0}
-                    onClick={() => {
-                      setLearnStep(2);
-                      setCurrentIndex(0);
-                    }}
-                  >
-                    Bắt đầu học →
-                  </Button>
-                </div>
+                    </div>
+
+                    <aside className="glass-card p-5 sticky top-[96px] space-y-4">
+                      <div className="text-sm text-text-muted">Đã chọn realtime</div>
+                      <div className="font-bold text-lg">
+                        {selectedWordIds.length} từ ({selectedNewCount} new, {selectedReviewCount} review)
+                      </div>
+
+                      <Button
+                        variant="primary"
+                        className="w-full"
+                        disabled={selectedWordIds.length === 0}
+                        onClick={() => {
+                          setLearnStep(2);
+                          setCurrentIndex(0);
+                        }}
+                      >
+                        Bắt đầu học
+                      </Button>
+
+                      <div className="space-y-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => applySmartPreset(5)}
+                        >
+                          Nhanh 5 phút
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => applySmartPreset(10)}
+                        >
+                          Tiêu chuẩn
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => applySmartPreset(15)}
+                        >
+                          Tăng tốc
+                        </Button>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => setSelectedWordIds([])}
+                      >
+                        Bỏ chọn tất cả
+                      </Button>
+                    </aside>
+                  </div>
+                )}
               </div>
             )}
 

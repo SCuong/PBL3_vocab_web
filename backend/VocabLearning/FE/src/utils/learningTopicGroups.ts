@@ -74,8 +74,12 @@ export const buildLearningTopicGroups = (
         return acc;
     }, {});
 
-    const byParent = topicFilters.filter(topic => !topic.parentTopicId);
-    const children = topicFilters.filter(topic => topic.parentTopicId);
+    const byParent = topicFilters
+        .filter(topic => !topic.parentTopicId)
+        .sort((a, b) => a.topicId - b.topicId);
+    const children = topicFilters
+        .filter(topic => topic.parentTopicId)
+        .sort((a, b) => a.topicId - b.topicId);
 
     const toTopicUiModel = (topic: VocabularyTopicItem): TopicUiModel => {
         const wordIds = wordsByTopic[topic.topicId] ?? [];
@@ -92,7 +96,9 @@ export const buildLearningTopicGroups = (
             {
                 id: 'all',
                 title: 'Chủ đề học tập',
-                topics: topicFilters.map(toTopicUiModel)
+                topics: [...topicFilters]
+                    .sort((a, b) => a.topicId - b.topicId)
+                    .map(toTopicUiModel)
             }
         ];
     }
