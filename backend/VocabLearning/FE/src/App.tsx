@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { authApi, type AuthenticatedUser } from './services/authApi';
+import { learningProgressApi, type LearningProgressState } from './services/learningProgressApi';
 import {
     EMPTY_CURRENT_USER_GAME_DATA
 } from './constants/appConstants';
@@ -17,6 +18,7 @@ import {
     loadCurrentUserGameData,
     saveCurrentUserGameData
 } from './utils/gameDataStorage';
+import { buildLearningTopicGroups } from './utils/learningTopicGroups';
 import { playPronunciationAudio } from './utils/audio';
 import { useToasts } from './hooks/useToasts';
 import { useGameProgress } from './hooks/useGameProgress';
@@ -116,7 +118,10 @@ const LearningTopics = ({ onStartStudy, currentUser, onNavigate, topicGroups }: 
                                         <div className="p-8 grid md:grid-cols-2 gap-6">
                                             {cat.topics.map((topic: any, idx: number) => {
                                                 const isTopicLocked = isGuest && idx >= 3;
-                                                const isLearnedOut = !isGuest && topic.stats.new === 0;
+                                                const isLearnedOut = !isGuest && topic.stats.new === 0 && topic.stats.review === 0;
+                                                const progressPercent = topic.stats.total > 0
+                                                    ? Math.round((topic.stats.learned / topic.stats.total) * 100)
+                                                    : 0;
 
                                                 return (
                                                     <div
@@ -148,9 +153,9 @@ const LearningTopics = ({ onStartStudy, currentUser, onNavigate, topicGroups }: 
                                                         {!isGuest && (
                                                             <div className="mb-6">
                                                                 <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden mb-1">
-                                                                    <div className="h-full bg-linear-to-r from-primary to-accent transition-all duration-1000" style={{ width: `${Math.min(100, topic.stats.learned * 10)}%` }} />
+                                                                    <div className="h-full bg-linear-to-r from-primary to-accent transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
                                                                 </div>
-                                                                <div className="text-[10px] text-text-muted text-right font-medium">Tiến độ: {Math.min(100, topic.stats.learned * 10)}%</div>
+                                                                <div className="text-[10px] text-text-muted text-right font-medium">Tiến độ: {progressPercent}%</div>
                                                             </div>
                                                         )}
 
@@ -280,96 +285,200 @@ const MatchingGame = ({ words, type, onFinish }: any) => {
     );
 };
 
-const Minitest = ({ topicId, onFinish }: any) => {
-    const fillQuestions = useMemo(
-        () => mockData.vocabulary.filter(v => v.topicId === topicId).slice(0, 5),
-        [topicId]
-    );
-    const reading = useMemo(
-        () => readingPassages.find(p => p.topicId === topicId),
-        [topicId]
-    );
-    const readingQuestions = reading?.questions ?? [];
+const Minitest = ({ topicId, learnedWords, onFinish }: any) => {
+    const [fillAnswers, setFillAnswers] = useState<string[]>([]);
+    const [readingAnswers, setReadingAnswers] = useState<(number | null)[]>([]);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+    const [showingPart2, setShowingPart2] = useState(false);
 
-    const [fillAnswers, setFillAnswers] = useState<Record<number, string>>({});
-    const [readingAnswers, setReadingAnswers] = useState<Record<number, number>>({});
+    const fillQuestions = useMemo(() => {
+        return (Array.isArray(learnedWords) ? learnedWords : [])
+            .slice(0, 5)
+            .map((w: any) => ({
+                id: w.id,
+                q: (w.example || '').replace(new RegExp(w.word, 'gi'), '________'),
+                hint: w.word?.charAt(0)?.toLowerCase() || '',
+                a: w.word || ''
+            }));
+    }, [learnedWords]);
 
-    const submitMinitest = () => {
-        const fillCorrect = fillQuestions.reduce((acc, q) => {
-            const answer = (fillAnswers[q.id] ?? '').trim().toLowerCase();
-            return acc + (answer === q.word.toLowerCase() ? 1 : 0);
-        }, 0);
+    const passage = useMemo(() => {
+        return readingPassages.find(p => p.topicId === topicId) || readingPassages[0];
+    }, [topicId]);
 
-        const readingCorrect = readingQuestions.reduce((acc, q, idx) => {
-            return acc + (readingAnswers[idx] === q.correct ? 1 : 0);
-        }, 0);
+    useEffect(() => {
+        setFillAnswers(new Array(fillQuestions.length).fill(''));
+        setReadingAnswers(new Array(passage.questions.length).fill(null));
+        setIsSubmitted(false);
+        setShowingPart2(false);
+    }, [fillQuestions, passage]);
 
-        const bonus = readingQuestions.length > 0 && readingCorrect === readingQuestions.length ? 50 : 0;
-        const score = fillCorrect + readingCorrect;
-        const total = fillQuestions.length + readingQuestions.length;
+    const answeredCount = fillAnswers.filter(a => a !== '').length + readingAnswers.filter(a => a !== null).length;
+    const totalQuestions = fillQuestions.length + passage.questions.length;
 
-        confetti({ particleCount: 120, spread: 75, origin: { y: 0.7 } });
-        onFinish(score, total, { fill: fillCorrect, reading: readingCorrect, bonus });
+    const handleSubmit = () => {
+        setIsSubmitted(true);
+        let sFill = 0;
+        let sReading = 0;
+
+        fillAnswers.forEach((ans, i) => {
+            if (ans.trim().toLowerCase() === fillQuestions[i].a.toLowerCase()) {
+                sFill++;
+            }
+        });
+
+        readingAnswers.forEach((ans, i) => {
+            if (ans === passage.questions[i].correct) {
+                sReading++;
+            }
+        });
+
+        const bonus = sReading === passage.questions.length ? 50 : 0;
+
+        if (bonus > 0) {
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        }
+
+        onFinish(sFill + sReading, totalQuestions, { fill: sFill, reading: sReading, bonus });
     };
 
+    if (!passage) {
+        return null;
+    }
+
     return (
-        <div className="max-w-5xl mx-auto space-y-10">
-            <div className="glass-card p-8">
-                <h3 className="text-2xl font-bold mb-6">Điền từ ({fillQuestions.length})</h3>
-                <div className="space-y-4">
-                    {fillQuestions.map((q, idx) => (
-                        <div key={q.id} className="grid md:grid-cols-[40px_1fr] gap-3 items-center">
-                            <span className="font-bold text-text-muted">{idx + 1}.</span>
-                            <input
-                                className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
-                                placeholder={`Nghĩa: ${q.meaning}`}
-                                value={fillAnswers[q.id] ?? ''}
-                                onChange={(e) => setFillAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {reading && (
-                <div className="glass-card p-8">
-                    <h3 className="text-2xl font-bold mb-3">Reading ({readingQuestions.length})</h3>
-                    <p className="text-text-secondary mb-6 leading-relaxed">{reading.content}</p>
-
-                    <div className="space-y-6">
-                        {readingQuestions.map((q, qIdx) => (
-                            <div key={qIdx}>
-                                <p className="font-bold mb-3">{qIdx + 1}. {q.q}</p>
-                                <div className="grid md:grid-cols-2 gap-3">
-                                    {q.options.map((opt: string, optIdx: number) => (
-                                        <button
-                                            key={optIdx}
-                                            onClick={() => setReadingAnswers(prev => ({ ...prev, [qIdx]: optIdx }))}
-                                            className={`text-left px-4 py-3 rounded-xl border-2 transition-all ${readingAnswers[qIdx] === optIdx
-                                                ? 'border-primary bg-primary/10'
-                                                : 'border-primary/10 bg-white hover:border-primary/40'
-                                                }`}
-                                        >
-                                            {opt}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+        <div className="max-w-5xl mx-auto pb-24 relative">
+            <div className="sticky top-[80px] z-40 bg-white/90 backdrop-blur-md p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
+                <div className="flex-1">
+                    <div className="flex justify-between text-xs font-bold text-text-muted mb-2 uppercase tracking-[0.2em]">
+                        <span>Tiến độ bài làm</span>
+                        <span>{answeredCount} / {totalQuestions} câu</span>
+                    </div>
+                    <div className="h-4 bg-purple/10 rounded-full overflow-hidden border border-primary/5">
+                        <motion.div
+                            animate={{ width: `${totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0}%` }}
+                            className="h-full bg-linear-to-r from-cyan to-primary"
+                        />
                     </div>
                 </div>
-            )}
-
-            <div className="text-center">
-                <Button variant="primary" className="px-12" onClick={submitMinitest}>
-                    Nộp bài
-                </Button>
             </div>
+
+            <div className="space-y-24">
+                <section id="part1">
+                    <header className="flex items-center gap-6 mb-12">
+                        <Badge variant="purple" className="py-3 px-6 text-base font-bold">Bài 1: Điền từ còn thiếu</Badge>
+                        <div className="flex-1 h-px bg-purple/10" />
+                    </header>
+                    <div className="grid gap-10">
+                        {fillQuestions.length === 0 && (
+                            <div className="glass-card p-8 text-center text-text-secondary">
+                                Bạn chưa có từ nào đã học trong chủ đề này để làm bài 1. Hãy học và hoàn thành phần luyện tập trước.
+                            </div>
+                        )}
+                        {fillQuestions.map((q: any, i: number) => {
+                            const isCorrect = isSubmitted && fillAnswers[i].trim().toLowerCase() === q.a.toLowerCase();
+
+                            return (
+                                <div key={q.id} className={`glass-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? 'border-green-500 bg-green-50/50' : 'border-red-500 bg-red-50/50') : 'bg-white'}`}>
+                                    <div className="flex justify-between items-start mb-6">
+                                        <span className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center font-bold text-primary">{i + 1}</span>
+                                    </div>
+                                    <div className="text-2xl font-medium mb-8 leading-relaxed italic text-text-primary">"{q.q}"</div>
+                                    <div className="flex flex-col sm:flex-row gap-6 items-end sm:items-center">
+                                        <div className="relative flex-1 group">
+                                            <input
+                                                type="text"
+                                                placeholder="Gõ đáp án..."
+                                                disabled={isSubmitted}
+                                                value={fillAnswers[i]}
+                                                onChange={(e) => {
+                                                    const next = [...fillAnswers];
+                                                    next[i] = e.target.value;
+                                                    setFillAnswers(next);
+                                                }}
+                                                className={`w-full px-8 py-5 rounded-2xl border-2 transition-all text-xl font-bold bg-transparent outline-none
+                                                ${isSubmitted ? (isCorrect ? 'border-green-500 text-green-700' : 'border-red-500 text-red-700') : 'border-primary/10 hover:border-primary/30 focus:border-primary focus:bg-white'}`}
+                                            />
+                                            {!isSubmitted && <div className="mt-3 text-sm text-text-muted">💡 Bắt đầu bằng chữ "{q.hint}"</div>}
+                                        </div>
+                                        {isSubmitted && <div className={`mt-2 font-display font-bold text-xl ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>{isCorrect ? '✓ Chính xác!' : `Đáp án: ${q.a}`}</div>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {!isSubmitted && !showingPart2 && (
+                        <div className="mt-12 flex justify-center">
+                            <Button variant="accent" className="px-16 py-5 text-xl" onClick={() => setShowingPart2(true)}>
+                                Sang bài 2 →
+                            </Button>
+                        </div>
+                    )}
+                </section>
+
+                {(showingPart2 || isSubmitted) && (
+                    <section id="part2">
+                        <header className="flex items-center gap-6 mb-12">
+                            <Badge variant="accent" className="py-3 px-6 text-base font-bold">Bài 2: Đọc hiểu</Badge>
+                            <div className="flex-1 h-px bg-accent/20" />
+                        </header>
+                        <div className="glass-card mb-16 p-12 bg-linear-to-br from-bg-light to-white border-accent/20">
+                            <h4 className="text-3xl font-display font-bold mb-10 text-center text-accent">{passage.title}</h4>
+                            <div className="prose prose-purple max-w-none text-text-secondary leading-[2.2] text-xl whitespace-pre-wrap font-serif">{passage.content}</div>
+                        </div>
+                        <div className="grid gap-12">
+                            {passage.questions.map((q: any, qi: number) => (
+                                <div key={qi} className={`glass-card p-10 border-2 transition-all ${isSubmitted ? (readingAnswers[qi] === q.correct ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50') : 'border-transparent bg-white shadow-xl'}`}>
+                                    <div className="font-bold text-2xl mb-12 leading-relaxed text-text-primary">{q.q}</div>
+                                    <div className="grid sm:grid-cols-2 gap-6">
+                                        {q.options.map((opt: string, oi: number) => (
+                                            <label key={oi} className={`flex items-center gap-6 p-6 border-2 rounded-3xl cursor-pointer transition-all ${readingAnswers[qi] === oi ? 'border-primary bg-primary/5 shadow-inner' : 'border-primary/5 hover:border-primary/20 bg-white'} ${isSubmitted && oi === q.correct ? 'border-green-500 bg-green-100 text-green-900 font-bold scale-[1.02]' : ''} ${isSubmitted && readingAnswers[qi] === oi && oi !== q.correct ? 'border-red-500 bg-red-100 text-red-900' : ''}`}>
+                                                <input
+                                                    type="radio"
+                                                    checked={readingAnswers[qi] === oi}
+                                                    disabled={isSubmitted}
+                                                    onChange={() => {
+                                                        const next = [...readingAnswers];
+                                                        next[qi] = oi;
+                                                        setReadingAnswers(next);
+                                                    }}
+                                                    className="w-6 h-6 accent-primary"
+                                                />
+                                                <span className="text-xl">{opt}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {isSubmitted && (
+                                        <div className="mt-12 pt-10 border-t border-primary/10">
+                                            <p className="text-lg text-text-secondary italic leading-loose">💡 Giải thích: {q.explanation}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
+
+            <footer className="mt-24 pt-24 border-t border-primary/10 text-center">
+                {!isSubmitted ? (
+                    <Button variant="primary" className="px-24 py-6 text-3xl shadow-2xl" onClick={handleSubmit}>
+                        Nộp bài ngay 🚀
+                    </Button>
+                ) : (
+                    <div className="flex flex-col items-center gap-8">
+                        <Badge variant="green" className="py-4 px-12 text-2xl animate-bounce">KẾT QUẢ ĐÃ GHI NHẬN! 🏆</Badge>
+                        <Button variant="primary" className="px-12 py-5 text-xl" onClick={() => onFinish(0, 0)}>
+                            Hoàn thành chủ đề
+                        </Button>
+                    </div>
+                )}
+            </footer>
         </div>
     );
 };
 
-const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onStreakCheck, onAddToast }: any) => {
+const StudySession = ({ topicId, studyWords, topicGroups, learningProgressState, onFinish, onAddXP, onStreakCheck, onAddToast, onWordsLearned }: any) => {
     const [tab, setTab] = useState<'flashcard' | 'learn' | 'minitest'>('flashcard');
     const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
     const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
@@ -401,6 +510,19 @@ const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onS
         words.filter(w => selectedWordIds.includes(w.id)),
         [words, selectedWordIds]
     );
+    const learnedWordsForMinitest = useMemo(() => {
+        if (!topicId || !learningProgressState?.topics) {
+            return [];
+        }
+
+        const topicProgress = learningProgressState.topics.find((t: any) => t.topicId === topicId);
+        if (!topicProgress?.learnedWordIds?.length) {
+            return [];
+        }
+
+        const learnedWordIdSet = new Set(topicProgress.learnedWordIds);
+        return words.filter(w => learnedWordIdSet.has(w.id));
+    }, [learningProgressState, topicId, words]);
 
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
@@ -420,7 +542,11 @@ const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onS
         return () => window.removeEventListener('keydown', handleKey);
     }, [tab, learnStep, words.length, selectedWords.length]);
 
-    const handleFinishMatching = (correct: number, total: number, time: number) => {
+    const handleFinishMatching = async (correct: number, total: number, time: number) => {
+        if (topicId && selectedWordIds.length > 0) {
+            await onWordsLearned(topicId, selectedWordIds);
+        }
+
         onAddXP(correct * 5);
         onStreakCheck();
         onAddToast(`Hoàn thành Matching trong ${time}s! +${correct * 5} XP`, 'success');
@@ -612,7 +738,7 @@ const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onS
 
                 {tab === 'minitest' && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key="minitest-tab">
-                        <Minitest topicId={topicId} onFinish={onFinish} />
+                        <Minitest topicId={topicId} learnedWords={learnedWordsForMinitest} onFinish={onFinish} />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -625,6 +751,7 @@ const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onS
 export default function App() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [showStreakModal, setShowStreakModal] = useState(false);
+    const [learningProgressState, setLearningProgressState] = useState<LearningProgressState | null>(null);
     const { toasts, addToast, removeToast } = useToasts();
     const { gameData, setGameData, xpFloats, addXP, triggerStreakCheck } = useGameProgress(addToast);
 
@@ -654,48 +781,36 @@ export default function App() {
         handleFinishStudy
     } = useAppBootstrap({ addToast, syncUserGameData });
 
-    const learningTopicGroups = useMemo(() => {
-        const byParent = topicFilters.filter(topic => !topic.parentTopicId);
-        const children = topicFilters.filter(topic => topic.parentTopicId);
+    const learningTopicGroups = useMemo(() => (
+        buildLearningTopicGroups(topicFilters, vocabularyItems, learningProgressState)
+    ), [topicFilters, vocabularyItems, learningProgressState]);
 
-        if (byParent.length === 0 && topicFilters.length > 0) {
-            return [
-                {
-                    id: 'all',
-                    title: 'Chủ đề học tập',
-                    topics: topicFilters.map(topic => {
-                        const totalWords = vocabularyItems.filter(item => item.topicId === topic.topicId).length;
-                        return {
-                            id: topic.topicId,
-                            title: topic.name,
-                            description: topic.description,
-                            stats: { new: totalWords, review: 0, learned: 0 }
-                        };
-                    })
-                }
-            ];
+    const refreshLearningProgress = useCallback(async () => {
+        if (!currentUser?.userId) {
+            setLearningProgressState(null);
+            return;
         }
 
-        return byParent.map(parent => {
-            const childTopics = children.filter(topic => topic.parentTopicId === parent.topicId);
-            const topics = (childTopics.length > 0 ? childTopics : [parent]).map(topic => {
-                const totalWords = vocabularyItems.filter(item => item.topicId === topic.topicId).length;
+        try {
+            const nextState = await learningProgressApi.getState();
+            setLearningProgressState(nextState);
+        } catch {
+            setLearningProgressState(null);
+        }
+    }, [currentUser?.userId]);
 
-                return {
-                    id: topic.topicId,
-                    title: topic.name,
-                    description: topic.description,
-                    stats: { new: totalWords, review: 0, learned: 0 }
-                };
-            });
+    const handleWordsLearned = useCallback(async (topicId: number, wordIds: number[]) => {
+        if (!currentUser?.userId || topicId <= 0 || wordIds.length === 0) {
+            return;
+        }
 
-            return {
-                id: String(parent.topicId),
-                title: parent.name,
-                topics
-            };
-        });
-    }, [topicFilters, vocabularyItems]);
+        try {
+            const nextState = await learningProgressApi.markWordsLearned(topicId, wordIds);
+            setLearningProgressState(nextState);
+        } catch {
+            addToast('Không thể cập nhật tiến độ học lúc này.', 'info');
+        }
+    }, [currentUser?.userId, addToast]);
 
     const handleLogout = async () => {
         try {
@@ -714,6 +829,10 @@ export default function App() {
 
         saveCurrentUserGameData(currentUser.userId, gameData.currentUser);
     }, [currentUser?.userId, gameData.currentUser]);
+
+    useEffect(() => {
+        void refreshLearningProgress();
+    }, [refreshLearningProgress]);
 
     return (
         <div className="min-h-screen bg-bg-light text-text-primary">
@@ -763,11 +882,13 @@ export default function App() {
                             currentUser={currentUser}
                             gameData={gameData}
                             learningTopicGroups={learningTopicGroups}
+                            learningProgressState={learningProgressState}
                             studyTopicId={studyTopicId}
                             studyWords={studyWords}
                             handleFinishStudy={handleFinishStudy}
                             addXP={addXP}
                             triggerStreakCheck={triggerStreakCheck}
+                            handleWordsLearned={handleWordsLearned}
                             testResult={testResult}
                             handleLogout={handleLogout}
                             onOpenStreak={() => setShowStreakModal(true)}

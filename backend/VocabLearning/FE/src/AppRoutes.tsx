@@ -15,11 +15,13 @@ type AppRoutesProps = {
     currentUser: any;
     gameData: any;
     learningTopicGroups: any[];
+    learningProgressState: any;
     studyTopicId: number | null;
     studyWords: any[];
     handleFinishStudy: (score?: number, total?: number, detail?: any) => void;
     addXP: (amount: number) => void;
     triggerStreakCheck: () => void;
+    handleWordsLearned: (topicId: number, wordIds: number[]) => Promise<void>;
     testResult: { score: number; total: number; detail?: any } | null;
     handleLogout: () => void;
     onOpenStreak: () => void;
@@ -41,11 +43,13 @@ export const AppRoutes = ({
     currentUser,
     gameData,
     learningTopicGroups,
+    learningProgressState,
     studyTopicId,
     studyWords,
     handleFinishStudy,
     addXP,
     triggerStreakCheck,
+    handleWordsLearned,
     testResult,
     handleLogout,
     onOpenStreak,
@@ -61,7 +65,7 @@ export const AppRoutes = ({
             setCurrentPage('home');
         }} onAddToast={addToast} />,
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
-        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} />,
+        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
         profile: <Profile user={{ ...currentUser, ...gameData.currentUser }} onLogout={handleLogout} gameData={gameData} onFreezeStreak={() => { }} onOpenStreak={onOpenStreak} />,
         leaderboard: <Leaderboard gameData={gameData} />,
