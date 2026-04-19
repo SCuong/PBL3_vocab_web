@@ -59,6 +59,20 @@ export const AppRoutes = ({
     LearningTopicsComponent,
     StudySessionComponent
 }: AppRoutesProps) => {
+    const learnedWordsCount = Array.isArray(learningProgressState?.topics)
+        ? new Set(
+            learningProgressState.topics
+                .flatMap((topic: any) => Array.isArray(topic.learnedWordIds) ? topic.learnedWordIds : [])
+                .filter((wordId: any) => Number.isFinite(wordId) && wordId > 0)
+        ).size
+        : undefined;
+
+    const profileUser = {
+        ...currentUser,
+        ...gameData.currentUser,
+        learnedWords: learnedWordsCount ?? gameData.currentUser?.learnedWords ?? 0
+    };
+
     const routeMap: Record<string, any> = {
         home: <Home onNavigate={setCurrentPage} />,
         vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
@@ -74,7 +88,7 @@ export const AppRoutes = ({
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
         'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
-        profile: <Profile user={{ ...currentUser, ...gameData.currentUser }} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
+        profile: <Profile user={profileUser} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
         leaderboard: <Leaderboard gameData={gameData} />,
         admin: <AdminDashboard />
     };
