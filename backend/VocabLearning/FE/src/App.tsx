@@ -369,7 +369,7 @@ const Minitest = ({ topicId, onFinish }: any) => {
     );
 };
 
-const StudySession = ({ topicId, studyWords, onFinish, onAddXP, onStreakCheck, onAddToast }: any) => {
+const StudySession = ({ topicId, studyWords, topicGroups, onFinish, onAddXP, onStreakCheck, onAddToast }: any) => {
     const [tab, setTab] = useState<'flashcard' | 'learn' | 'minitest'>('flashcard');
     const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
     const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
@@ -382,8 +382,20 @@ const StudySession = ({ topicId, studyWords, onFinish, onAddXP, onStreakCheck, o
             ? studyWords
             : mockData.vocabulary.filter(v => v.topicId === topicId)),
         [studyWords, topicId]);
+    const currentTopicGroup = useMemo(
+        () => topicGroups?.find((group: any) => group.topics?.some((topic: any) => topic.id === topicId)),
+        [topicGroups, topicId]
+    );
+    const currentTopic = useMemo(
+        () => currentTopicGroup?.topics?.find((topic: any) => topic.id === topicId),
+        [currentTopicGroup, topicId]
+    );
     const topic = mockData.topics.find(t => t.id === topicId);
     const category = mockData.categories.find(c => c.id === topic?.catId);
+    const breadcrumbCategoryTitle = currentTopicGroup?.title ?? category?.title ?? 'Chủ đề';
+    const breadcrumbTopicTitle = currentTopic?.title ?? topic?.title ?? 'Bài học';
+    const topicTitle = currentTopic?.title ?? topic?.title ?? 'Học từ vựng';
+    const topicStats = currentTopic?.stats ?? topic?.stats;
 
     const selectedWords = useMemo(() =>
         words.filter(w => selectedWordIds.includes(w.id)),
@@ -423,9 +435,9 @@ const StudySession = ({ topicId, studyWords, onFinish, onAddXP, onStreakCheck, o
             <nav className="flex items-center gap-2 text-sm text-text-muted mb-6">
                 <button onClick={() => onFinish()} className="hover:text-primary transition-colors">Learning</button>
                 <ChevronRight size={14} />
-                <button onClick={() => onFinish()} className="hover:text-primary transition-colors">{category?.title}</button>
+                <button onClick={() => onFinish()} className="hover:text-primary transition-colors">{breadcrumbCategoryTitle}</button>
                 <ChevronRight size={14} />
-                <span className="text-primary font-bold">{topic?.title}</span>
+                <span className="text-primary font-bold">{breadcrumbTopicTitle}</span>
             </nav>
 
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
@@ -434,10 +446,10 @@ const StudySession = ({ topicId, studyWords, onFinish, onAddXP, onStreakCheck, o
                         <ArrowLeft size={24} />
                     </Button>
                     <div>
-                        <h1 className="text-5xl mb-2 font-display font-extrabold text-text-primary">{topic?.title}</h1>               <div className="flex gap-2">
-                            <Badge variant="cyan" className="text-xs">🆕 {topic?.stats?.new}</Badge>
-                            <Badge variant="purple" className="text-xs">🔔 {topic?.stats?.review}</Badge>
-                            <Badge variant="green" className="text-xs font-bold">✅ {topic?.stats?.learned}</Badge>
+                        <h1 className="text-5xl mb-2 font-display font-extrabold text-text-primary">{topicTitle}</h1>               <div className="flex gap-2">
+                            <Badge variant="cyan" className="text-xs">🆕 {topicStats?.new ?? 0}</Badge>
+                            <Badge variant="purple" className="text-xs">🔔 {topicStats?.review ?? 0}</Badge>
+                            <Badge variant="green" className="text-xs font-bold">✅ {topicStats?.learned ?? 0}</Badge>
                         </div>
                     </div>
                 </div>

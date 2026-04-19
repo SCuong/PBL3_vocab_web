@@ -1,3 +1,4 @@
+import React from 'react';
 import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, Profile, Vocabulary, VocabDetail } from './pages';
 
 type AppRoutesProps = {
@@ -51,7 +52,7 @@ export const AppRoutes = ({
     LearningTopicsComponent,
     StudySessionComponent
 }: AppRoutesProps) => {
-    const routeMap: Record<string, JSX.Element> = {
+    const routeMap: Record<string, any> = {
         home: <Home onNavigate={setCurrentPage} />,
         vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
         'vocab-detail': <VocabDetail word={selectedWord} onBack={() => setCurrentPage('vocabulary')} />,
@@ -60,7 +61,7 @@ export const AppRoutes = ({
             setCurrentPage('home');
         }} onAddToast={addToast} />,
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
-        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} />,
+        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
         profile: <Profile user={{ ...currentUser, ...gameData.currentUser }} onLogout={handleLogout} gameData={gameData} onFreezeStreak={() => { }} onOpenStreak={onOpenStreak} />,
         leaderboard: <Leaderboard gameData={gameData} />,
