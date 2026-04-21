@@ -1,7 +1,11 @@
 import { useCallback, useState } from 'react';
 import { EMPTY_CURRENT_USER_GAME_DATA, XP_RULES } from '../constants/appConstants';
 import { mockData } from '../mocks/mockData';
-import { appendStudyDate, getTodayStudyDate } from '../utils/studyHistory';
+import {
+    appendStudyDate,
+    calculateStreakFromHistory,
+    getTodayStudyDate
+} from '../utils/studyHistory';
 
 export type XpFloatItem = {
     id: number;
@@ -31,14 +35,31 @@ export const useGameProgress = (addToast: (message: string, type?: string) => vo
     const triggerStreakCheck = useCallback(() => {
         const today = getTodayStudyDate();
         let nextStreak: number | null = null;
+        let shouldAwardStreakBonus = false;
 
         setGameData(prev => {
-            if (prev.currentUser.lastStudyDate === today) {
-                return prev;
+            const alreadyStudiedToday = prev.currentUser.studyHistory.includes(today);
+
+            if (alreadyStudiedToday) {
+                const recalculatedStreak = calculateStreakFromHistory(prev.currentUser.studyHistory);
+
+                if (recalculatedStreak === prev.currentUser.streak && prev.currentUser.lastStudyDate === today) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    currentUser: {
+                        ...prev.currentUser,
+                        streak: recalculatedStreak,
+                        lastStudyDate: today
+                    }
+                };
             }
 
-            nextStreak = prev.currentUser.streak + 1;
             const nextHistory = appendStudyDate(prev.currentUser.studyHistory, today);
+            nextStreak = calculateStreakFromHistory(nextHistory);
+            shouldAwardStreakBonus = true;
 
             return {
                 ...prev,
@@ -51,7 +72,7 @@ export const useGameProgress = (addToast: (message: string, type?: string) => vo
             };
         });
 
-        if (nextStreak !== null) {
+        if (nextStreak !== null && shouldAwardStreakBonus) {
             addXP(XP_RULES.STREAK_BONUS(nextStreak));
             addToast(`Streak ${nextStreak} ngày! 🔥`, 'success');
         }

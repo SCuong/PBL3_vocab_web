@@ -2,7 +2,12 @@ import {
     EMPTY_CURRENT_USER_GAME_DATA,
     type CurrentUserGameData
 } from '../constants/appConstants';
-import { buildHistoryFromStreak, normalizeStudyHistory } from './studyHistory';
+import {
+    buildHistoryFromStreak,
+    calculateStreakFromHistory,
+    getLatestStudyDate,
+    normalizeStudyHistory
+} from './studyHistory';
 
 const STORAGE_KEY_PREFIX = 'vocab-learning:current-user-game-data:';
 
@@ -13,11 +18,18 @@ export const normalizeCurrentUserGameData = (
 ): CurrentUserGameData => {
     const normalizedHistory = normalizeStudyHistory(data?.studyHistory);
     const historyFromStreak = buildHistoryFromStreak(data?.lastStudyDate || '', data?.streak || 0);
+    const studyHistory = normalizedHistory.length > 0 ? normalizedHistory : historyFromStreak;
+    const streak = studyHistory.length > 0
+        ? calculateStreakFromHistory(studyHistory)
+        : (Number.isFinite(data?.streak) ? Number(data?.streak) : 0);
+    const lastStudyDate = getLatestStudyDate(studyHistory) || data?.lastStudyDate || '';
 
     return {
         ...EMPTY_CURRENT_USER_GAME_DATA,
         ...data,
-        studyHistory: normalizedHistory.length > 0 ? normalizedHistory : historyFromStreak,
+        streak,
+        lastStudyDate,
+        studyHistory,
         studyHistoryDetails: data?.studyHistoryDetails && typeof data.studyHistoryDetails === 'object'
             ? data.studyHistoryDetails
             : {}

@@ -824,7 +824,8 @@ namespace VocabLearning.Controllers
                 Role = user.Role,
                 Status = user.Status,
                 HasGoogleLogin = !string.IsNullOrWhiteSpace(user.GoogleSubject),
-                HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
+                HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash),
+                CreatedAt = user.CreatedAt
             };
         }
 

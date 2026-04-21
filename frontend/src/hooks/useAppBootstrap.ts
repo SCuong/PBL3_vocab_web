@@ -63,8 +63,10 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         } catch {
             setSelectedWord(word);
         }
+    }, []);
 
-        setCurrentPage('vocab-detail');
+    const handleCloseWordDetail = useCallback(() => {
+        setSelectedWord(null);
     }, []);
 
     const handleFinishStudy = useCallback((score?: number, total?: number, detail?: any) => {
@@ -117,6 +119,7 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         testResult,
         handleStartStudy,
         handleSelectWord,
+        handleCloseWordDetail,
         handleFinishStudy
     };
 };

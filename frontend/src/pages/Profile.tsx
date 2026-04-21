@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '../components/ui';
 import { StreakHeatmap } from '../components/streak';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
 import { buildStudyDaySummary } from '../utils/studyHistory';
+
+const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(value));
 
 type ProfileProps = {
     user: any;
@@ -96,7 +99,7 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
             return;
         }
 
-        const latestDate = [...studyHistoryDates].at(-1) ?? null;
+        const latestDate = studyHistoryDates[studyHistoryDates.length - 1] ?? null;
         setSelectedStudyDate(latestDate);
     }, [studyHistoryDates]);
 
@@ -119,7 +122,7 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
     }, [selectedStudyDate]);
 
     const hasStudiedOnSelectedDate = selectedStudyDate
-        ? studyHistoryDates.includes(selectedStudyDate)
+        ? studyHistoryDates.indexOf(selectedStudyDate) !== -1
         : false;
 
     const selectedStudyDetail = useMemo(
@@ -137,6 +140,27 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
         ),
         [selectedStudyDate, studyHistoryDates, selectedStudyDetail, user.learnedWords, learnedWords.length, user.xp]
     );
+
+    const accountCreatedDate = useMemo(() => {
+        if (!user?.createdAt || typeof user.createdAt !== 'string') {
+            return null;
+        }
+
+        const datePart = user.createdAt.slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            return datePart;
+        }
+
+        const parsed = new Date(user.createdAt);
+        if (Number.isNaN(parsed.getTime())) {
+            return null;
+        }
+
+        const year = parsed.getFullYear();
+        const month = format2Digits(parsed.getMonth() + 1);
+        const day = format2Digits(parsed.getDate());
+        return `${year}-${month}-${day}`;
+    }, [user?.createdAt]);
 
     const handleSaveProfile = async () => {
         if (isSavingProfile) {
@@ -226,9 +250,10 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
                         ))}
                     </div>
                     <div className="glass-card p-8">
-                        <h3 className="text-xl mb-6">Study History (30 Days)</h3>
+                        <h3 className="text-xl mb-6">Study History</h3>
                         <StreakHeatmap
                             history={studyHistoryDates}
+                            startDate={accountCreatedDate}
                             selectedDate={selectedStudyDate}
                             onSelectDate={setSelectedStudyDate}
                         />
@@ -302,20 +327,32 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
                 </div>
             </div>
 
-            {isEditing && (
-                <div className="fixed inset-0 z-[700] bg-black/30 backdrop-blur-sm p-6 flex items-center justify-center">
-                    <div className="glass-card w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-2xl font-bold">Edit Profile</h3>
-                            <button
-                                className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
-                                onClick={() => setIsEditing(false)}
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
+            <AnimatePresence>
+                {isEditing && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[700] bg-white/35 backdrop-blur-sm p-6 flex items-center justify-center"
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                            transition={{ duration: 0.24, ease: 'easeOut' }}
+                            className="glass-card bg-white/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-bold">Edit Profile</h3>
+                                <button
+                                    className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
+                                    onClick={() => setIsEditing(false)}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
 
-                        <div className="space-y-8">
+                            <div className="space-y-8">
                             <section className="space-y-4">
                                 <h4 className="font-bold">Thông tin tài khoản & Avatar</h4>
                                 <div className="flex items-center gap-4">
@@ -423,10 +460,11 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
                                     {isSavingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
                                 </Button>
                             </section>
-                        </div>
-                    </div>
-                </div>
-            )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

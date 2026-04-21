@@ -2,6 +2,7 @@ export type AuthenticatedUser = {
     userId: number;
     username: string;
     email: string;
+    createdAt: string;
     role: string;
     status: string;
     hasGoogleLogin: boolean;

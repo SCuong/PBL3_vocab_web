@@ -49,6 +49,8 @@ namespace VocabLearning.ViewModels.Account
         public bool HasGoogleLogin { get; set; }
 
         public bool HasLocalPassword { get; set; }
+
+        public DateTime CreatedAt { get; set; }
     }
 
     public sealed class AuthApiResponse

@@ -13,7 +13,15 @@ export type StudySessionRecordInput = {
     timeSpentSeconds?: number;
 };
 
-export const getTodayStudyDate = () => new Date().toISOString().split('T')[0];
+const toLocalIsoDate = (date: Date) => {
+    const pad2 = (value: number) => (value < 10 ? `0${value}` : String(value));
+    const year = date.getFullYear();
+    const month = pad2(date.getMonth() + 1);
+    const day = pad2(date.getDate());
+    return `${year}-${month}-${day}`;
+};
+
+export const getTodayStudyDate = () => toLocalIsoDate(new Date());
 
 export const isIsoDateString = (value: unknown): value is string => (
     typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -32,10 +40,44 @@ export const buildHistoryFromStreak = (lastStudyDate: string, streak: number) =>
     const days = Array.from({ length: streak }, (_, i) => {
         const d = new Date(anchor);
         d.setDate(d.getDate() - ((streak - 1) - i));
-        return d.toISOString().split('T')[0];
+        return toLocalIsoDate(d);
     });
 
     return Array.from(new Set(days)).sort((a, b) => a.localeCompare(b));
+};
+
+export const getLatestStudyDate = (history: unknown) => {
+    const normalized = normalizeStudyHistory(history);
+    return normalized.length > 0 ? normalized[normalized.length - 1] : '';
+};
+
+export const calculateStreakFromHistory = (history: unknown) => {
+    const normalized = normalizeStudyHistory(history);
+    if (normalized.length === 0) {
+        return 0;
+    }
+
+    let streak = 1;
+
+    for (let i = normalized.length - 1; i > 0; i -= 1) {
+        const current = new Date(`${normalized[i]}T00:00:00`);
+        const previous = new Date(`${normalized[i - 1]}T00:00:00`);
+
+        if (Number.isNaN(current.getTime()) || Number.isNaN(previous.getTime())) {
+            break;
+        }
+
+        const expectedPrevious = new Date(current);
+        expectedPrevious.setDate(expectedPrevious.getDate() - 1);
+
+        if (toLocalIsoDate(expectedPrevious) !== toLocalIsoDate(previous)) {
+            break;
+        }
+
+        streak += 1;
+    }
+
+    return streak;
 };
 
 export const normalizeStudyHistory = (history: unknown) => (
@@ -45,7 +87,7 @@ export const normalizeStudyHistory = (history: unknown) => (
 );
 
 export const appendStudyDate = (history: string[], date: string) => (
-    history.includes(date)
+    history.indexOf(date) !== -1
         ? history
         : [...history, date].sort((a, b) => a.localeCompare(b))
 );
@@ -65,9 +107,16 @@ export const appendStudySessionDetail = (
     };
 
     const sessions = [...(current?.sessions ?? []), nextSession];
+    const words = sessions.reduce<StudyWordSnapshot[]>((allWords, session) => {
+        if (!Array.isArray(session.words) || session.words.length === 0) {
+            return allWords;
+        }
+
+        return [...allWords, ...session.words];
+    }, []);
+
     const uniqueWordIds = new Set(
-        sessions
-            .flatMap(session => session.words)
+        words
             .map(word => word.id)
             .filter(id => Number.isFinite(id) && id > 0)
     );

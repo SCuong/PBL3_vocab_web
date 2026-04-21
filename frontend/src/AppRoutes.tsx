@@ -1,5 +1,5 @@
 import React from 'react';
-import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, Profile, Vocabulary, VocabDetail } from './pages';
+import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, Profile, Vocabulary } from './pages';
 import type { AuthenticatedUser } from './services/authApi';
 
 type AppRoutesProps = {
@@ -10,6 +10,7 @@ type AppRoutesProps = {
     topicFilters: any[];
     isVocabularyLoading: boolean;
     selectedWord: any;
+    handleCloseWordDetail: () => void;
     syncUserGameData: (user: any) => void;
     addToast: (message: string, type?: string) => void;
     handleStartStudy: (topicId: number) => void;
@@ -40,6 +41,7 @@ export const AppRoutes = ({
     topicFilters,
     isVocabularyLoading,
     selectedWord,
+    handleCloseWordDetail,
     syncUserGameData,
     addToast,
     handleStartStudy,
@@ -89,8 +91,7 @@ export const AppRoutes = ({
 
     const routeMap: Record<string, any> = {
         home: <Home onNavigate={setCurrentPage} />,
-        vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
-        'vocab-detail': <VocabDetail word={selectedWord} onBack={() => setCurrentPage('vocabulary')} />,
+        vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} onCloseWordDetail={handleCloseWordDetail} selectedWord={selectedWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
         auth: <Auth onLogin={(u: any) => {
             syncUserGameData(u);
             setCurrentPage('home');

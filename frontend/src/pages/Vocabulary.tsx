@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Search, Volume2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Search, Volume2, X } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { playPronunciationAudio } from '../utils/audio';
 import { Badge, Button } from '../components/ui';
 
-const Vocabulary = ({ onSelectWord, items, isLoading, topics }: any) => {
+const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, items, isLoading, topics }: any) => {
     const [search, setSearch] = useState('');
     const [selectedCefr, setSelectedCefr] = useState('ALL');
     const [selectedTopic, setSelectedTopic] = useState('ALL');
@@ -88,6 +89,72 @@ const Vocabulary = ({ onSelectWord, items, isLoading, topics }: any) => {
                     </div>
                 ))}
             </div>
+
+            <AnimatePresence>
+                {selectedWord && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[700] bg-black/35 backdrop-blur-sm p-4 md:p-6 flex items-center justify-center"
+                        onClick={onCloseWordDetail}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: 20 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            className="glass-card bg-white/90 w-full max-w-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-start justify-between gap-4 mb-6">
+                                <div>
+                                    <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
+                                    <h2 className="text-4xl mb-1">{selectedWord.word}</h2>
+                                    <p className="text-text-muted font-mono">{selectedWord.transcription}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
+                                    onClick={onCloseWordDetail}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3 mb-6">
+                                <Button
+                                    variant="primary"
+                                    className="px-6"
+                                    onClick={() => playPronunciationAudio(selectedWord.audioUrl, selectedWord.word)}
+                                >
+                                    <Volume2 size={18} /> Nghe phát âm
+                                </Button>
+                                {selectedWord.example && (
+                                    <Button
+                                        variant="ghost"
+                                        className="px-6"
+                                        onClick={() => playPronunciationAudio(selectedWord.exampleAudioUrl, selectedWord.example)}
+                                    >
+                                        <Volume2 size={18} /> Nghe ví dụ
+                                    </Button>
+                                )}
+                            </div>
+
+                            <div className="bg-white/60 p-5 rounded-card border border-primary/10">
+                                <h3 className="text-lg font-bold text-primary mb-2">Ý nghĩa</h3>
+                                <p className="text-lg mb-4">{selectedWord.meaning}</p>
+                                {selectedWord.example && (
+                                    <>
+                                        <h3 className="text-lg font-bold text-purple mb-2">Ví dụ</h3>
+                                        <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
+                                    </>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

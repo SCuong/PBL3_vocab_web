@@ -41,6 +41,7 @@ import {
 const LearningTopics = ({
   onStartStudy,
   currentUser,
+  gameData,
   onNavigate,
   topicGroups,
 }: any) => {
@@ -54,6 +55,12 @@ const LearningTopics = ({
       setHasInitializedAccordion(true);
     }
   }, [expandedCat, hasInitializedAccordion, topicGroups]);
+
+  const streakDays = Number.isFinite(gameData?.streak)
+    ? gameData.streak
+    : Number.isFinite(currentUser?.streak)
+      ? currentUser.streak
+      : 0;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12 relative">
@@ -93,7 +100,7 @@ const LearningTopics = ({
             <div className="glass-card px-6 py-3 border-orange-500/20 bg-orange-500/5 flex items-center gap-3">
               <span className="text-2xl">🔥</span>
               <span className="font-bold text-orange-600">
-                {currentUser.streak} ngày liên tiếp
+                {streakDays} ngày liên tiếp
               </span>
             </div>
           </div>
@@ -133,7 +140,7 @@ const LearningTopics = ({
               >
                 <div className="flex items-center gap-6">
                   <div className="text-4xl group-hover:scale-110 transition-transform">
-                    📚
+                    {cat.icon ?? "📚"}
                   </div>
                   <div className="text-left">
                     <h3
@@ -1597,6 +1604,7 @@ export default function App() {
     testResult,
     handleStartStudy,
     handleSelectWord,
+    handleCloseWordDetail,
     handleFinishStudy,
   } = useAppBootstrap({ addToast, syncUserGameData });
 
@@ -1749,6 +1757,7 @@ export default function App() {
               topicFilters={topicFilters}
               isVocabularyLoading={isVocabularyLoading}
               selectedWord={selectedWord}
+              handleCloseWordDetail={handleCloseWordDetail}
               syncUserGameData={syncUserGameData}
               addToast={addToast}
               handleStartStudy={handleStartStudy}

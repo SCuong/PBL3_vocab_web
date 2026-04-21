@@ -17,13 +17,96 @@ type TopicUiModel = {
     id: number;
     title: string;
     description: string;
+    icon: string;
     stats: TopicStats;
 };
 
 type TopicGroupUiModel = {
     id: string;
     title: string;
+    icon: string;
     topics: TopicUiModel[];
+};
+
+const CATEGORY_ICONS_BY_PARENT_TOPIC_ID: Record<number, string> = {
+    1: '💬',
+    11: '💼',
+    20: '💪',
+    25: '✈️',
+    29: '🏠',
+    39: '💭',
+    42: '🌍'
+};
+
+const CATEGORY_ICONS_BY_TITLE: Record<string, string> = {
+    'daily communication': '💬',
+    'work & education': '💼',
+    'work and education': '💼',
+    health: '💪',
+    'entertainment & travel': '✈️',
+    'entertainment and travel': '✈️',
+    'daily life': '🏠',
+    'emotions & opinions': '💭',
+    'emotions and opinions': '💭',
+    'culture & science': '🌍',
+    'culture and science': '🌍'
+};
+
+const getCategoryIcon = (parent: VocabularyTopicItem) => {
+    const iconById = CATEGORY_ICONS_BY_PARENT_TOPIC_ID[parent.topicId];
+    if (iconById) {
+        return iconById;
+    }
+
+    const normalizedTitle = parent.name.trim().toLowerCase();
+    return CATEGORY_ICONS_BY_TITLE[normalizedTitle] ?? '📚';
+};
+
+const TOPIC_ICONS_BY_TOPIC_ID: Record<number, string> = {
+    1: '👋',
+    2: '👨‍👩-👧‍👦',
+    3: '🤝',
+    4: '☀️',
+    5: '📅',
+    6: '🎨',
+    7: '🏠',
+    8: '📍',
+    9: '🛍️',
+    10: '🍽️',
+    11: '👨‍💼',
+    12: '🏢',
+    13: '🎓',
+    14: '📧',
+    15: '📝',
+    16: '👥',
+    17: '⏰',
+    18: '🖨️',
+    19: '🤝',
+    20: '🦶',
+    21: '🤒',
+    22: '🏃',
+    23: '🥗',
+    24: '🍎',
+    25: '🎬',
+    26: '🌍',
+    27: '🗽',
+    28: '🏨',
+    29: '🍔',
+    30: '🛒',
+    31: '🚌',
+    32: '🐶',
+    33: '🪁',
+    34: '👗',
+    35: '🚿',
+    36: '🍳',
+    37: '🧹',
+    38: '🌐',
+    39: '😊',
+    40: '🎨',
+    41: '💬',
+    42: '🌿',
+    43: '🦁',
+    44: '📚'
 };
 
 type TopicProgressLookup = Record<number, LearningProgressTopicStateItem>;
@@ -87,6 +170,7 @@ export const buildLearningTopicGroups = (
             id: topic.topicId,
             title: topic.name,
             description: topic.description,
+            icon: TOPIC_ICONS_BY_TOPIC_ID[topic.topicId] ?? '📘',
             stats: calculateTopicStats(wordIds, progressLookup[topic.topicId])
         };
     };
@@ -96,6 +180,7 @@ export const buildLearningTopicGroups = (
             {
                 id: 'all',
                 title: 'Chủ đề học tập',
+                icon: '📚',
                 topics: [...topicFilters]
                     .sort((a, b) => a.topicId - b.topicId)
                     .map(toTopicUiModel)
@@ -110,6 +195,7 @@ export const buildLearningTopicGroups = (
         return {
             id: String(parent.topicId),
             title: parent.name,
+            icon: getCategoryIcon(parent),
             topics
         };
     });
