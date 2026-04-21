@@ -219,22 +219,15 @@ namespace VocabLearning.Services
                 return null;
             }
 
-            var topicMeanings = _context.Vocabularies
+            var topicWords = _context.Vocabularies
                 .Where(vocabulary =>
                     vocabulary.TopicId == topicId
+                    && !string.IsNullOrWhiteSpace(vocabulary.Word)
                     && !string.IsNullOrWhiteSpace(vocabulary.MeaningVi))
-                .Select(vocabulary => new MeaningOption
+                .Select(vocabulary => new WordOption
                 {
                     VocabId = vocabulary.VocabId,
-                    Meaning = vocabulary.MeaningVi ?? string.Empty
-                })
-                .ToList();
-
-            var globalMeanings = _context.Vocabularies
-                .Where(vocabulary => !string.IsNullOrWhiteSpace(vocabulary.MeaningVi))
-                .Select(vocabulary => new MeaningOption
-                {
-                    VocabId = vocabulary.VocabId,
+                    Word = vocabulary.Word ?? string.Empty,
                     Meaning = vocabulary.MeaningVi ?? string.Empty
                 })
                 .ToList();
@@ -256,9 +249,10 @@ namespace VocabLearning.Services
                 {
                     VocabId = vocabulary.VocabId,
                     Word = vocabulary.Word ?? string.Empty,
+                    Meaning = NormalizeMeaning(vocabulary.MeaningVi),
                     ExerciseType = ExerciseTypes.MatchMeaning,
                     MatchMode = ExerciseMatchModes.MatchMeaning,
-                    Options = BuildMeaningOptions(vocabulary, topicMeanings, globalMeanings, random)
+                    Options = BuildMinitestWordOptions(vocabulary, topicWords, random)
                 });
             }
 
@@ -1096,6 +1090,46 @@ namespace VocabLearning.Services
                 {
                     DisplayText = wrongOption,
                     Value = optionMeaning
+                });
+            }
+
+            return options
+                .GroupBy(item => item.DisplayText, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(_ => random.Next())
+                .ToList();
+        }
+
+        private List<LearningMinitestAnswerOptionViewModel> BuildMinitestWordOptions(
+            Vocabulary vocabulary,
+            List<WordOption> topicWords,
+            Random random)
+        {
+            var correctWord = NormalizeWord(vocabulary.Word);
+            var correctMeaning = NormalizeMeaning(vocabulary.MeaningVi);
+
+            var options = topicWords
+                .Where(item => item.VocabId != vocabulary.VocabId)
+                .Select(item => new LearningMinitestAnswerOptionViewModel
+                {
+                    DisplayText = NormalizeWord(item.Word),
+                    Value = NormalizeMeaning(item.Meaning)
+                })
+                .Where(item => !string.IsNullOrWhiteSpace(item.DisplayText))
+                .Where(item => !string.IsNullOrWhiteSpace(item.Value))
+                .Where(item => !string.Equals(item.DisplayText, correctWord, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(item => item.DisplayText, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(_ => random.Next())
+                .Take(3)
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(correctWord) && !string.IsNullOrWhiteSpace(correctMeaning))
+            {
+                options.Add(new LearningMinitestAnswerOptionViewModel
+                {
+                    DisplayText = correctWord,
+                    Value = correctMeaning
                 });
             }
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { EMPTY_CURRENT_USER_GAME_DATA, XP_RULES } from '../constants/appConstants';
 import { mockData } from '../mocks/mockData';
+import { appendStudyDate, getTodayStudyDate } from '../utils/studyHistory';
 
 export type XpFloatItem = {
     id: number;
@@ -28,7 +29,7 @@ export const useGameProgress = (addToast: (message: string, type?: string) => vo
     }, []);
 
     const triggerStreakCheck = useCallback(() => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayStudyDate();
         let nextStreak: number | null = null;
 
         setGameData(prev => {
@@ -37,12 +38,15 @@ export const useGameProgress = (addToast: (message: string, type?: string) => vo
             }
 
             nextStreak = prev.currentUser.streak + 1;
+            const nextHistory = appendStudyDate(prev.currentUser.studyHistory, today);
+
             return {
                 ...prev,
                 currentUser: {
                     ...prev.currentUser,
                     streak: nextStreak,
-                    lastStudyDate: today
+                    lastStudyDate: today,
+                    studyHistory: nextHistory
                 }
             };
         });

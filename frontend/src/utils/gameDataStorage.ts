@@ -2,6 +2,7 @@ import {
     EMPTY_CURRENT_USER_GAME_DATA,
     type CurrentUserGameData
 } from '../constants/appConstants';
+import { buildHistoryFromStreak, normalizeStudyHistory } from './studyHistory';
 
 const STORAGE_KEY_PREFIX = 'vocab-learning:current-user-game-data:';
 
@@ -9,13 +10,19 @@ const getStorageKey = (userId: number) => `${STORAGE_KEY_PREFIX}${userId}`;
 
 export const normalizeCurrentUserGameData = (
     data?: Partial<CurrentUserGameData> | null
-): CurrentUserGameData => ({
-    ...EMPTY_CURRENT_USER_GAME_DATA,
-    ...data,
-    studyHistory: Array.isArray(data?.studyHistory)
-        ? data.studyHistory
-        : []
-});
+): CurrentUserGameData => {
+    const normalizedHistory = normalizeStudyHistory(data?.studyHistory);
+    const historyFromStreak = buildHistoryFromStreak(data?.lastStudyDate || '', data?.streak || 0);
+
+    return {
+        ...EMPTY_CURRENT_USER_GAME_DATA,
+        ...data,
+        studyHistory: normalizedHistory.length > 0 ? normalizedHistory : historyFromStreak,
+        studyHistoryDetails: data?.studyHistoryDetails && typeof data.studyHistoryDetails === 'object'
+            ? data.studyHistoryDetails
+            : {}
+    };
+};
 
 export const loadCurrentUserGameData = (userId: number): CurrentUserGameData => {
     if (typeof window === 'undefined') {

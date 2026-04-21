@@ -5,16 +5,18 @@ import { StreakHeatmap } from '../components/streak';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
+import { buildStudyDaySummary } from '../utils/studyHistory';
 
 type ProfileProps = {
     user: any;
+    learnedWordsList?: any[];
     onLogout: () => void;
     onOpenStreak: () => void;
     onAddToast?: (message: string, type?: string) => void;
     onUserUpdated: (user: AuthenticatedUser) => void;
 };
 
-const Profile = ({ user, onLogout, onOpenStreak, onAddToast, onUserUpdated }: ProfileProps) => {
+const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, onUserUpdated }: ProfileProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [username, setUsername] = useState(user.username || '');
     const [email, setEmail] = useState(user.email || '');
@@ -25,6 +27,8 @@ const Profile = ({ user, onLogout, onOpenStreak, onAddToast, onUserUpdated }: Pr
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
+    const [showLearnedWords, setShowLearnedWords] = useState(false);
+    const [selectedStudyDate, setSelectedStudyDate] = useState<string | null>(null);
 
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -58,6 +62,81 @@ const Profile = ({ user, onLogout, onOpenStreak, onAddToast, onUserUpdated }: Pr
 
         return source[0].toUpperCase();
     }, [user.username]);
+
+    const learnedWords = useMemo(
+        () => (Array.isArray(learnedWordsList) ? learnedWordsList : [])
+            .filter(item => item?.word)
+            .sort((a, b) => String(a.word || '').localeCompare(String(b.word || ''))),
+        [learnedWordsList]
+    );
+
+    const studyHistory = useMemo(
+        () => (Array.isArray(user.studyHistory) ? user.studyHistory : [])
+            .filter((day: unknown): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)),
+        [user.studyHistory]
+    );
+
+    const studyHistoryDetails = useMemo(
+        () => (user?.studyHistoryDetails && typeof user.studyHistoryDetails === 'object')
+            ? user.studyHistoryDetails
+            : {},
+        [user?.studyHistoryDetails]
+    );
+
+    const studyHistoryDates = useMemo(() => {
+        const detailDates = Object.keys(studyHistoryDetails)
+            .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day));
+
+        return Array.from(new Set([...studyHistory, ...detailDates])).sort((a, b) => a.localeCompare(b));
+    }, [studyHistory, studyHistoryDetails]);
+
+    useEffect(() => {
+        if (studyHistoryDates.length === 0) {
+            setSelectedStudyDate(null);
+            return;
+        }
+
+        const latestDate = [...studyHistoryDates].at(-1) ?? null;
+        setSelectedStudyDate(latestDate);
+    }, [studyHistoryDates]);
+
+    const selectedStudyDateLabel = useMemo(() => {
+        if (!selectedStudyDate) {
+            return 'Chọn một ngày để xem chi tiết học tập.';
+        }
+
+        const parsedDate = new Date(`${selectedStudyDate}T00:00:00`);
+        if (Number.isNaN(parsedDate.getTime())) {
+            return selectedStudyDate;
+        }
+
+        return parsedDate.toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }, [selectedStudyDate]);
+
+    const hasStudiedOnSelectedDate = selectedStudyDate
+        ? studyHistoryDates.includes(selectedStudyDate)
+        : false;
+
+    const selectedStudyDetail = useMemo(
+        () => (selectedStudyDate ? studyHistoryDetails[selectedStudyDate] : null),
+        [selectedStudyDate, studyHistoryDetails]
+    );
+
+    const selectedStudySummary = useMemo(
+        () => buildStudyDaySummary(
+            selectedStudyDate || '',
+            studyHistoryDates,
+            selectedStudyDetail,
+            Number(user.learnedWords || learnedWords.length || 0),
+            Number(user.xp || 0)
+        ),
+        [selectedStudyDate, studyHistoryDates, selectedStudyDetail, user.learnedWords, learnedWords.length, user.xp]
+    );
 
     const handleSaveProfile = async () => {
         if (isSavingProfile) {
@@ -148,7 +227,77 @@ const Profile = ({ user, onLogout, onOpenStreak, onAddToast, onUserUpdated }: Pr
                     </div>
                     <div className="glass-card p-8">
                         <h3 className="text-xl mb-6">Study History (30 Days)</h3>
-                        <StreakHeatmap history={user.studyHistory} />
+                        <StreakHeatmap
+                            history={studyHistoryDates}
+                            selectedDate={selectedStudyDate}
+                            onSelectDate={setSelectedStudyDate}
+                        />
+                        <div className="mt-5 p-4 rounded-2xl border border-primary/20 bg-white/40">
+                            <p className="text-sm font-bold capitalize">{selectedStudyDateLabel}</p>
+                            {selectedStudyDate ? (
+                                <>
+                                    <p className={`text-sm mt-1 ${hasStudiedOnSelectedDate ? 'text-green-700' : 'text-text-muted'}`}>
+                                        {hasStudiedOnSelectedDate
+                                            ? 'Bạn có học trong ngày này. ✅'
+                                            : 'Không có hoạt động học trong ngày này.'}
+                                    </p>
+
+                                    {hasStudiedOnSelectedDate && (
+                                        <div className="mt-3 space-y-3">
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                    <div className="text-text-muted uppercase">Từ đã học</div>
+                                                    <div className="text-base font-bold">{selectedStudySummary.totalWords}</div>
+                                                </div>
+                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                    <div className="text-text-muted uppercase">XP</div>
+                                                    <div className="text-base font-bold">+{selectedStudySummary.totalXp}</div>
+                                                </div>
+                                            </div>
+
+                                            {selectedStudySummary.topics.length > 0 && (
+                                                <div className="text-xs text-text-secondary">
+                                                    Chủ đề: {selectedStudySummary.topics.join(', ')}
+                                                </div>
+                                            )}
+
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-sm mt-1 text-text-muted">Nhấp vào ô ngày trong heatmap để xem.</p>
+                            )}
+                        </div>
+                    </div>
+                    <div className="glass-card p-8">
+                        <div className="flex items-center justify-between gap-4 mb-4">
+                            <h3 className="text-xl">Learned Words</h3>
+                            <Button
+                                variant="ghost"
+                                className="px-4 py-2"
+                                onClick={() => setShowLearnedWords((prev) => !prev)}
+                            >
+                                {showLearnedWords ? 'Hide' : 'Show'}
+                            </Button>
+                        </div>
+
+                        {!showLearnedWords ? (
+                            <p className="text-sm text-text-muted">Nhấn Show để xem danh sách từ đã học.</p>
+                        ) : learnedWords.length === 0 ? (
+                            <p className="text-sm text-text-muted">Bạn chưa có từ nào đã học.</p>
+                        ) : (
+                            <div className="max-h-80 overflow-auto border border-primary/10 rounded-2xl divide-y divide-primary/10">
+                                {learnedWords.map((item) => (
+                                    <div key={item.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                                        <div>
+                                            <div className="font-bold">{item.word}</div>
+                                            <div className="text-sm text-text-muted">{item.meaning}</div>
+                                        </div>
+                                        <div className="text-xs text-text-muted">{item.topicName || 'Unknown topic'}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

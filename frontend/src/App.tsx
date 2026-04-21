@@ -28,6 +28,13 @@ import { Badge, Button, Toast } from "./components/ui";
 import { Footer, Navbar } from "./components/layout";
 import { StreakModal } from "./components/streak";
 import { AppRoutes } from "./AppRoutes";
+import { buildMinitestFillQuestions } from "./utils/minitestQuestions";
+import {
+  appendStudyDate,
+  appendStudySessionDetail,
+  getTodayStudyDate,
+  type StudySessionRecordInput,
+} from "./utils/studyHistory";
 
 // --- COMPONENTS ---
 
@@ -403,22 +410,19 @@ const MatchingGame = ({ words, type, onFinish }: any) => {
   );
 };
 
-const Minitest = ({ topicId, learnedWords, onFinish }: any) => {
+const Minitest = ({ topicId, learnedWords, topicWords, onFinish }: any) => {
   const [fillAnswers, setFillAnswers] = useState<string[]>([]);
   const [readingAnswers, setReadingAnswers] = useState<(number | null)[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showingPart2, setShowingPart2] = useState(false);
 
   const fillQuestions = useMemo(() => {
-    return (Array.isArray(learnedWords) ? learnedWords : [])
-      .slice(0, 5)
-      .map((w: any) => ({
-        id: w.id,
-        q: (w.example || "").replace(new RegExp(w.word, "gi"), "________"),
-        hint: w.word?.charAt(0)?.toLowerCase() || "",
-        a: w.word || "",
-      }));
-  }, [learnedWords]);
+    return buildMinitestFillQuestions(
+      Array.isArray(learnedWords) ? learnedWords : [],
+      Array.isArray(topicWords) ? topicWords : [],
+      5,
+    );
+  }, [learnedWords, topicWords]);
 
   const passage = useMemo(() => {
     return (
@@ -497,7 +501,7 @@ const Minitest = ({ topicId, learnedWords, onFinish }: any) => {
         <section id="part1">
           <header className="flex items-center gap-6 mb-12">
             <Badge variant="purple" className="py-3 px-6 text-base font-bold">
-              Bài 1: Điền từ còn thiếu
+              Bài 1: Chọn từ đúng
             </Badge>
             <div className="flex-1 h-px bg-purple/10" />
           </header>
@@ -524,29 +528,60 @@ const Minitest = ({ topicId, learnedWords, onFinish }: any) => {
                     </span>
                   </div>
                   <div className="text-2xl font-medium mb-8 leading-relaxed italic text-text-primary">
-                    "{q.q}"
+                    {q.promptType === "example"
+                      ? q.q
+                      : `Nghĩa: ${q.q}`}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-6 items-end sm:items-center">
-                    <div className="relative flex-1 group">
-                      <input
-                        type="text"
-                        placeholder="Gõ đáp án..."
-                        disabled={isSubmitted}
-                        value={fillAnswers[i]}
-                        onChange={(e) => {
-                          const next = [...fillAnswers];
-                          next[i] = e.target.value;
-                          setFillAnswers(next);
-                        }}
-                        className={`w-full px-8 py-5 rounded-2xl border-2 transition-all text-xl font-bold bg-transparent outline-none
-                                                ${isSubmitted ? (isCorrect ? "border-green-500 text-green-700" : "border-red-500 text-red-700") : "border-primary/10 hover:border-primary/30 focus:border-primary focus:bg-white"}`}
-                      />
-                      {!isSubmitted && (
-                        <div className="mt-3 text-sm text-text-muted">
-                          💡 Bắt đầu bằng chữ "{q.hint}"
-                        </div>
-                      )}
+                  <div className="flex flex-col gap-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {q.options.map((option: string, optionIndex: number) => {
+                        const isSelected = fillAnswers[i] === option;
+                        const isCorrectOption =
+                          isSubmitted &&
+                          option.toLowerCase() === q.a.toLowerCase();
+                        const isWrongSelected =
+                          isSubmitted &&
+                          isSelected &&
+                          option.toLowerCase() !== q.a.toLowerCase();
+
+                        return (
+                          <label
+                            key={`${q.id}-${optionIndex}`}
+                            className={`flex items-center gap-4 p-5 border-2 rounded-2xl cursor-pointer transition-all ${isSubmitted
+                              ? isCorrectOption
+                                ? "border-green-500 bg-green-100 text-green-900"
+                                : isWrongSelected
+                                  ? "border-red-500 bg-red-100 text-red-900"
+                                  : "border-primary/10 bg-white"
+                              : isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-primary/10 hover:border-primary/30 bg-white"
+                              }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`fill-question-${i}`}
+                              checked={isSelected}
+                              disabled={isSubmitted}
+                              onChange={() => {
+                                const next = [...fillAnswers];
+                                next[i] = option;
+                                setFillAnswers(next);
+                              }}
+                              className="w-5 h-5 accent-primary"
+                            />
+                            <span className="text-lg font-semibold">{option}</span>
+                          </label>
+                        );
+                      })}
                     </div>
+
+                    {isSubmitted && !fillAnswers[i] && (
+                      <div className="text-red-600 font-semibold">
+                        Vui lòng chọn đáp án cho câu này.
+                      </div>
+                    )}
+
                     {isSubmitted && (
                       <div
                         className={`mt-2 font-display font-bold text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
@@ -690,6 +725,7 @@ const StudySession = ({
   onStreakCheck,
   onAddToast,
   onWordsLearned,
+  onRecordStudyHistory,
 }: any) => {
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
     "flashcard",
@@ -858,14 +894,28 @@ const StudySession = ({
     total: number,
     time: number,
   ) => {
+    const gainedXp = correct * 5;
+
     if (topicId && selectedWordIds.length > 0) {
       await onWordsLearned(topicId, selectedWordIds);
+
+      onRecordStudyHistory?.({
+        topicId,
+        topicTitle,
+        xp: gainedXp,
+        words: selectedWords.map((word: any) => ({
+          id: word.id,
+          word: word.word,
+          meaning: word.meaning,
+        })),
+        timeSpentSeconds: time,
+      });
     }
 
-    onAddXP(correct * 5);
+    onAddXP(gainedXp);
     onStreakCheck();
     onAddToast(
-      `Hoàn thành Matching trong ${time}s! +${correct * 5} XP`,
+      `Hoàn thành Matching trong ${time}s! +${gainedXp} XP`,
       "success",
     );
     setMatchType(null);
@@ -1500,6 +1550,7 @@ const StudySession = ({
             <Minitest
               topicId={topicId}
               learnedWords={learnedWordsForMinitest}
+              topicWords={words}
               onFinish={onFinish}
             />
           </motion.div>
@@ -1590,6 +1641,30 @@ export default function App() {
       }
     },
     [currentUser?.userId, addToast],
+  );
+
+  const handleRecordStudyHistory = useCallback(
+    (sessionInput: StudySessionRecordInput) => {
+      if (!sessionInput || !Array.isArray(sessionInput.words) || sessionInput.words.length === 0) {
+        return;
+      }
+
+      const today = getTodayStudyDate();
+
+      setGameData((prev) => ({
+        ...prev,
+        currentUser: {
+          ...prev.currentUser,
+          studyHistory: appendStudyDate(prev.currentUser.studyHistory, today),
+          studyHistoryDetails: appendStudySessionDetail(
+            prev.currentUser.studyHistoryDetails,
+            today,
+            sessionInput,
+          ),
+        },
+      }));
+    },
+    [setGameData],
   );
 
   const handleLogout = async () => {
@@ -1693,6 +1768,7 @@ export default function App() {
               onUserUpdated={handleUserUpdated}
               LearningTopicsComponent={LearningTopics}
               StudySessionComponent={StudySession}
+              onRecordStudyHistory={handleRecordStudyHistory}
             />
           </motion.div>
         </AnimatePresence>

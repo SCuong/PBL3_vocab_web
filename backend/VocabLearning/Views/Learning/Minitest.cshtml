@@ -17,7 +17,7 @@
     <div class="alert alert-danger">@errorMessage</div>
 }
 
-<form asp-action="Minitest" method="post" class="d-grid gap-3">
+<form id="minitest-form" asp-action="Minitest" method="post" class="d-grid gap-3">
     @Html.AntiForgeryToken()
     <input asp-for="TopicId" type="hidden" />
     <input asp-for="ParentTopicId" type="hidden" />
@@ -36,7 +36,7 @@
         <div class="card learning-quiz-card">
             <div class="card-body">
                 <div class="text-uppercase small text-muted mb-2">Question @(i + 1)</div>
-                <h4 class="mb-3">@Model.Questions[i].Word</h4>
+                <h4 class="mb-3">@Model.Questions[i].Meaning</h4>
 
                 <div class="d-grid gap-2">
                     @for (var j = 0; j < Model.Questions[i].Options.Count; j++)
@@ -55,11 +55,56 @@
                         </div>
                     }
                 </div>
+
+                <div id="question-error-@i" class="text-danger small mt-2 d-none">
+                    Please choose one answer for this question.
+                </div>
             </div>
         </div>
     }
 
     <div class="d-flex justify-content-end">
-        <button type="submit" class="btn btn-success">Submit Minitest</button>
+        <button id="submit-minitest" type="submit" class="btn btn-success">Submit Minitest</button>
     </div>
 </form>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById("minitest-form");
+            if (!form) {
+                return;
+            }
+
+            const questionCount = @Model.Questions.Count;
+
+            form.addEventListener("submit", function (event) {
+                let hasError = false;
+                let firstErrorElement = null;
+
+                for (let i = 0; i < questionCount; i++) {
+                    const checked = form.querySelector(`input[name='Questions[${i}].SelectedAnswer']:checked`);
+                    const errorElement = document.getElementById(`question-error-${i}`);
+
+                    if (!checked) {
+                        hasError = true;
+                        if (errorElement) {
+                            errorElement.classList.remove("d-none");
+                            if (!firstErrorElement) {
+                                firstErrorElement = errorElement;
+                            }
+                        }
+                    }
+                    else if (errorElement) {
+                        errorElement.classList.add("d-none");
+                    }
+                }
+
+                if (hasError) {
+                    event.preventDefault();
+                    firstErrorElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+            });
+        })();
+    </script>
+}

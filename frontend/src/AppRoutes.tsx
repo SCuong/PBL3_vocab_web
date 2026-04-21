@@ -23,6 +23,7 @@ type AppRoutesProps = {
     addXP: (amount: number) => void;
     triggerStreakCheck: () => void;
     handleWordsLearned: (topicId: number, wordIds: number[]) => Promise<void>;
+    onRecordStudyHistory: (sessionInput: any) => void;
     testResult: { score: number; total: number; detail?: any } | null;
     handleLogout: () => void;
     onOpenStreak: () => void;
@@ -52,6 +53,7 @@ export const AppRoutes = ({
     addXP,
     triggerStreakCheck,
     handleWordsLearned,
+    onRecordStudyHistory,
     testResult,
     handleLogout,
     onOpenStreak,
@@ -73,6 +75,18 @@ export const AppRoutes = ({
         learnedWords: learnedWordsCount ?? gameData.currentUser?.learnedWords ?? 0
     };
 
+    const learnedWordIds = Array.isArray(learningProgressState?.topics)
+        ? new Set(
+            learningProgressState.topics
+                .flatMap((topic: any) => Array.isArray(topic.learnedWordIds) ? topic.learnedWordIds : [])
+                .filter((wordId: any) => Number.isFinite(wordId) && wordId > 0)
+        )
+        : new Set<number>();
+
+    const learnedVocabularyItems = Array.isArray(vocabularyItems)
+        ? vocabularyItems.filter((item: any) => learnedWordIds.has(item.id))
+        : [];
+
     const routeMap: Record<string, any> = {
         home: <Home onNavigate={setCurrentPage} />,
         vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
@@ -86,9 +100,9 @@ export const AppRoutes = ({
             setCurrentPage('home');
         }} onAddToast={addToast} initialMode="register" />,
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
-        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} />,
+        'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} onRecordStudyHistory={onRecordStudyHistory} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
-        profile: <Profile user={profileUser} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
+        profile: <Profile user={profileUser} learnedWordsList={learnedVocabularyItems} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
         leaderboard: <Leaderboard gameData={gameData} />,
         admin: <AdminDashboard />
     };
