@@ -92,8 +92,6 @@ docker compose down
 docker compose up
 ```
 
-Không cần `--build` nữa vì images đã được build sẵn.
-
 ---
 
 ## 📋 Các lệnh thường dùng
