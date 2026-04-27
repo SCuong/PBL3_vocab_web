@@ -1,128 +1,175 @@
-# Run and deploy your AI Studio app
+# 📚 VocabLearning
 
-This contains everything you need to run your app locally.
+Ứng dụng học từ vựng tiếng Anh — React + ASP.NET Core + SQL Server.
 
-View your app in AI Studio: https://ai.studio/apps/376cd535-5c05-460f-8f74-d8bd10fe928c
+> **Nhánh `main`** — bản dành cho người dùng, chạy bằng Docker.  
+> **Nhánh `Cuong`** — môi trường phát triển (dev).
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## 🖥️ Yêu cầu
 
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows / macOS / Linux)
+- Không cần Node.js, .NET hay SQL Server.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-=======
-# PBL3\_vocab\_web
+---
 
-PBL3 – Basic English vocabulary learning web application
+## 🚀 Cài đặt & Chạy
 
+### Bước 1 — Tải về
 
+```bash
+git clone https://github.com/SCuong/PBL3_vocab_web.git
+cd PBL3_vocab_web
+```
 
-\# ImportVocabularyPBL3
+> Hoặc tải ZIP: nhấn nút **Code → Download ZIP** trên GitHub, giải nén ra.
 
+---
 
+### Bước 2 — Tạo file cấu hình
 
-.NET Framework utility for bootstrapping the `PBL3` database and importing vocabulary data from Excel.
+**Windows:**
+```bash
+copy .env.example .env
+```
 
+**macOS / Linux:**
+```bash
+cp .env.example .env
+```
 
+Mở file `.env` và điền các thông tin sau:
 
-\## Requirements
+```env
+# Mật khẩu SQL Server (phải có chữ HOA + thường + số + ký tự đặc biệt, ≥8 ký tự)
+SA_PASSWORD=VocabLearn@2024!
 
+# Chuỗi bí mật JWT — đặt ngẫu nhiên
+JWT_SECRET=change-this-to-a-very-long-random-secret-string
 
+# Gmail dùng để gửi email quên mật khẩu
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+SMTP_FROM_EMAIL=your_email@gmail.com
+```
 
-\- Visual Studio 2022 or later
+> **App Password Gmail** (nếu chưa có):  
+> Vào [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) → tạo password cho app "VocabLearning" → Gmail trả về dãy 16 ký tự → dán vào `SMTP_PASSWORD`.
 
-\- .NET Framework 4.7.2 Developer Pack
+---
 
-\- SQL Server Express or Full
+### Bước 3 — Chạy
 
+```bash
+docker compose up --build
+```
 
+⏳ Lần đầu mất khoảng **3–5 phút** (tải images, build code, khởi tạo database).
 
-\## Setup and Run
+Khi thấy log:
+```
+vocablearning_db  | DB READY
+```
 
+Mở trình duyệt tại: **http://localhost:3000** ✅
 
+---
 
-1\. Clone the repository
+## 🛑 Tắt ứng dụng
 
+```bash
+docker compose down
+```
 
+> Data vẫn được giữ nguyên, lần sau chạy lại bình thường.
 
-&#x20;  ```bash
+---
 
-&#x20;  git clone https://github.com/SCuong/pbl3\_vocab\_web.git
+## 🔄 Lần sau muốn chạy lại
 
-&#x20;  ```
+```bash
+docker compose up
+```
 
+Không cần `--build` nữa vì images đã được build sẵn.
 
+---
 
-2\. Open the solution
+## 📋 Các lệnh thường dùng
 
-
-
-&#x20;  Open `database/ImportVocabularyPBL3/ImportVocabularyPBL3.sln` in Visual Studio 2026.
-
-
-
-3\. Configure SQL Server
-
-
-
-&#x20;  Update `App.config` if your SQL Server is not the default local instance.
-
-
-
-&#x20;  Default connection string:
-
-
-
-&#x20;  ```xml
-
-&#x20;  Server=.;Database=PBL3;Trusted\_Connection=True;TrustServerCertificate=True;
-
-&#x20;  ```
-
-
-
-&#x20;  Note: if a database named `PBL3` already exists delete/drop that database before running the tool.
-
-
-
-4\. Verify input files
-
-
-
-&#x20;  - Bootstrap script: `Scripts/PBL3.bootstrap.sql`
-
-&#x20;  - Excel source: `Data/vocab.xlsx`
-
-
-
-5\. Build and run
-
-
-
-&#x20;  - Build Solution
-
-&#x20;  - Press `F5` to run
-
-
-
-\## What the tool does
-
-
-
-When the application runs, it will:
-
-
-
-\- Create the `PBL3` database if it does not already exist
-
-\- Execute the bootstrap SQL script
-
-\- Import vocabulary data from the Excel file
-
-
-
->>>>>>> c3716feb33a07df8b0c14cdab51b3691c2d57e2b
+| Lệnh | Mô tả |
+|------|-------|
+| `docker compose up --build` | Lần đầu chạy |
+| `docker compose up` | Các lần sau |
+| `docker compose up -d` | Chạy nền (không chiếm terminal) |
+| `docker compose down` | Tắt, giữ data |
+| `docker compose down -v` | Tắt + xoá sạch data ⚠️ |
+| `docker compose logs -f` | Xem log realtime |
+| `docker compose logs -f backend` | Xem log backend |
+| `docker compose pull && docker compose up --build` | Cập nhật phiên bản mới |
+
+---
+
+## ❓ Xử lý lỗi thường gặp
+
+**Lỗi `SA_PASSWORD` không đủ mạnh**  
+→ Mật khẩu phải có đủ: chữ HOA, chữ thường, số, ký tự đặc biệt (`@`, `!`, `#`...), tối thiểu 8 ký tự.  
+→ Ví dụ hợp lệ: `MyPass@2024!`  
+→ Sau khi đổi password, chạy `docker compose down -v` rồi `docker compose up --build`.
+
+**Lỗi gửi email (SMTP)**  
+→ Gmail cần bật **2-Step Verification** trước, sau đó tạo [App Password](https://myaccount.google.com/apppasswords).  
+→ Dùng App Password 16 ký tự, không dùng mật khẩu Gmail thông thường.
+
+**Port 3000 đã bị chiếm**  
+→ Thêm dòng `FRONTEND_PORT=3001` vào file `.env` rồi chạy lại.  
+→ Truy cập tại `http://localhost:3001`.
+
+**Backend khởi động lại liên tục**  
+→ SQL Server chưa sẵn sàng. Chờ thêm 1–2 phút.  
+→ Kiểm tra: `docker compose logs db`
+
+**Muốn reset toàn bộ về trạng thái ban đầu**  
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+---
+
+## 🏗️ Kiến trúc
+
+```
+Trình duyệt → http://localhost:3000
+                    │
+                    ▼
+          ┌─────────────────┐
+          │  Nginx (port 80) │  frontend container
+          │  React SPA       │
+          │  /api/* → proxy  │
+          └────────┬─────────┘
+                   │ proxy /api/*
+                   ▼
+          ┌─────────────────┐
+          │  ASP.NET Core   │  backend container
+          │  (.NET 10)      │  (port 5152, nội bộ)
+          └────────┬─────────┘
+                   │ Entity Framework
+                   ▼
+          ┌─────────────────┐
+          │  SQL Server     │  db container
+          │  2022 Express   │  (port 1433, nội bộ)
+          │  Database: PBL3 │
+          └─────────────────┘
+```
+
+---
+
+## 👨‍💻 Dành cho developer
+
+Xem nhánh [`Cuong`](https://github.com/SCuong/PBL3_vocab_web/tree/Cuong) để phát triển với hot-reload.
+
+---
+
+*VocabLearning — PBL3 Project*

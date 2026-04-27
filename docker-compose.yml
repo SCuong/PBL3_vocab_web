@@ -1,23 +1,5 @@
-version: "3.9"
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  PBL3 VocabLearning — Production Docker Compose
-#
-#  Lần đầu chạy:
-#    1. cp .env.example .env        (điền passwords/secrets)
-#    2. docker compose up --build   (build images + khởi động)
-#
-#  Các lần sau:
-#    docker compose up -d           (chạy nền)
-#    docker compose down            (tắt)
-#    docker compose logs -f         (xem log)
-#
-#  Truy cập: http://localhost:3000
-# ─────────────────────────────────────────────────────────────────────────────
-
 services:
 
-  # ── SQL Server 2022 ──────────────────────────────────────────────────────────
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: vocablearning_db
@@ -25,21 +7,29 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "${SA_PASSWORD}"
       MSSQL_PID: "Express"
+      SA_PASSWORD: "${SA_PASSWORD}"
     volumes:
       - sqlserver_data:/var/opt/mssql
+      - ./database/init.sql:/init.sql
+      - ./database/init-db.sh:/init-db.sh
     ports:
-      - "1433:1433"        # Bỏ dòng này nếu không cần truy cập DB từ ngoài
+      - "1433:1433"
+    command: >
+      bash -c "
+      /opt/mssql/bin/sqlservr &
+      sleep 30 &&
+      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -Q \"IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'PBL3') CREATE DATABASE PBL3;\" &&
+      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -d PBL3 -i /init.sql &&
+      echo 'DB READY' &&
+      wait"
     healthcheck:
-      test: >
-        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD"
-        -Q "SELECT 1" -No -l 5 || exit 1
-      interval: 20s
-      timeout: 15s
-      retries: 15
-      start_period: 60s
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     restart: unless-stopped
 
-  # ── ASP.NET Core 10 Backend ──────────────────────────────────────────────────
   backend:
     build:
       context: ./backend/VocabLearning
@@ -51,25 +41,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5152"
-
-      # Connection string — "db" = tên service SQL Server ở trên
-      ConnectionStrings__DefaultConnection: >-
-        Server=db,1433;Database=PBL3;User Id=sa;Password=${SA_PASSWORD};
-        TrustServerCertificate=True;MultipleActiveResultSets=True;
-        Connect Timeout=30;
-
-      # CORS — phải khớp với port người dùng truy cập
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=PBL3;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True;Connect Timeout=30;"
       Frontend__Origin: "http://localhost:${FRONTEND_PORT:-3000}"
-
-      # Avatar directory trong container (mount volume bên dưới)
       Frontend__AvatarPath: "/app/avatars"
-
-      # JWT
       Jwt__Secret: "${JWT_SECRET}"
       Jwt__Issuer: "VocabLearning"
       Jwt__Audience: "VocabLearningUsers"
-
-      # SMTP
       Smtp__Host: "${SMTP_HOST:-smtp.gmail.com}"
       Smtp__Port: "${SMTP_PORT:-587}"
       Smtp__EnableSsl: "true"
@@ -77,25 +54,16 @@ services:
       Smtp__Password: "${SMTP_PASSWORD}"
       Smtp__FromEmail: "${SMTP_FROM_EMAIL}"
       Smtp__FromName: "VocabLearning"
-
-      # Google OAuth (để trống nếu không dùng)
       Authentication__Google__ClientId: "${GOOGLE_CLIENT_ID}"
       Authentication__Google__ClientSecret: "${GOOGLE_CLIENT_SECRET}"
-
-      # Tắt expose reset link trong production
       PasswordReset__ExposeResetLinkInResponse: "false"
-
-      # Cookie policy — HTTP-only Docker không có HTTPS nên dùng Lax/SameAsRequest
-      # (xem appsettings.Production.json)
       Cookie__SecurePolicy: "SameAsRequest"
       Cookie__SameSite: "Lax"
-
+      Database__AutoMigrate: "true"
     volumes:
-      # Avatar files được share giữa backend và có thể mount từ host
       - avatar_data:/app/avatars
     restart: unless-stopped
 
-  # ── Nginx + React Frontend ───────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -107,7 +75,6 @@ services:
       - "${FRONTEND_PORT:-3000}:80"
     restart: unless-stopped
 
-# ── Persistent Volumes ────────────────────────────────────────────────────────
 volumes:
   sqlserver_data:
     name: vocablearning_sqlserver_data

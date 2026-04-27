@@ -38,8 +38,12 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromDays(14);
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.None;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        var sameSiteConfig = builder.Configuration["Cookie:SameSite"] ?? "None";
+        var securePolicyConfig = builder.Configuration["Cookie:SecurePolicy"] ?? "Always";
+        options.Cookie.SameSite = sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
+        options.Cookie.SecurePolicy = securePolicyConfig == "SameAsRequest"
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
         options.Events = new CookieAuthenticationEvents
         {
             OnRedirectToLogin = context =>
@@ -70,8 +74,12 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {
         options.Cookie.Name = "__VocabLearning.External";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.None;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        var sameSiteConfig = builder.Configuration["Cookie:SameSite"] ?? "None";
+        var securePolicyConfig = builder.Configuration["Cookie:SecurePolicy"] ?? "Always";
+        options.Cookie.SameSite = sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
+        options.Cookie.SecurePolicy = securePolicyConfig == "SameAsRequest"
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
     });
 
@@ -114,6 +122,48 @@ var app = builder.Build();
 
 await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
 
+// Auto-initialize database in production (Docker environment)
+if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        // Kiểm tra xem bảng vocabulary đã tồn tại chưa
+        var exists = await db.Database.ExecuteSqlRawAsync(
+            "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'vocabulary') " +
+            "BEGIN RAISERROR('NEEDS_INIT', 16, 1) END"
+        );
+    }
+    catch (Exception ex) when (ex.Message.Contains("NEEDS_INIT"))
+    {
+        logger.LogInformation("First run — running init.sql...");
+        var initSqlPath = "/docker-entrypoint-initdb.d/init.sql";
+        if (File.Exists(initSqlPath))
+        {
+            var sql = await File.ReadAllTextAsync(initSqlPath);
+            var batches = System.Text.RegularExpressions.Regex
+                .Split(sql, @"^\s*GO\s*$", System.Text.RegularExpressions.RegexOptions.Multiline)
+                .Select(b => b.Trim())
+                .Where(b => b.Length > 0);
+            foreach (var batch in batches)
+            {
+                try { await db.Database.ExecuteSqlRawAsync(batch); }
+                catch (Exception batchEx)
+                {
+                    logger.LogWarning("Batch warning (non-fatal): {Msg}", batchEx.Message);
+                }
+            }
+            logger.LogInformation("Database initialized successfully.");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Database initialization failed.");
+        throw;
+    }
+}
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -122,7 +172,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 var configuredAvatarPath = builder.Configuration["Frontend:AvatarPath"];

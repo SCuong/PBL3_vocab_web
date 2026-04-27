@@ -1,8 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build output
 build/
 dist/
 coverage/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+
+# Environment — giữ .env.example, bỏ hết còn lại
 .env*
 !.env.example
+
+# Docker volumes (nếu lỡ tạo local)
+.docker/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# IDE
+.vscode/
+.idea/
