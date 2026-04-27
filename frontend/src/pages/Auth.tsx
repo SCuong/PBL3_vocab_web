@@ -34,6 +34,10 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    // 'idle' | 'active' | 'close' — mirrors the sample's container class
+    const [flipState, setFlipState] = useState<'idle' | 'active' | 'close'>(
+        initialMode === 'register' ? 'active' : 'idle'
+    );
 
     const resetForgotPasswordState = () => {
         setForgotPasswordSent(false);
@@ -43,7 +47,9 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
     };
 
     useEffect(() => {
-        setIsLogin(initialMode !== 'register');
+        const nextLogin = initialMode !== 'register';
+        setIsLogin(nextLogin);
+        setFlipState(nextLogin ? 'idle' : 'active');
         resetForgotPasswordState();
         setIsForgotPasswordMode(false);
         setIsResetPasswordMode(false);
@@ -57,6 +63,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
 
         if (mode === 'reset') {
             setIsLogin(true);
+            setFlipState('idle');
             setIsForgotPasswordMode(false);
             setIsResetPasswordMode(true);
             resetForgotPasswordState();
@@ -69,6 +76,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         setIsForgotPasswordMode(false);
         setIsResetPasswordMode(false);
         setIsLogin(true);
+        setFlipState('idle');
         setErrorMessage('');
         setSuccessMessage('');
         resetForgotPasswordState();
@@ -85,27 +93,20 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         hasLowercase: /[a-z]/.test(password),
         hasUppercase: /[A-Z]/.test(password),
         hasNumber: /[0-9]/.test(password),
-        hasSpecial: /[^A-Za-z0-9]/.test(password)
+        hasSpecial: /[^A-Za-z0-9]/.test(password),
     };
 
     const isPasswordValid = Object.values(passwordPolicy).every(Boolean);
 
     const handleSubmit = async () => {
-        if (isSubmitting) {
-            return;
-        }
-
+        if (isSubmitting) return;
         setErrorMessage('');
         setSuccessMessage('');
         setIsSubmitting(true);
 
         try {
             if (isLogin) {
-                const user = await authApi.login({
-                    usernameOrEmail,
-                    password,
-                    rememberMe: true
-                });
+                const user = await authApi.login({ usernameOrEmail, password, rememberMe: true });
                 onLogin(user);
                 onAddToast?.('Đăng nhập thành công!', 'success');
             } else {
@@ -113,17 +114,11 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                     setErrorMessage('Mật khẩu chưa đúng định dạng yêu cầu.');
                     return;
                 }
-
                 if (password !== confirmPassword) {
                     setErrorMessage('Xác nhận mật khẩu không khớp.');
                     return;
                 }
-
-                const user = await authApi.register({
-                    name,
-                    email,
-                    password
-                });
+                const user = await authApi.register({ name, email, password });
                 onLogin(user);
                 onAddToast?.('Đăng ký thành công!', 'success');
             }
@@ -136,31 +131,26 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         }
     };
 
-    const switchAuthMode = (loginMode: boolean) => {
-        setIsLogin(loginMode);
+    const switchToRegister = () => {
+        setIsLogin(false);
+        setFlipState('active');
         setErrorMessage('');
         setSuccessMessage('');
+    };
 
-        if (loginMode) {
-            setConfirmPassword('');
-            setShowConfirmPassword(false);
-        }
+    const switchToLogin = () => {
+        setIsLogin(true);
+        setFlipState('close');
+        setErrorMessage('');
+        setSuccessMessage('');
+        setConfirmPassword('');
+        setShowConfirmPassword(false);
     };
 
     const handleForgotPasswordSubmit = async () => {
-        if (isSubmitting) {
-            return;
-        }
-
-        if (!forgotEmail.trim()) {
-            setErrorMessage('Vui lòng nhập email.');
-            return;
-        }
-
-        setErrorMessage('');
-        setSuccessMessage('');
-        setIsSubmitting(true);
-
+        if (isSubmitting) return;
+        if (!forgotEmail.trim()) { setErrorMessage('Vui lòng nhập email.'); return; }
+        setErrorMessage(''); setSuccessMessage(''); setIsSubmitting(true);
         try {
             const result = await authApi.forgotPassword({ email: forgotEmail.trim() });
             setForgotPasswordSent(true);
@@ -179,32 +169,15 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
     };
 
     const handleResetPasswordSubmit = async () => {
-        if (isSubmitting) {
-            return;
-        }
-
+        if (isSubmitting) return;
         if (!forgotEmail.trim() || !resetToken.trim() || !newPassword || !confirmNewPassword) {
             setErrorMessage('Vui lòng nhập đầy đủ email, mã xác thực và mật khẩu mới.');
             return;
         }
-
-        if (newPassword !== confirmNewPassword) {
-            setErrorMessage('Xác nhận mật khẩu không khớp.');
-            return;
-        }
-
-        setErrorMessage('');
-        setSuccessMessage('');
-        setIsSubmitting(true);
-
+        if (newPassword !== confirmNewPassword) { setErrorMessage('Xác nhận mật khẩu không khớp.'); return; }
+        setErrorMessage(''); setSuccessMessage(''); setIsSubmitting(true);
         try {
-            const message = await authApi.resetPassword({
-                email: forgotEmail.trim(),
-                token: resetToken.trim(),
-                newPassword,
-                confirmNewPassword
-            });
-
+            const message = await authApi.resetPassword({ email: forgotEmail.trim(), token: resetToken.trim(), newPassword, confirmNewPassword });
             onAddToast?.(message, 'success');
             goBackToLogin();
             setSuccessMessage('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.');
@@ -217,24 +190,15 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         }
     };
 
-    const title = isResetPasswordMode
-        ? 'Đặt lại mật khẩu'
-        : isForgotPasswordMode
-            ? 'Quên mật khẩu'
-            : isLogin
-                ? 'Đăng nhập'
-                : 'Đăng ký';
-
+    // ─── Forgot / Reset Password screens (unchanged layout) ─────────────────────
     if (isForgotPasswordMode || isResetPasswordMode) {
+        const title = isResetPasswordMode ? 'Đặt lại mật khẩu' : 'Quên mật khẩu';
         return (
             <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
-                {/* Gradient Background Orbs */}
                 <div className="absolute -top-40 -left-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
-                <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-accent/20 rounded-full blur-3xl -z-10" style={{animationDelay: '0.5s'}} />
-
+                <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-accent/20 rounded-full blur-3xl -z-10" style={{ animationDelay: '0.5s' }} />
                 <div className="max-w-md w-full">
                     <div className="glass-card p-8 md:p-10 rounded-2xl md:rounded-3xl">
-                        {/* Header */}
                         <div className="text-center mb-8">
                             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-4">
                                 <span className="text-2xl">{isForgotPasswordMode ? '🔐' : '🔑'}</span>
@@ -244,24 +208,15 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                                 {isForgotPasswordMode ? 'Nhập email của bạn để nhận liên kết đặt lại mật khẩu' : 'Nhập thông tin để đặt lại mật khẩu mới'}
                             </p>
                         </div>
-
-                        {/* Form Content */}
                         <div className="space-y-4 mb-8">
                             {isForgotPasswordMode ? (
                                 !forgotPasswordSent ? (
-                                    <input
-                                        type="email"
-                                        placeholder="Email tài khoản"
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                        value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                    />
+                                    <input type="email" placeholder="Email tài khoản"
+                                        className="auth-input"
+                                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} />
                                 ) : (
                                     <div className="space-y-3 rounded-xl border-2 border-accent/30 bg-white/70 px-4 py-4 text-sm text-center">
-                                        <p className="text-accent font-semibold flex items-center justify-center gap-2">
-                                            <span>✓</span>
-                                            Email đã được gửi!
-                                        </p>
+                                        <p className="text-accent font-semibold flex items-center justify-center gap-2"><span>✓</span>Email đã được gửi!</p>
                                         <p className="text-text-secondary text-xs">
                                             {forgotPasswordUsedFallback
                                                 ? 'Môi trường hiện tại chưa gửi được email thật. Bạn có thể mở trực tiếp trang đặt lại mật khẩu ở nút bên dưới.'
@@ -272,71 +227,35 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                                 )
                             ) : (
                                 <>
-                                    <input
-                                        type="email"
-                                        placeholder="Email tài khoản"
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                        value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                        readOnly
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Mã xác thực"
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                        value={resetToken}
-                                        onChange={(e) => setResetToken(e.target.value)}
-                                    />
+                                    <input type="email" placeholder="Email tài khoản" className="auth-input"
+                                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} readOnly />
+                                    <input type="text" placeholder="Mã xác thực" className="auth-input"
+                                        value={resetToken} onChange={(e) => setResetToken(e.target.value)} />
                                     <div className="relative">
-                                        <input
-                                            type={showNewPassword ? 'text' : 'password'}
-                                            placeholder="Mật khẩu mới"
-                                            className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform"
-                                            onClick={() => setShowNewPassword((prev) => !prev)}
-                                            aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
-                                        >
+                                        <input type={showNewPassword ? 'text' : 'password'} placeholder="Mật khẩu mới"
+                                            className="auth-input pr-12"
+                                            value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                                        <button type="button" className="auth-eye-btn"
+                                            onClick={() => setShowNewPassword((p) => !p)}
+                                            aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>
                                             {showNewPassword ? '🙈' : '👁'}
                                         </button>
                                     </div>
                                     <div className="relative">
-                                        <input
-                                            type={showConfirmNewPassword ? 'text' : 'password'}
-                                            placeholder="Xác nhận mật khẩu mới"
-                                            className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                            value={confirmNewPassword}
-                                            onChange={(e) => setConfirmNewPassword(e.target.value)}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform"
-                                            onClick={() => setShowConfirmNewPassword((prev) => !prev)}
-                                            aria-label={showConfirmNewPassword ? 'Ẩn xác nhận mật khẩu mới' : 'Hiện xác nhận mật khẩu mới'}
-                                        >
+                                        <input type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu mới"
+                                            className="auth-input pr-12"
+                                            value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} />
+                                        <button type="button" className="auth-eye-btn"
+                                            onClick={() => setShowConfirmNewPassword((p) => !p)}
+                                            aria-label={showConfirmNewPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
                                             {showConfirmNewPassword ? '🙈' : '👁'}
                                         </button>
                                     </div>
                                 </>
                             )}
-
-                            {errorMessage && (
-                                <div className="text-sm text-red-500 font-medium bg-red-50/70 rounded-lg p-3 border border-red-200/50">
-                                    {errorMessage}
-                                </div>
-                            )}
-                            {successMessage && (
-                                <div className="text-sm text-green-600 font-medium bg-green-50/70 rounded-lg p-3 border border-green-200/50">
-                                    {successMessage}
-                                </div>
-                            )}
+                            {errorMessage && <div className="auth-error">{errorMessage}</div>}
+                            {successMessage && <div className="auth-success">{successMessage}</div>}
                         </div>
-
-                        {/* Action Buttons */}
                         <div className="space-y-3">
                             {isForgotPasswordMode ? (
                                 <>
@@ -346,34 +265,21 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                                         </Button>
                                     ) : forgotPasswordUsedFallback && forgotPasswordResetLink ? (
                                         <a href={forgotPasswordResetLink} className="block">
-                                            <Button variant="primary" className="w-full">
-                                                Mở trang đặt lại mật khẩu
-                                            </Button>
+                                            <Button variant="primary" className="w-full">Mở trang đặt lại mật khẩu</Button>
                                         </a>
                                     ) : (
                                         <a href={forgotPasswordInboxUrl} target="_blank" rel="noreferrer" className="block">
-                                            <Button variant="primary" className="w-full">
-                                                Mở hộp thư
-                                            </Button>
+                                            <Button variant="primary" className="w-full">Mở hộp thư</Button>
                                         </a>
                                     )}
-                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>
-                                        Quay lại đăng nhập
-                                    </Button>
+                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>Quay lại đăng nhập</Button>
                                 </>
                             ) : (
                                 <>
-                                    <Button 
-                                        variant="primary" 
-                                        className="w-full" 
-                                        onClick={handleResetPasswordSubmit} 
-                                        disabled={isSubmitting || !resetToken}
-                                    >
+                                    <Button variant="primary" className="w-full" onClick={handleResetPasswordSubmit} disabled={isSubmitting || !resetToken}>
                                         {isSubmitting ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
                                     </Button>
-                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>
-                                        Quay lại đăng nhập
-                                    </Button>
+                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>Quay lại đăng nhập</Button>
                                 </>
                             )}
                         </div>
@@ -383,62 +289,66 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         );
     }
 
+    // ─── Main Login / Register Flip Layout ───────────────────────────────────────
+    //
+    // Pattern from sample (CSSStyling.css):
+    //   #container  → .auth-flip-root        (perspective wrapper, preserve-3d)
+    //   .login       → .auth-panel-login      (left, white bg, z-0)
+    //   .register    → .auth-panel-register   (right, white bg, z-1)
+    //   .page.front  → .auth-page-front       (right, gradient, z-3, flips OUT on .active)
+    //   .page.back   → .auth-page-back        (right, gradient, z-2, flips IN  on .active)
+    //   class on container: '' | 'active' | 'close'
+
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
-            {/* Gradient Background Orbs */}
-            <div className="absolute -top-40 -left-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
-            <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-accent/20 rounded-full blur-3xl -z-10" style={{animationDelay: '0.5s'}} />
+            {/* Background orbs */}
+            <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
+            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" style={{ animationDelay: '0.5s' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-secondary/15 rounded-full blur-[80px] -z-10" />
 
-            <div className="auth-flip-container">
-                <div className={`auth-flip-book ${!isLogin ? 'is-register' : ''}`}>
-                    {/* Login Page - Front Left */}
-                    <div className="auth-flip-page auth-flip-login">
-                        <div className="text-center mb-8 lg:mb-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/15 mb-4">
-                                <span className="text-3xl">👤</span>
+            {/* Root flip container */}
+            <div className={`auth-flip-root ${flipState}`}>
+
+                {/* ── Login panel (LEFT) ─────────────────────────────────── */}
+                <div className="auth-panel auth-panel-login">
+                    <div className="auth-panel-content">
+                        <div className="text-center mb-6">
+                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
+                                <span className="text-2xl">👤</span>
                             </div>
-                            <h2 className="text-3xl md:text-4xl font-bold text-text-primary">Đăng nhập</h2>
-                            <p className="text-text-secondary text-sm mt-2">Tiếp tục hành trình học của bạn</p>
+                            <h2 className="text-3xl font-bold text-text-primary">Đăng nhập</h2>
+                            <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
                         </div>
 
-                        <div className="space-y-4 w-full">
+                        <div className="space-y-3 w-full">
                             <input
                                 type="text"
                                 placeholder="Tên đăng nhập hoặc email"
-                                className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
+                                className="auth-input"
                                 value={usernameOrEmail}
                                 onChange={(e) => setUsernameOrEmail(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                             />
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     placeholder="Mật khẩu"
-                                    className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
+                                    className="auth-input pr-12"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                                 />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform"
-                                    onClick={() => setShowPassword((prev) => !prev)}
-                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                                >
+                                <button type="button" className="auth-eye-btn"
+                                    onClick={() => setShowPassword((p) => !p)}
+                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
                                     {showPassword ? '🙈' : '👁'}
                                 </button>
                             </div>
 
-                            {errorMessage && isLogin && (
-                                <div className="text-sm text-red-500 font-medium bg-red-50/70 rounded-lg p-3 border border-red-200/50">
-                                    {errorMessage}
-                                </div>
-                            )}
-                            {successMessage && isLogin && (
-                                <div className="text-sm text-green-600 font-medium bg-green-50/70 rounded-lg p-3 border border-green-200/50">
-                                    {successMessage}
-                                </div>
-                            )}
+                            {errorMessage && isLogin && <div className="auth-error">{errorMessage}</div>}
+                            {successMessage && isLogin && <div className="auth-success">{successMessage}</div>}
 
-                            <Button variant="primary" className="w-full mt-6" onClick={handleSubmit} disabled={isSubmitting}>
+                            <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? 'Đang xử lý...' : 'Vào học ngay'}
                             </Button>
 
@@ -456,169 +366,124 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                                 Quên mật khẩu?
                             </button>
                         </div>
-                    </div>
 
-                    {/* Register Page - Back Right (Flipped) */}
-                    <div className="auth-flip-page auth-flip-register">
-                        <div className="text-center mb-8 lg:mb-10">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/15 mb-4">
-                                <span className="text-3xl">✨</span>
+                        {/* Mobile-only switch to register */}
+                        <p className="auth-mobile-switch">
+                            Chưa có tài khoản?{' '}
+                            <button type="button" className="text-primary font-bold hover:underline" onClick={switchToRegister}>
+                                Đăng ký ngay
+                            </button>
+                        </p>
+                    </div>
+                </div>
+
+                {/* ── Register panel (RIGHT) ─────────────────────────────── */}
+                <div className="auth-panel auth-panel-register">
+                    <div className="auth-panel-content">
+                        <div className="text-center mb-6">
+                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
+                                <span className="text-2xl">✨</span>
                             </div>
-                            <h2 className="text-3xl md:text-4xl font-bold text-text-primary">Đăng ký</h2>
-                            <p className="text-text-secondary text-sm mt-2">Bắt đầu học từ vựng mới</p>
+                            <h2 className="text-3xl font-bold text-text-primary">Đăng ký</h2>
+                            <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
                         </div>
 
-                        <div className="space-y-4 w-full">
-                            <input
-                                type="text"
-                                placeholder="Tên hiển thị"
-                                className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                className="w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
+                        <div className="space-y-3 w-full">
+                            <input type="text" placeholder="Tên hiển thị"
+                                className="auth-input"
+                                value={name} onChange={(e) => setName(e.target.value)} />
+                            <input type="email" placeholder="Email"
+                                className="auth-input"
+                                value={email} onChange={(e) => setEmail(e.target.value)} />
                             <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    placeholder="Mật khẩu"
-                                    className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform"
-                                    onClick={() => setShowPassword((prev) => !prev)}
-                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                                >
+                                <input type={showPassword ? 'text' : 'password'} placeholder="Mật khẩu"
+                                    className="auth-input pr-12"
+                                    value={password} onChange={(e) => setPassword(e.target.value)} />
+                                <button type="button" className="auth-eye-btn"
+                                    onClick={() => setShowPassword((p) => !p)}
+                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
                                     {showPassword ? '🙈' : '👁'}
                                 </button>
                             </div>
                             <div className="relative">
-                                <input
-                                    type={showConfirmPassword ? 'text' : 'password'}
-                                    placeholder="Xác nhận mật khẩu"
-                                    className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-primary/10 bg-white/50 focus:border-primary/30 focus:bg-white transition-all outline-none"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                />
-                                <button
-                                    type="button"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform"
-                                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                                    aria-label={showConfirmPassword ? 'Ẩn xác nhận mật khẩu' : 'Hiện xác nhận mật khẩu'}
-                                >
+                                <input type={showConfirmPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu"
+                                    className="auth-input pr-12"
+                                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                                <button type="button" className="auth-eye-btn"
+                                    onClick={() => setShowConfirmPassword((p) => !p)}
+                                    aria-label={showConfirmPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
                                     {showConfirmPassword ? '🙈' : '👁'}
                                 </button>
                             </div>
 
-                            {/* Password Requirements */}
-                            <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs md:text-sm text-text-secondary space-y-1.5 text-left">
-                                <p className="font-semibold text-text-primary mb-2">Yêu cầu mật khẩu:</p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.minLength ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.minLength ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.minLength ? '✓' : ''}
-                                    </span>
-                                    Tối thiểu 8 ký tự
-                                </p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.maxLength ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.maxLength ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.maxLength ? '✓' : ''}
-                                    </span>
-                                    Tối đa 15 ký tự
-                                </p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.hasLowercase ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.hasLowercase ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.hasLowercase ? '✓' : ''}
-                                    </span>
-                                    Có ít nhất 1 chữ thường
-                                </p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.hasUppercase ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.hasUppercase ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.hasUppercase ? '✓' : ''}
-                                    </span>
-                                    Có ít nhất 1 chữ in hoa
-                                </p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.hasNumber ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.hasNumber ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.hasNumber ? '✓' : ''}
-                                    </span>
-                                    Có ít nhất 1 chữ số
-                                </p>
-                                <p className={`flex items-center gap-2 ${passwordPolicy.hasSpecial ? 'text-green-700' : ''}`}>
-                                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${passwordPolicy.hasSpecial ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                        {passwordPolicy.hasSpecial ? '✓' : ''}
-                                    </span>
-                                    Có ít nhất 1 ký tự đặc biệt
-                                </p>
+                            {/* Password policy checklist */}
+                            <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs text-text-secondary space-y-1.5 text-left">
+                                <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                                {[
+                                    [passwordPolicy.minLength, 'Tối thiểu 8 ký tự'],
+                                    [passwordPolicy.maxLength, 'Tối đa 15 ký tự'],
+                                    [passwordPolicy.hasLowercase, 'Có ít nhất 1 chữ thường'],
+                                    [passwordPolicy.hasUppercase, 'Có ít nhất 1 chữ in hoa'],
+                                    [passwordPolicy.hasNumber, 'Có ít nhất 1 chữ số'],
+                                    [passwordPolicy.hasSpecial, 'Có ít nhất 1 ký tự đặc biệt'],
+                                ].map(([ok, label]) => (
+                                    <p key={label as string} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                                            {ok ? '✓' : ''}
+                                        </span>
+                                        {label as string}
+                                    </p>
+                                ))}
                             </div>
 
-                            {errorMessage && !isLogin && (
-                                <div className="text-sm text-red-500 font-medium bg-red-50/70 rounded-lg p-3 border border-red-200/50">
-                                    {errorMessage}
-                                </div>
-                            )}
-                            {successMessage && !isLogin && (
-                                <div className="text-sm text-green-600 font-medium bg-green-50/70 rounded-lg p-3 border border-green-200/50">
-                                    {successMessage}
-                                </div>
-                            )}
+                            {errorMessage && !isLogin && <div className="auth-error">{errorMessage}</div>}
+                            {successMessage && !isLogin && <div className="auth-success">{successMessage}</div>}
 
-                            <Button variant="primary" className="w-full mt-6" onClick={handleSubmit} disabled={isSubmitting}>
+                            <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? 'Đang xử lý...' : 'Tạo tài khoản'}
                             </Button>
                         </div>
-                    </div>
 
-                    {/* Flip Overlay - Animates between login/register */}
-                    <div className="auth-flip-overlay">
-                        <div className="auth-flip-page-face auth-flip-page-front">
-                            <div className="text-center space-y-6">
-                                <div className="text-6xl animate-float">📚</div>
-                                <div>
-                                    <h3 className="text-4xl font-bold mb-3">Xin chào!</h3>
-                                    <p className="text-white/90 text-sm md:text-base leading-relaxed">
-                                        Tạo tài khoản để bắt đầu hành trình học từ vựng tiếng Anh của bạn.
-                                    </p>
-                                </div>
-                                <button 
-                                    type="button" 
-                                    className="auth-flip-overlay-btn" 
-                                    onClick={() => switchAuthMode(false)}
-                                >
-                                    Đăng ký
-                                    <span className="ml-2">→</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="auth-flip-page-face auth-flip-page-back">
-                            <div className="text-center space-y-6">
-                                <div className="text-6xl animate-float">🚀</div>
-                                <div>
-                                    <h3 className="text-4xl font-bold mb-3">Chào mừng trở lại!</h3>
-                                    <p className="text-white/90 text-sm md:text-base leading-relaxed">
-                                        Đăng nhập để tiếp tục bài học của bạn và nâng cao kỹ năng.
-                                    </p>
-                                </div>
-                                <button 
-                                    type="button" 
-                                    className="auth-flip-overlay-btn" 
-                                    onClick={() => switchAuthMode(true)}
-                                >
-                                    <span className="mr-2">←</span>
-                                    Đăng nhập
-                                </button>
-                            </div>
-                        </div>
+                        {/* Mobile-only switch to login */}
+                        <p className="auth-mobile-switch">
+                            Đã có tài khoản?{' '}
+                            <button type="button" className="text-primary font-bold hover:underline" onClick={switchToLogin}>
+                                Đăng nhập
+                            </button>
+                        </p>
                     </div>
                 </div>
+
+                {/* ── Front page overlay (RIGHT side, gradient — visible by default) ── */}
+                {/* Flips OUT (rotateY -180°) when .active, flips back IN when .close   */}
+                <div className="auth-page auth-page-front">
+                    <div className="auth-page-content">
+                        <span className="auth-page-icon animate-float">📚</span>
+                        <h3 className="text-4xl font-bold mb-3">Xin chào!</h3>
+                        <p className="text-white/90 text-sm leading-relaxed text-center">
+                            Tạo tài khoản để bắt đầu hành trình học từ vựng tiếng Anh của bạn.
+                        </p>
+                        <button type="button" className="auth-page-btn" onClick={switchToRegister}>
+                            Đăng ký <span className="ml-1">→</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* ── Back page overlay (RIGHT side, gradient — hidden behind front) ── */}
+                {/* Flips IN (rotateY -180°) when .active, flips back OUT when .close   */}
+                <div className="auth-page auth-page-back">
+                    <div className="auth-page-content auth-page-back-content">
+                        <span className="auth-page-icon animate-float">🚀</span>
+                        <h3 className="text-4xl font-bold mb-3">Chào mừng trở lại!</h3>
+                        <p className="text-white/90 text-sm leading-relaxed text-center">
+                            Đăng nhập để tiếp tục bài học và nâng cao kỹ năng của bạn.
+                        </p>
+                        <button type="button" className="auth-page-btn" onClick={switchToLogin}>
+                            <span className="mr-1">←</span> Đăng nhập
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
     );
