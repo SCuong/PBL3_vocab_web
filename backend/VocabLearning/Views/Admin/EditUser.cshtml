@@ -26,7 +26,16 @@
 
     <div class="mb-3">
         <label asp-for="Password" class="form-label">New Password (Optional)</label>
-        <input asp-for="Password" type="password" class="form-control" />
+        <div class="input-group">
+            <input asp-for="Password" type="password" class="form-control password-toggle-input" />
+            <button type="button"
+                    class="btn btn-outline-secondary password-toggle-btn"
+                    data-password-toggle
+                    aria-label="Show password"
+                    aria-pressed="false">
+                <span data-password-icon>👁</span>
+            </button>
+        </div>
         <span asp-validation-for="Password" class="text-danger"></span>
     </div>
 

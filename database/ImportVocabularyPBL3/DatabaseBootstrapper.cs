@@ -9,13 +9,18 @@ namespace ImportVocabularyPBL3
 {
     internal sealed class DatabaseBootstrapper
     {
-        public void EnsureReady(string schemaScriptPath)
+        public void EnsureReady(string schemaScriptPath, string migrationScriptPath)
         {
             EnsureDatabaseExists();
 
-            var resolvedScriptPath = ProjectFileLocator.ResolveExistingFile(schemaScriptPath);
-            var script = File.ReadAllText(resolvedScriptPath);
+            ExecuteScriptFromPath(schemaScriptPath);
+            ExecuteScriptFromPath(migrationScriptPath);
+        }
 
+        private void ExecuteScriptFromPath(string scriptPath)
+        {
+            var resolvedScriptPath = ProjectFileLocator.ResolveExistingFile(scriptPath);
+            var script = File.ReadAllText(resolvedScriptPath);
             ExecuteScript(script);
         }
 

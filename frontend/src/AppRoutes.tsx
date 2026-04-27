@@ -6,9 +6,7 @@ type AppRoutesProps = {
     currentPage: string;
     setCurrentPage: (page: string) => void;
     handleSelectWord: (word: any) => void;
-    vocabularyItems: any[];
     topicFilters: any[];
-    isVocabularyLoading: boolean;
     selectedWord: any;
     handleCloseWordDetail: () => void;
     syncUserGameData: (user: any) => void;
@@ -29,6 +27,7 @@ type AppRoutesProps = {
     handleLogout: () => void;
     onOpenStreak: () => void;
     onUserUpdated: (user: AuthenticatedUser) => void;
+    learnedWordIds: number[];
     LearningTopicsComponent: any;
     StudySessionComponent: any;
 };
@@ -37,9 +36,7 @@ export const AppRoutes = ({
     currentPage,
     setCurrentPage,
     handleSelectWord,
-    vocabularyItems,
     topicFilters,
-    isVocabularyLoading,
     selectedWord,
     handleCloseWordDetail,
     syncUserGameData,
@@ -60,6 +57,7 @@ export const AppRoutes = ({
     handleLogout,
     onOpenStreak,
     onUserUpdated,
+    learnedWordIds,
     LearningTopicsComponent,
     StudySessionComponent
 }: AppRoutesProps) => {
@@ -77,21 +75,9 @@ export const AppRoutes = ({
         learnedWords: learnedWordsCount ?? gameData.currentUser?.learnedWords ?? 0
     };
 
-    const learnedWordIds = Array.isArray(learningProgressState?.topics)
-        ? new Set(
-            learningProgressState.topics
-                .flatMap((topic: any) => Array.isArray(topic.learnedWordIds) ? topic.learnedWordIds : [])
-                .filter((wordId: any) => Number.isFinite(wordId) && wordId > 0)
-        )
-        : new Set<number>();
-
-    const learnedVocabularyItems = Array.isArray(vocabularyItems)
-        ? vocabularyItems.filter((item: any) => learnedWordIds.has(item.id))
-        : [];
-
     const routeMap: Record<string, any> = {
         home: <Home onNavigate={setCurrentPage} />,
-        vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} onCloseWordDetail={handleCloseWordDetail} selectedWord={selectedWord} items={vocabularyItems} topics={topicFilters} isLoading={isVocabularyLoading} />,
+        vocabulary: <Vocabulary onNavigate={setCurrentPage} onSelectWord={handleSelectWord} onCloseWordDetail={handleCloseWordDetail} selectedWord={selectedWord} topics={topicFilters} />,
         auth: <Auth onLogin={(u: any) => {
             syncUserGameData(u);
             setCurrentPage('home');
@@ -103,7 +89,7 @@ export const AppRoutes = ({
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
         'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} onRecordStudyHistory={onRecordStudyHistory} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
-        profile: <Profile user={profileUser} learnedWordsList={learnedVocabularyItems} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
+        profile: <Profile user={profileUser} learnedWordIds={learnedWordIds} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
         leaderboard: <Leaderboard gameData={gameData} />,
         admin: <AdminDashboard />
     };

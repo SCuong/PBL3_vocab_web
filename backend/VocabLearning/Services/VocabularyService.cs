@@ -6,6 +6,7 @@ namespace VocabLearning.Services
 {
     public class VocabularyService
     {
+        private const int MaxVocabularyPageSize = 100;
         private readonly AppDbContext _context;
 
         public VocabularyService(AppDbContext context)
@@ -19,6 +20,59 @@ namespace VocabLearning.Services
                 .Include(vocabulary => vocabulary.Topic)
                 .OrderBy(vocabulary => vocabulary.Word)
                 .ToList();
+        }
+
+        public async Task<(List<Vocabulary> Items, int TotalCount, int Page, int PageSize)> GetVocabularyPageAsync(
+            int page,
+            int pageSize,
+            string? search,
+            string? cefr,
+            long? topicId,
+            CancellationToken cancellationToken = default)
+        {
+            var normalizedPage = Math.Max(1, page);
+            var normalizedPageSize = Math.Clamp(pageSize, 1, MaxVocabularyPageSize);
+            var normalizedSearch = search?.Trim();
+            var normalizedCefr = string.IsNullOrWhiteSpace(cefr) || string.Equals(cefr, "ALL", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : cefr.Trim().ToUpperInvariant();
+
+            var query = _context.Vocabularies
+                .AsNoTracking()
+                .Include(vocabulary => vocabulary.Topic)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                var keywordPattern = $"%{normalizedSearch}%";
+                query = query.Where(vocabulary =>
+                    EF.Functions.Like(vocabulary.Word ?? string.Empty, keywordPattern)
+                    || EF.Functions.Like(vocabulary.MeaningVi ?? string.Empty, keywordPattern));
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalizedCefr))
+            {
+                query = query.Where(vocabulary => vocabulary.Level == normalizedCefr);
+            }
+
+            if (topicId.HasValue)
+            {
+                query = query.Where(vocabulary => vocabulary.TopicId == topicId.Value);
+            }
+
+            var totalCount = await query.CountAsync(cancellationToken);
+            var items = await query
+                .OrderBy(vocabulary => vocabulary.Word)
+                .Skip((normalizedPage - 1) * normalizedPageSize)
+                .Take(normalizedPageSize)
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in items)
+            {
+                item.AudioUrl = NormalizeAudioUrl(item.AudioUrl);
+            }
+
+            return (items, totalCount, normalizedPage, normalizedPageSize);
         }
 
         public List<Topic> GetTopics()
@@ -35,6 +89,42 @@ namespace VocabLearning.Services
                 .ThenBy(topic => topic.ParentTopicId)
                 .ThenBy(topic => topic.Name)
                 .ToList();
+        }
+
+        public Dictionary<long, int> GetVocabularyCountsByTopic()
+        {
+            return _context.Vocabularies
+                .Where(vocabulary => vocabulary.TopicId.HasValue)
+                .GroupBy(vocabulary => vocabulary.TopicId!.Value)
+                .Select(group => new { TopicId = group.Key, Count = group.Count() })
+                .ToDictionary(item => item.TopicId, item => item.Count);
+        }
+
+        public List<Vocabulary> GetVocabularyByIds(IEnumerable<long> vocabularyIds)
+        {
+            var ids = vocabularyIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToArray();
+
+            if (ids.Length == 0)
+            {
+                return new List<Vocabulary>();
+            }
+
+            var items = _context.Vocabularies
+                .AsNoTracking()
+                .Include(vocabulary => vocabulary.Topic)
+                .Where(vocabulary => ids.Contains(vocabulary.VocabId))
+                .OrderBy(vocabulary => vocabulary.Word)
+                .ToList();
+
+            foreach (var item in items)
+            {
+                item.AudioUrl = NormalizeAudioUrl(item.AudioUrl);
+            }
+
+            return items;
         }
 
         public List<Vocabulary> GetVocabularyByTopicId(long topicId)
@@ -110,17 +200,19 @@ namespace VocabLearning.Services
                 return (false, "Word is required.");
             }
 
+            var cleanWord = vocabulary.Word.Trim();
+
             var normalizedLevel = NormalizeLevel(vocabulary.Level);
             if (!IsValidLevel(normalizedLevel))
             {
                 return (false, "Level is invalid. Use: A1, A2, B1, B2, C1, C2.");
             }
 
+            vocabulary.Word = cleanWord;
             vocabulary.Level = normalizedLevel;
 
-            var normalizedWord = vocabulary.Word.Trim().ToUpperInvariant();
             var wordExists = _context.Vocabularies
-                .Any(item => (item.Word ?? string.Empty).Trim().ToUpper() == normalizedWord);
+                .Any(item => item.Word == cleanWord);
 
             if (wordExists)
             {
@@ -153,10 +245,10 @@ namespace VocabLearning.Services
                 return (false, "Vocabulary was not found or word is empty.");
             }
 
-            var normalizedWord = updatedVocabulary.Word.Trim().ToUpperInvariant();
+            var cleanWord = updatedVocabulary.Word.Trim();
             var duplicateWord = _context.Vocabularies.Any(item =>
                 item.VocabId != updatedVocabulary.VocabId
-                && (item.Word ?? string.Empty).Trim().ToUpper() == normalizedWord);
+                && item.Word == cleanWord);
 
             if (duplicateWord)
             {
@@ -174,7 +266,7 @@ namespace VocabLearning.Services
                 return (false, "Level is invalid. Use: A1, A2, B1, B2, C1, C2.");
             }
 
-            vocabulary.Word = updatedVocabulary.Word;
+            vocabulary.Word = cleanWord;
             vocabulary.Ipa = updatedVocabulary.Ipa;
             vocabulary.AudioUrl = updatedVocabulary.AudioUrl;
             vocabulary.Level = normalizedLevel;

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '../components/ui';
 import { StreakHeatmap } from '../components/streak';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
+import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
 import { buildStudyDaySummary } from '../utils/studyHistory';
@@ -12,14 +13,14 @@ const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(valu
 
 type ProfileProps = {
     user: any;
-    learnedWordsList?: any[];
+    learnedWordIds?: number[];
     onLogout: () => void;
     onOpenStreak: () => void;
     onAddToast?: (message: string, type?: string) => void;
     onUserUpdated: (user: AuthenticatedUser) => void;
 };
 
-const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, onUserUpdated }: ProfileProps) => {
+const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onUserUpdated }: ProfileProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [username, setUsername] = useState(user.username || '');
     const [email, setEmail] = useState(user.email || '');
@@ -31,6 +32,8 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
     const [showLearnedWords, setShowLearnedWords] = useState(false);
+    const [learnedWordsList, setLearnedWordsList] = useState<VocabularyListItem[]>([]);
+    const [isLoadingLearnedWords, setIsLoadingLearnedWords] = useState(false);
     const [selectedStudyDate, setSelectedStudyDate] = useState<string | null>(null);
 
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -72,6 +75,48 @@ const Profile = ({ user, learnedWordsList, onLogout, onOpenStreak, onAddToast, o
             .sort((a, b) => String(a.word || '').localeCompare(String(b.word || ''))),
         [learnedWordsList]
     );
+
+    useEffect(() => {
+        if (!showLearnedWords) {
+            return;
+        }
+
+        const normalizedIds = Array.isArray(learnedWordIds)
+            ? learnedWordIds.filter((id): id is number => Number.isFinite(id) && id > 0)
+            : [];
+
+        if (normalizedIds.length === 0) {
+            setLearnedWordsList([]);
+            return;
+        }
+
+        let isDisposed = false;
+
+        const loadLearnedWords = async () => {
+            setIsLoadingLearnedWords(true);
+            try {
+                const items = await vocabularyApi.getByIds(normalizedIds);
+                if (!isDisposed) {
+                    setLearnedWordsList(items);
+                }
+            } catch (error: any) {
+                if (!isDisposed) {
+                    setLearnedWordsList([]);
+                    onAddToast?.(error?.message || 'Không thể tải danh sách từ đã học.', 'info');
+                }
+            } finally {
+                if (!isDisposed) {
+                    setIsLoadingLearnedWords(false);
+                }
+            }
+        };
+
+        void loadLearnedWords();
+
+        return () => {
+            isDisposed = true;
+        };
+    }, [showLearnedWords, learnedWordIds, onAddToast]);
 
     const studyHistory = useMemo(
         () => (Array.isArray(user.studyHistory) ? user.studyHistory : [])

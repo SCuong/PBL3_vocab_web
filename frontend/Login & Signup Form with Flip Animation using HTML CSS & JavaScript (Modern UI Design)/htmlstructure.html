@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Login & Signup form With Flip Animation | CodeByGaurav</title>
+        <link rel="stylesheet" href="style.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div id="container">
+            <!-- Login -->
+            <div class="login">
+                <div class="content">
+                    <h1>Log In</h1>
+                    <form>
+                        <input type="email" placeholder="email" />
+                        <input type="password" placeholder="password" />
+                        <span class="remember">Remember me</span>
+                        <span class="forget">Forgot Password</span>
+                        <span class="clearfix"></span>
+                        <button onclick="return false;">Log In</button>
+                    </form>
+
+                    <span class="loginwith">Or Connect with</span>
+
+                    <!-- Socials Icons -->
+                    <a href="#"><i class="fa-brands fa-facebook-f"></i></a>
+                    <a href="#"><i class="fa-brands fa-twitter"></i></a>
+                    <a href="#"><i class="fa-brands fa-github"></i></a>
+                    <a href="#"><i class="fa-brands fa-linkedin-in"></i></a>
+
+                    <span class="copy">&copy 2026</span>
+                </div>
+            </div>
+
+            <!-- Front Page -->
+            <div class="page front">
+                <div class="content">
+                    <!-- User Icon -->
+                    <i class="fa-solid fa-user-plus userIcon"></i>
+
+                    <h1>Hello, friend</h1>
+                    <p>Enter your personal details and start journey with us</p>
+
+                    <button id="register">
+                        Register
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Back Page -->
+            <div class="page back">
+                <div class="content">
+                    <!-- Login Icon -->
+                    <i class="fa-solid fa-right-to-bracket bracketIcon"></i>
+
+                    <h1>Welcome Back!</h1>
+                    <p>
+                        To keep connected with us please login with your
+                        personal info
+                    </p>
+
+                    <button id="login">
+                        <i class="fa-solid fa-arrow-left"></i> Log In
+                    </button>
+                </div>
+            </div>
+
+            <!-- Register -->
+            <div class="register">
+                <div class="content">
+                    <h1>Sign Up</h1>
+
+                    <!-- Socials icons -->
+                    <i class="fa-brands fa-facebook-f"></i>
+                    <i class="fa-brands fa-twitter"></i>
+                    <i class="fa-brands fa-github"></i>
+                    <i class="fa-brands fa-linkedin-in"></i>
+
+                    <span class="loginwith">Or</span>
+
+                    <form>
+                        <input type="text" placeholder="name">
+                        <input type="email" placeholder="email">
+                        <input type="password" placeholder="password">
+                        <span class="remember">I accept terms</span>
+                        <span class="clearfix"></span>
+                        <button onclick="return false;">Register</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script src="script.js"></script>
+</html>

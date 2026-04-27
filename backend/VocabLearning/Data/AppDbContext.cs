@@ -21,6 +21,7 @@ namespace VocabLearning.Data
         public DbSet<ExerciseResult> ExerciseResults { get; set; }
         public DbSet<LearningLog> LearningLogs { get; set; }
         public DbSet<Meaning> Meanings { get; set; }
+        public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -271,6 +272,43 @@ namespace VocabLearning.Data
                 entity.HasOne(meaning => meaning.Vocabulary)
                     .WithMany()
                     .HasForeignKey(meaning => meaning.VocabId);
+            });
+
+            modelBuilder.Entity<PasswordResetToken>(entity =>
+            {
+                entity.ToTable("password_reset_token");
+                entity.HasKey(item => item.PasswordResetTokenId);
+
+                entity.Property(item => item.PasswordResetTokenId)
+                    .HasColumnName("password_reset_token_id")
+                    .UseIdentityColumn();
+
+                entity.Property(item => item.UserId).HasColumnName("user_id");
+
+                entity.Property(item => item.TokenHash)
+                    .HasColumnName("token_hash")
+                    .HasMaxLength(255);
+
+                entity.Property(item => item.ExpiresAt).HasColumnName("expires_at");
+
+                entity.Property(item => item.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.Property(item => item.UsedAt).HasColumnName("used_at");
+
+                entity.Property(item => item.ConsumedByIp)
+                    .HasColumnName("consumed_by_ip")
+                    .HasMaxLength(64);
+
+                entity.HasOne(item => item.User)
+                    .WithMany()
+                    .HasForeignKey(item => item.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(item => item.TokenHash);
+                entity.HasIndex(item => new { item.UserId, item.CreatedAt });
+                entity.HasIndex(item => item.ExpiresAt);
             });
         }
     }

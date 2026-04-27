@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using VocabLearning.Constants;
 using VocabLearning.Models;
 using VocabLearning.Services;
+using VocabLearning.ViewModels.Common;
 using VocabLearning.ViewModels.Vocabulary;
 
 namespace VocabLearning.Controllers
@@ -24,9 +25,48 @@ namespace VocabLearning.Controllers
         }
 
         [HttpGet("/api/vocabulary")]
-        public ActionResult<IEnumerable<VocabularyListItemViewModel>> GetVocabularyApi()
+        public async Task<ActionResult<PagedResultViewModel<VocabularyListItemViewModel>>> GetVocabularyApi(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 24,
+            [FromQuery] string? search = null,
+            [FromQuery] string? cefr = null,
+            [FromQuery] long? topicId = null,
+            CancellationToken cancellationToken = default)
         {
-            var items = _service.GetVocabularyList()
+            var result = await _service.GetVocabularyPageAsync(page, pageSize, search, cefr, topicId, cancellationToken);
+            var items = result.Items
+                .Select(vocabulary => new VocabularyListItemViewModel
+                {
+                    Id = vocabulary.VocabId,
+                    Word = vocabulary.Word ?? string.Empty,
+                    Ipa = vocabulary.Ipa ?? string.Empty,
+                    Meaning = vocabulary.MeaningVi ?? string.Empty,
+                    Cefr = vocabulary.Level ?? string.Empty,
+                    TopicId = vocabulary.TopicId,
+                    TopicName = vocabulary.Topic?.Name ?? string.Empty,
+                    AudioUrl = vocabulary.AudioUrl ?? string.Empty
+                })
+                .ToList();
+
+            var totalPages = result.TotalCount == 0
+                ? 0
+                : (int)Math.Ceiling(result.TotalCount / (double)result.PageSize);
+
+            return Ok(new PagedResultViewModel<VocabularyListItemViewModel>
+            {
+                Items = items,
+                Page = result.Page,
+                PageSize = result.PageSize,
+                TotalCount = result.TotalCount,
+                TotalPages = totalPages,
+                HasNextPage = result.Page < totalPages
+            });
+        }
+
+        [HttpGet("/api/vocabulary/by-ids")]
+        public ActionResult<IEnumerable<VocabularyListItemViewModel>> GetVocabularyByIdsApi([FromQuery] long[] ids)
+        {
+            var items = _service.GetVocabularyByIds(ids)
                 .Select(vocabulary => new VocabularyListItemViewModel
                 {
                     Id = vocabulary.VocabId,
@@ -46,13 +86,15 @@ namespace VocabLearning.Controllers
         [HttpGet("/api/vocabulary/topics")]
         public ActionResult<IEnumerable<VocabularyTopicFilterItemViewModel>> GetVocabularyTopicsApi()
         {
+            var vocabularyCountsByTopic = _service.GetVocabularyCountsByTopic();
             var items = _service.GetTopicsForFilter()
                 .Select(topic => new VocabularyTopicFilterItemViewModel
                 {
                     TopicId = topic.TopicId,
                     Name = topic.Name,
                     Description = topic.Description,
-                    ParentTopicId = topic.ParentTopicId
+                    ParentTopicId = topic.ParentTopicId,
+                    WordCount = vocabularyCountsByTopic.TryGetValue(topic.TopicId, out var count) ? count : 0
                 })
                 .ToList();
 

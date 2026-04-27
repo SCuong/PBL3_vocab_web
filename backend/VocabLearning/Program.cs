@@ -7,6 +7,11 @@ using VocabLearning.Data;
 using VocabLearning.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.AddEventSourceLogger();
+
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localhost:3000";
@@ -14,7 +19,10 @@ var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localho
 builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<CustomAuthenticationService>();
 builder.Services.AddScoped<AdminDataService>();
+builder.Services.AddScoped<AdminExerciseService>();
 builder.Services.AddScoped<LearningService>();
+builder.Services.AddScoped<LearningFlowService>();
+builder.Services.AddScoped<PasswordResetEmailService>();
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {

@@ -34,6 +34,22 @@ namespace VocabLearning.ViewModels.Account
         public string ConfirmNewPassword { get; set; } = string.Empty;
     }
 
+    public sealed class ForgotPasswordApiRequest
+    {
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public sealed class ResetPasswordApiRequest
+    {
+        public string Email { get; set; } = string.Empty;
+
+        public string Token { get; set; } = string.Empty;
+
+        public string NewPassword { get; set; } = string.Empty;
+
+        public string ConfirmNewPassword { get; set; } = string.Empty;
+    }
+
     public sealed class AuthenticatedUserViewModel
     {
         public long UserId { get; set; }
@@ -60,5 +76,13 @@ namespace VocabLearning.ViewModels.Account
         public string? Message { get; set; }
 
         public AuthenticatedUserViewModel? User { get; set; }
+
+        public bool EmailSent { get; set; }
+
+        public bool UsedFallbackLink { get; set; }
+
+        public string? ResetLink { get; set; }
+
+        public string? InboxUrl { get; set; }
     }
 }

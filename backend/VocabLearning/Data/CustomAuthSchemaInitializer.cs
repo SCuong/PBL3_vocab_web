@@ -108,6 +108,63 @@ BEGIN
         WHERE [google_subject] IS NOT NULL;
 END;",
                 @"
+IF OBJECT_ID(N'dbo.password_reset_token', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[password_reset_token]
+    (
+        [password_reset_token_id] BIGINT IDENTITY(1,1) NOT NULL,
+        [user_id] BIGINT NOT NULL,
+        [token_hash] NVARCHAR(255) NOT NULL,
+        [expires_at] DATETIME NOT NULL,
+        [created_at] DATETIME NOT NULL CONSTRAINT [DF_password_reset_token_created_at] DEFAULT GETDATE(),
+        [used_at] DATETIME NULL,
+        [consumed_by_ip] NVARCHAR(64) NULL,
+        CONSTRAINT [PK_password_reset_token] PRIMARY KEY ([password_reset_token_id]),
+        CONSTRAINT [FK_password_reset_token_users]
+            FOREIGN KEY ([user_id]) REFERENCES [dbo].[users]([user_id])
+            ON DELETE CASCADE
+    );
+END;",
+                @"
+IF OBJECT_ID(N'dbo.password_reset_token', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_password_reset_token_token_hash'
+          AND [object_id] = OBJECT_ID(N'dbo.password_reset_token')
+    )
+    BEGIN
+        CREATE INDEX [IX_password_reset_token_token_hash]
+            ON [dbo].[password_reset_token]([token_hash]);
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_password_reset_token_user_id_created_at'
+          AND [object_id] = OBJECT_ID(N'dbo.password_reset_token')
+    )
+    BEGIN
+        CREATE INDEX [IX_password_reset_token_user_id_created_at]
+            ON [dbo].[password_reset_token]([user_id], [created_at]);
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_password_reset_token_expires_at'
+          AND [object_id] = OBJECT_ID(N'dbo.password_reset_token')
+    )
+    BEGIN
+        CREATE INDEX [IX_password_reset_token_expires_at]
+            ON [dbo].[password_reset_token]([expires_at]);
+    END;
+END;",
+                @"
 IF OBJECT_ID(N'dbo.learning_log', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[learning_log]

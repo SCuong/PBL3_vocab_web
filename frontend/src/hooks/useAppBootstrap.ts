@@ -14,32 +14,33 @@ export type MinitestResultState = {
     detail?: any;
 };
 
+const resolveInitialPage = () => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = (params.get('mode') || '').toLowerCase();
+
+    if (mode === 'reset') {
+        return 'auth';
+    }
+
+    return 'home';
+};
+
 export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapParams) => {
     const [isLoading, setIsLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState('home');
+    const [currentPage, setCurrentPage] = useState(resolveInitialPage);
     const [selectedWord, setSelectedWord] = useState<any>(null);
-    const [vocabularyItems, setVocabularyItems] = useState<any[]>([]);
     const [topicFilters, setTopicFilters] = useState<VocabularyTopicItem[]>([]);
-    const [isVocabularyLoading, setIsVocabularyLoading] = useState(false);
     const [studyTopicId, setStudyTopicId] = useState<number | null>(null);
     const [studyWords, setStudyWords] = useState<any[]>([]);
     const [testResult, setTestResult] = useState<MinitestResultState | null>(null);
 
-    const loadVocabulary = useCallback(async () => {
-        setIsVocabularyLoading(true);
+    const loadTopics = useCallback(async () => {
         try {
-            const [items, topics] = await Promise.all([
-                vocabularyApi.getAll(),
-                vocabularyApi.getTopics()
-            ]);
-            setVocabularyItems(items.map(mapVocabularyToUiModel));
+            const topics = await vocabularyApi.getTopics();
             setTopicFilters(topics);
         } catch {
-            setVocabularyItems([]);
             setTopicFilters([]);
-            addToast('Không tải được danh sách từ vựng từ hệ thống.', 'info');
-        } finally {
-            setIsVocabularyLoading(false);
+            addToast('Không tải được danh sách chủ đề từ hệ thống.', 'info');
         }
     }, [addToast]);
 
@@ -86,7 +87,7 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
             const splashTimer = new Promise(resolve => setTimeout(resolve, 1200));
             const [session] = await Promise.all([
                 authApi.me(),
-                loadVocabulary()
+                loadTopics()
             ]);
 
             if (!isDisposed && session?.succeeded && session.user) {
@@ -104,16 +105,14 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         return () => {
             isDisposed = true;
         };
-    }, [loadVocabulary, syncUserGameData]);
+    }, [loadTopics, syncUserGameData]);
 
     return {
         isLoading,
         currentPage,
         setCurrentPage,
         selectedWord,
-        vocabularyItems,
         topicFilters,
-        isVocabularyLoading,
         studyTopicId,
         studyWords,
         testResult,

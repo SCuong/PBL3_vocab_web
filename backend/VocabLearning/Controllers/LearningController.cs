@@ -13,13 +13,16 @@ namespace VocabLearning.Controllers
         private const string ResultTempDataKey = "LearningMinitestResult";
 
         private readonly LearningService _learningService;
+        private readonly LearningFlowService _learningFlowService;
         private readonly CustomAuthenticationService _authenticationService;
 
         public LearningController(
             LearningService learningService,
+            LearningFlowService learningFlowService,
             CustomAuthenticationService authenticationService)
         {
             _learningService = learningService;
+            _learningFlowService = learningFlowService;
             _authenticationService = authenticationService;
         }
 
@@ -160,26 +163,8 @@ namespace VocabLearning.Controllers
                 return await RedirectToLoginAsync();
             }
 
-            if (string.IsNullOrWhiteSpace(mode))
-            {
-                var selection = _learningService.GetExerciseSelection(currentUser.UserId, topicId, ids);
-                if (selection == null)
-                {
-                    TempData["InfoMessage"] = "The exercise could not be created for this topic.";
-                    return RedirectToAction(nameof(Index), new { parentTopicId = _learningService.GetParentTopicId(topicId) });
-                }
-
-                return View("ExerciseMode", selection);
-            }
-
-            var model = _learningService.GetExercise(currentUser.UserId, topicId, ids, mode);
-            if (model == null)
-            {
-                TempData["InfoMessage"] = "The selected exercise mode is not available.";
-                return RedirectToAction(nameof(Exercise), new { topicId, ids });
-            }
-
-            return View("Exercise", model);
+            var flowResult = _learningFlowService.BuildExercisePage(currentUser.UserId, topicId, ids, mode);
+            return ApplyViewFlowResult(flowResult);
         }
 
         [HttpGet]
@@ -191,14 +176,8 @@ namespace VocabLearning.Controllers
                 return await RedirectToLoginAsync();
             }
 
-            var model = _learningService.GetStudySession(currentUser.UserId, topicId, ids, index);
-            if (model == null)
-            {
-                TempData["InfoMessage"] = "This topic has no available batch right now.";
-                return RedirectToAction(nameof(Index), new { parentTopicId = _learningService.GetParentTopicId(topicId) });
-            }
-
-            return View(model);
+            var flowResult = _learningFlowService.BuildStudyPage(currentUser.UserId, topicId, ids, index);
+            return ApplyViewFlowResult(flowResult);
         }
 
         [HttpGet]
@@ -210,14 +189,8 @@ namespace VocabLearning.Controllers
                 return await RedirectToLoginAsync();
             }
 
-            var model = _learningService.GetMinitest(currentUser.UserId, topicId, ids);
-            if (model == null)
-            {
-                TempData["InfoMessage"] = "The minitest could not be created for this topic.";
-                return RedirectToAction(nameof(Index), new { parentTopicId = _learningService.GetParentTopicId(topicId) });
-            }
-
-            return View(model);
+            var flowResult = _learningFlowService.BuildMinitestPage(currentUser.UserId, topicId, ids);
+            return ApplyViewFlowResult(flowResult);
         }
 
         [HttpPost]
@@ -230,16 +203,8 @@ namespace VocabLearning.Controllers
                 return await RedirectToLoginAsync();
             }
 
-            var submitResult = _learningService.SubmitMinitest(currentUser.UserId, model);
-            if (!submitResult.Succeeded || submitResult.Result == null)
-            {
-                TempData["ErrorMessage"] = submitResult.ErrorMessage ?? "The minitest result could not be saved.";
-                return RedirectToAction(nameof(Minitest), new { topicId = model.TopicId, ids = model.BatchVocabularyIds });
-            }
-
-            TempData[ResultTempDataKey] = JsonSerializer.Serialize(submitResult.Result);
-
-            return RedirectToAction(nameof(Result), new { topicId = model.TopicId });
+            var flowResult = _learningFlowService.SubmitMinitest(currentUser.UserId, model);
+            return ApplySubmitFlowResult(flowResult);
         }
 
         [HttpPost]
@@ -252,38 +217,49 @@ namespace VocabLearning.Controllers
                 return await RedirectToLoginAsync();
             }
 
-            var submitResult = _learningService.SubmitExercise(currentUser.UserId, model);
-            if (!submitResult.Succeeded || submitResult.Result == null)
-            {
-                var mode = model.Questions.All(item => string.Equals(item.ExerciseType, "MATCH_MEANING", StringComparison.OrdinalIgnoreCase))
-                    ? "matching"
-                    : "filling";
-                TempData["ErrorMessage"] = submitResult.ErrorMessage ?? "The exercise result could not be saved.";
-                return RedirectToAction(nameof(Exercise), new { topicId = model.TopicId, ids = model.BatchVocabularyIds, mode });
-            }
-
-            TempData[ResultTempDataKey] = JsonSerializer.Serialize(submitResult.Result);
-
-            return RedirectToAction(nameof(Result), new { topicId = model.TopicId });
+            var flowResult = _learningFlowService.SubmitExercise(currentUser.UserId, model);
+            return ApplySubmitFlowResult(flowResult);
         }
 
         [HttpGet]
         public IActionResult Result(long topicId)
         {
-            if (TempData[ResultTempDataKey] is not string json)
+            var json = TempData[ResultTempDataKey] as string;
+            var flowResult = _learningFlowService.BuildResultPage(json, topicId);
+            return ApplyViewFlowResult(flowResult);
+        }
+
+        private IActionResult ApplyViewFlowResult(LearningViewFlowResult flowResult)
+        {
+            if (!string.IsNullOrWhiteSpace(flowResult.TempDataMessageKey)
+                && !string.IsNullOrWhiteSpace(flowResult.TempDataMessage))
             {
-                TempData["InfoMessage"] = "There is no minitest result to show.";
-                return RedirectToAction(nameof(Index), new { parentTopicId = _learningService.GetParentTopicId(topicId) });
+                TempData[flowResult.TempDataMessageKey] = flowResult.TempDataMessage;
             }
 
-            var model = JsonSerializer.Deserialize<LearningMinitestResultViewModel>(json);
-            if (model == null)
+            if (flowResult.ShouldRedirect)
             {
-                TempData["ErrorMessage"] = "The minitest result could not be loaded.";
-                return RedirectToAction(nameof(Index), new { parentTopicId = _learningService.GetParentTopicId(topicId) });
+                return RedirectToAction(flowResult.RedirectAction!, flowResult.RedirectRouteValues);
             }
 
-            return View(model);
+            return View(flowResult.ViewName, flowResult.Model);
+        }
+
+        private IActionResult ApplySubmitFlowResult(LearningSubmitFlowResult flowResult)
+        {
+            if (!flowResult.Succeeded)
+            {
+                if (!string.IsNullOrWhiteSpace(flowResult.TempDataMessageKey)
+                    && !string.IsNullOrWhiteSpace(flowResult.TempDataMessage))
+                {
+                    TempData[flowResult.TempDataMessageKey] = flowResult.TempDataMessage;
+                }
+
+                return RedirectToAction(flowResult.RedirectAction, flowResult.RedirectRouteValues);
+            }
+
+            TempData[ResultTempDataKey] = JsonSerializer.Serialize(flowResult.Result);
+            return RedirectToAction(flowResult.RedirectAction, flowResult.RedirectRouteValues);
         }
 
         private Task<Users?> GetCurrentUserAsync(CancellationToken cancellationToken)

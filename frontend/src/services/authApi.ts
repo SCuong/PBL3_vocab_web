@@ -13,6 +13,18 @@ export type AuthApiResponse = {
     succeeded: boolean;
     message?: string;
     user?: AuthenticatedUser;
+    emailSent?: boolean;
+    usedFallbackLink?: boolean;
+    resetLink?: string;
+    inboxUrl?: string;
+};
+
+export type ForgotPasswordResult = {
+    message: string;
+    emailSent: boolean;
+    usedFallbackLink: boolean;
+    resetLink: string;
+    inboxUrl: string;
 };
 
 export const authApi = {
@@ -63,6 +75,49 @@ export const authApi = {
         }
 
         return data.user;
+    },
+
+    forgotPassword: async (payload: { email: string }): Promise<ForgotPasswordResult> => {
+        const response = await fetch('/api/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Không thể gửi yêu cầu quên mật khẩu.');
+        }
+
+        return {
+            message: data.message || 'Nếu email tồn tại, hệ thống đã gửi liên kết đặt lại mật khẩu.',
+            emailSent: Boolean(data.emailSent),
+            usedFallbackLink: Boolean(data.usedFallbackLink),
+            resetLink: data.resetLink || '',
+            inboxUrl: data.inboxUrl || 'https://mail.google.com'
+        };
+    },
+
+    resetPassword: async (payload: {
+        email: string;
+        token: string;
+        newPassword: string;
+        confirmNewPassword: string;
+    }) => {
+        const response = await fetch('/api/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Đặt lại mật khẩu thất bại.');
+        }
+
+        return data.message || 'Đặt lại mật khẩu thành công.';
     },
 
     updateProfile: async (payload: { username: string; email: string }) => {

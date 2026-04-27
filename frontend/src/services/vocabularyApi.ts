@@ -25,6 +25,7 @@ export type VocabularyTopicItem = {
     name: string;
     description: string;
     parentTopicId?: number;
+    wordCount: number;
 };
 
 export type VocabularyLearningItem = {
@@ -40,25 +41,76 @@ export type VocabularyLearningItem = {
     exampleAudioUrl: string;
 };
 
+export type PagedVocabularyResult = {
+    items: VocabularyListItem[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+};
+
+type GetVocabularyPageParams = {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    cefr?: string;
+    topicId?: number | null;
+};
+
+const buildVocabularyQuery = ({ page = 1, pageSize = 24, search = '', cefr = '', topicId = null }: GetVocabularyPageParams) => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
+
+    if (search.trim()) {
+        params.set('search', search.trim());
+    }
+
+    if (cefr.trim() && cefr !== 'ALL') {
+        params.set('cefr', cefr.trim());
+    }
+
+    if (typeof topicId === 'number' && Number.isFinite(topicId) && topicId > 0) {
+        params.set('topicId', String(topicId));
+    }
+
+    return params.toString();
+};
+
 export const vocabularyApi = {
-    getAll: async (): Promise<VocabularyListItem[]> => {
-        const response = await fetch('/api/vocabulary', {
+    getPage: async (params: GetVocabularyPageParams = {}): Promise<PagedVocabularyResult> => {
+        const query = buildVocabularyQuery(params);
+        const response = await fetch(`/api/vocabulary?${query}`, {
             credentials: 'include'
         });
 
         if (!response.ok) {
-            throw new Error('Failed to load vocabulary list.');
+            throw new Error('Không thể tải danh sách từ vựng.');
         }
 
-        const data = (await response.json()) as VocabularyListItem[];
+        return (await response.json()) as PagedVocabularyResult;
+    },
 
-        // Log audio URLs for debugging
-        const missingAudio = data.filter(item => !item.audioUrl || item.audioUrl.trim() === '');
-        if (missingAudio.length > 0) {
-            console.warn(`${missingAudio.length} words have missing or empty audioUrl:`, missingAudio.map(w => w.word));
+    getByIds: async (ids: number[]): Promise<VocabularyListItem[]> => {
+        const normalizedIds = ids
+            .filter((id) => Number.isFinite(id) && id > 0)
+            .filter((id, index, array) => array.indexOf(id) === index);
+
+        if (normalizedIds.length === 0) {
+            return [];
         }
 
-        return data;
+        const query = normalizedIds.map((id) => `ids=${encodeURIComponent(String(id))}`).join('&');
+        const response = await fetch(`/api/vocabulary/by-ids?${query}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Không thể tải danh sách từ đã học.');
+        }
+
+        return (await response.json()) as VocabularyListItem[];
     },
 
     getById: async (id: number): Promise<VocabularyDetailItem> => {
@@ -67,24 +119,10 @@ export const vocabularyApi = {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to load vocabulary detail.');
+            throw new Error('Không thể tải chi tiết từ vựng.');
         }
 
-        const data = (await response.json()) as VocabularyDetailItem;
-
-        // Log audio URLs for debugging
-        if (!data.audioUrl || data.audioUrl.trim() === '') {
-            console.warn(`Word detail (${data.word}): Missing or empty audioUrl`);
-        }
-        if (data.examples) {
-            data.examples.forEach((example, index) => {
-                if (!example.audioUrl || example.audioUrl.trim() === '') {
-                    console.warn(`Example ${index + 1} of "${data.word}": Missing or empty audioUrl`);
-                }
-            });
-        }
-
-        return data;
+        return (await response.json()) as VocabularyDetailItem;
     },
 
     getTopics: async (): Promise<VocabularyTopicItem[]> => {
@@ -93,7 +131,7 @@ export const vocabularyApi = {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to load topic list.');
+            throw new Error('Không thể tải danh sách chủ đề.');
         }
 
         return (await response.json()) as VocabularyTopicItem[];
@@ -105,21 +143,9 @@ export const vocabularyApi = {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to load learning vocabulary by topic.');
+            throw new Error('Không thể tải danh sách học theo chủ đề.');
         }
 
-        const data = (await response.json()) as VocabularyLearningItem[];
-
-        // Log audio URLs for debugging
-        data.forEach((item, index) => {
-            if (!item.audioUrl || item.audioUrl.trim() === '') {
-                console.warn(`Word ${index + 1} (${item.word}): Missing or empty audioUrl`);
-            }
-            if (!item.exampleAudioUrl || item.exampleAudioUrl.trim() === '') {
-                console.warn(`Example ${index + 1} (${item.word}): Missing or empty exampleAudioUrl`);
-            }
-        });
-
-        return data;
+        return (await response.json()) as VocabularyLearningItem[];
     }
 };

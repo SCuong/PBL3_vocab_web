@@ -730,7 +730,7 @@ namespace VocabLearning.Services
         {
             var userExists = _context.Users.Any(user =>
                 user.UserId == userId
-                && user.Status.ToUpper() == UserStatuses.Active);
+                && user.Status == UserStatuses.Active);
 
             if (!userExists)
             {

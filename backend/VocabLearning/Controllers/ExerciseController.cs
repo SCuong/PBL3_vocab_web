@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using VocabLearning.Constants;
-using VocabLearning.Models;
 using VocabLearning.Services;
 using VocabLearning.ViewModels.Admin;
 
@@ -12,15 +11,17 @@ namespace VocabLearning.Controllers
     public class ExerciseController : Controller
     {
         private readonly AdminDataService _adminDataService;
+        private readonly AdminExerciseService _adminExerciseService;
 
-        public ExerciseController(AdminDataService adminDataService)
+        public ExerciseController(AdminDataService adminDataService, AdminExerciseService adminExerciseService)
         {
             _adminDataService = adminDataService;
+            _adminExerciseService = adminExerciseService;
         }
 
         public IActionResult Index()
         {
-            var exercises = _adminDataService.GetExercises();
+            var exercises = _adminExerciseService.GetExercises();
             ViewBag.VocabularyNames = _adminDataService.GetVocabularies()
                 .ToDictionary(vocabulary => vocabulary.VocabId, vocabulary => vocabulary.Word);
 
@@ -44,13 +45,7 @@ namespace VocabLearning.Controllers
                 return View(model);
             }
 
-            var result = _adminDataService.CreateExercise(new Exercise
-            {
-                VocabId = model.VocabId,
-                Type = model.Type.Trim(),
-                MatchMode = model.MatchMode?.Trim(),
-                CreatedAt = model.CreatedAt
-            });
+            var result = _adminExerciseService.CreateExercise(model);
 
             if (!result.Succeeded)
             {
@@ -65,7 +60,7 @@ namespace VocabLearning.Controllers
         [HttpGet]
         public IActionResult Edit(long id)
         {
-            var exercise = _adminDataService.GetExerciseById(id);
+            var exercise = _adminExerciseService.GetExerciseById(id);
 
             if (exercise == null)
             {
@@ -86,14 +81,7 @@ namespace VocabLearning.Controllers
                 return View(model);
             }
 
-            var result = _adminDataService.UpdateExercise(new Exercise
-            {
-                ExerciseId = model.ExerciseId,
-                VocabId = model.VocabId,
-                Type = model.Type.Trim(),
-                MatchMode = model.MatchMode?.Trim(),
-                CreatedAt = model.CreatedAt
-            });
+            var result = _adminExerciseService.UpdateExercise(model);
 
             if (!result.Succeeded)
             {
@@ -108,7 +96,7 @@ namespace VocabLearning.Controllers
         [HttpGet]
         public IActionResult Delete(long id)
         {
-            var exercise = _adminDataService.GetExerciseById(id);
+            var exercise = _adminExerciseService.GetExerciseById(id);
 
             if (exercise == null)
             {
@@ -125,7 +113,7 @@ namespace VocabLearning.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(long id)
         {
-            var isDeleted = _adminDataService.DeleteExercise(id);
+            var isDeleted = _adminExerciseService.DeleteExercise(id);
 
             if (!isDeleted)
             {
@@ -143,7 +131,7 @@ namespace VocabLearning.Controllers
             return model;
         }
 
-        private ExerciseFormViewModel BuildFormModel(Exercise exercise)
+        private ExerciseFormViewModel BuildFormModel(AdminExerciseViewModel exercise)
         {
             var model = new ExerciseFormViewModel
             {

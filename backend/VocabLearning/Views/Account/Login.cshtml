@@ -32,7 +32,16 @@
 
             <div class="mb-3">
                 <label asp-for="Password" class="form-label"></label>
-                <input asp-for="Password" class="form-control" />
+                <div class="input-group">
+                    <input asp-for="Password" class="form-control password-toggle-input" />
+                    <button type="button"
+                            class="btn btn-outline-secondary password-toggle-btn"
+                            data-password-toggle
+                            aria-label="Show password"
+                            aria-pressed="false">
+                        <span data-password-icon>👁</span>
+                    </button>
+                </div>
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>
 
@@ -41,6 +50,10 @@
                 <label class="form-check-label">
                     @Html.DisplayNameFor(a => a.RememberMe)
                 </label>
+            </div>
+
+            <div class="mb-3 text-end">
+                <a asp-controller="Account" asp-action="VerifyEmail" asp-route-returnUrl="@(ViewData["ReturnUrl"])" class="text-decoration-none">Forgot password?</a>
             </div>
 
             <input type="submit" value="Login" class="btn btn-success w-100 p-2" />

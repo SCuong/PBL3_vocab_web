@@ -1591,32 +1591,42 @@ export default function App() {
     [setGameData],
   );
 
-  const {
-    isLoading,
-    currentPage,
-    setCurrentPage,
-    selectedWord,
-    vocabularyItems,
-    topicFilters,
-    isVocabularyLoading,
-    studyTopicId,
-    studyWords,
-    testResult,
+    const {
+        isLoading,
+        currentPage,
+        setCurrentPage,
+        selectedWord,
+        topicFilters,
+        studyTopicId,
+        studyWords,
+        testResult,
     handleStartStudy,
     handleSelectWord,
     handleCloseWordDetail,
     handleFinishStudy,
   } = useAppBootstrap({ addToast, syncUserGameData });
 
-  const learningTopicGroups = useMemo(
-    () =>
-      buildLearningTopicGroups(
-        topicFilters,
-        vocabularyItems,
-        learningProgressState,
-      ),
-    [topicFilters, vocabularyItems, learningProgressState],
-  );
+    const learningTopicGroups = useMemo(
+        () =>
+            buildLearningTopicGroups(
+                topicFilters,
+                learningProgressState,
+            ),
+        [topicFilters, learningProgressState],
+    );
+
+    const learnedWordIds = useMemo(
+        () => Array.isArray(learningProgressState?.topics)
+            ? Array.from(
+                new Set(
+                    learningProgressState.topics
+                        .flatMap((topic: any) => Array.isArray(topic.learnedWordIds) ? topic.learnedWordIds : [])
+                        .filter((wordId: any) => Number.isFinite(wordId) && wordId > 0)
+                )
+            )
+            : [],
+        [learningProgressState?.topics]
+    );
 
   const refreshLearningProgress = useCallback(async () => {
     if (!currentUser?.userId) {
@@ -1753,9 +1763,7 @@ export default function App() {
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}
               handleSelectWord={handleSelectWord}
-              vocabularyItems={vocabularyItems}
               topicFilters={topicFilters}
-              isVocabularyLoading={isVocabularyLoading}
               selectedWord={selectedWord}
               handleCloseWordDetail={handleCloseWordDetail}
               syncUserGameData={syncUserGameData}
@@ -1775,6 +1783,7 @@ export default function App() {
               handleLogout={handleLogout}
               onOpenStreak={() => setShowStreakModal(true)}
               onUserUpdated={handleUserUpdated}
+              learnedWordIds={learnedWordIds}
               LearningTopicsComponent={LearningTopics}
               StudySessionComponent={StudySession}
               onRecordStudyHistory={handleRecordStudyHistory}

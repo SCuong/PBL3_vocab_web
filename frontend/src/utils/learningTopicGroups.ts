@@ -1,11 +1,6 @@
 import type { VocabularyTopicItem } from '../services/vocabularyApi';
 import type { LearningProgressState, LearningProgressTopicStateItem } from '../services/learningProgressApi';
 
-type VocabularyUiItem = {
-    id: number;
-    topicId?: number;
-};
-
 type TopicStats = {
     new: number;
     review: number;
@@ -52,19 +47,9 @@ const CATEGORY_ICONS_BY_TITLE: Record<string, string> = {
     'culture and science': '🌍'
 };
 
-const getCategoryIcon = (parent: VocabularyTopicItem) => {
-    const iconById = CATEGORY_ICONS_BY_PARENT_TOPIC_ID[parent.topicId];
-    if (iconById) {
-        return iconById;
-    }
-
-    const normalizedTitle = parent.name.trim().toLowerCase();
-    return CATEGORY_ICONS_BY_TITLE[normalizedTitle] ?? '📚';
-};
-
 const TOPIC_ICONS_BY_TOPIC_ID: Record<number, string> = {
     1: '👋',
-    2: '👨‍👩-👧‍👦',
+    2: '👨‍👩‍👧‍👦',
     3: '🤝',
     4: '☀️',
     5: '📅',
@@ -111,6 +96,16 @@ const TOPIC_ICONS_BY_TOPIC_ID: Record<number, string> = {
 
 type TopicProgressLookup = Record<number, LearningProgressTopicStateItem>;
 
+const getCategoryIcon = (parent: VocabularyTopicItem) => {
+    const iconById = CATEGORY_ICONS_BY_PARENT_TOPIC_ID[parent.topicId];
+    if (iconById) {
+        return iconById;
+    }
+
+    const normalizedTitle = parent.name.trim().toLowerCase();
+    return CATEGORY_ICONS_BY_TITLE[normalizedTitle] ?? '📚';
+};
+
 const createProgressLookup = (progressState: LearningProgressState | null): TopicProgressLookup => {
     if (!progressState?.topics) {
         return {};
@@ -122,13 +117,10 @@ const createProgressLookup = (progressState: LearningProgressState | null): Topi
     }, {});
 };
 
-const calculateTopicStats = (wordIds: number[], topicProgress?: LearningProgressTopicStateItem): TopicStats => {
-    const learnedIds = new Set(topicProgress?.learnedWordIds ?? []);
-    const reviewIds = new Set(topicProgress?.reviewWordIds ?? []);
-
-    const learned = wordIds.reduce((count, wordId) => count + (learnedIds.has(wordId) ? 1 : 0), 0);
-    const review = wordIds.reduce((count, wordId) => count + (reviewIds.has(wordId) && !learnedIds.has(wordId) ? 1 : 0), 0);
-    const total = wordIds.length;
+const calculateTopicStats = (wordCount: number, topicProgress?: LearningProgressTopicStateItem): TopicStats => {
+    const learned = new Set(topicProgress?.learnedWordIds ?? []).size;
+    const review = new Set(topicProgress?.reviewWordIds ?? []).size;
+    const total = wordCount;
 
     return {
         new: Math.max(0, total - learned - review),
@@ -140,22 +132,9 @@ const calculateTopicStats = (wordIds: number[], topicProgress?: LearningProgress
 
 export const buildLearningTopicGroups = (
     topicFilters: VocabularyTopicItem[],
-    vocabularyItems: VocabularyUiItem[],
     progressState: LearningProgressState | null
 ): TopicGroupUiModel[] => {
     const progressLookup = createProgressLookup(progressState);
-    const wordsByTopic = vocabularyItems.reduce<Record<number, number[]>>((acc, item) => {
-        if (!item.topicId) {
-            return acc;
-        }
-
-        if (!acc[item.topicId]) {
-            acc[item.topicId] = [];
-        }
-
-        acc[item.topicId].push(item.id);
-        return acc;
-    }, {});
 
     const byParent = topicFilters
         .filter(topic => !topic.parentTopicId)
@@ -164,16 +143,13 @@ export const buildLearningTopicGroups = (
         .filter(topic => topic.parentTopicId)
         .sort((a, b) => a.topicId - b.topicId);
 
-    const toTopicUiModel = (topic: VocabularyTopicItem): TopicUiModel => {
-        const wordIds = wordsByTopic[topic.topicId] ?? [];
-        return {
-            id: topic.topicId,
-            title: topic.name,
-            description: topic.description,
-            icon: TOPIC_ICONS_BY_TOPIC_ID[topic.topicId] ?? '📘',
-            stats: calculateTopicStats(wordIds, progressLookup[topic.topicId])
-        };
-    };
+    const toTopicUiModel = (topic: VocabularyTopicItem): TopicUiModel => ({
+        id: topic.topicId,
+        title: topic.name,
+        description: topic.description,
+        icon: TOPIC_ICONS_BY_TOPIC_ID[topic.topicId] ?? '📘',
+        stats: calculateTopicStats(topic.wordCount ?? 0, progressLookup[topic.topicId])
+    });
 
     if (byParent.length === 0 && topicFilters.length > 0) {
         return [

@@ -18,6 +18,8 @@ namespace VocabLearning.Services
         private const int SaltSize = 16;
         private const int KeySize = 32;
         private const int Iterations = 120_000;
+        private const int PasswordResetTokenSize = 32;
+        private static readonly TimeSpan PasswordResetTokenLifetime = TimeSpan.FromMinutes(30);
         private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
         private static readonly PasswordHasher<Users> LegacyPasswordHasher = new();
 
@@ -47,7 +49,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var emailExists = await dbContext.Users
-                .AnyAsync(user => user.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .AnyAsync(user => user.Email == normalizedEmail, cancellationToken);
 
             if (emailExists)
             {
@@ -76,11 +78,11 @@ namespace VocabLearning.Services
             CancellationToken cancellationToken = default)
         {
             var input = usernameOrEmail.Trim();
-            var normalizedInput = input.ToUpperInvariant();
+            var normalizedInput = NormalizeEmail(input);
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
-                    item => (item.Email.ToUpper() == normalizedInput || item.Username.ToUpper() == normalizedInput)
-                        && item.Status.ToUpper() == UserStatuses.Active,
+                    item => (item.Email == normalizedInput || item.Username == input)
+                        && item.Status == UserStatuses.Active,
                     cancellationToken);
 
             if (user is null)
@@ -132,7 +134,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
             user = await dbContext.Users
-                .SingleOrDefaultAsync(item => item.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(item => item.Email == normalizedEmail, cancellationToken);
 
             if (user is not null)
             {
@@ -171,7 +173,7 @@ namespace VocabLearning.Services
         {
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
-                    item => item.UserId == userId && item.Status.ToUpper() == UserStatuses.Active,
+                    item => item.UserId == userId && item.Status == UserStatuses.Active,
                     cancellationToken);
 
             if (user is null)
@@ -186,6 +188,122 @@ namespace VocabLearning.Services
             }
 
             user.PasswordHash = HashPassword(newPassword);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (true, null);
+        }
+
+        public async Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreatePasswordResetTokenAsync(
+            string email,
+            CancellationToken cancellationToken = default)
+        {
+            var cleanEmail = email.Trim();
+            if (string.IsNullOrWhiteSpace(cleanEmail))
+            {
+                return (false, string.Empty, string.Empty, string.Empty);
+            }
+
+            var normalizedEmail = NormalizeEmail(cleanEmail);
+            var user = await dbContext.Users
+                .SingleOrDefaultAsync(
+                    item => item.Email == normalizedEmail && item.Status == UserStatuses.Active,
+                    cancellationToken);
+
+            if (user is null)
+            {
+                return (false, string.Empty, string.Empty, string.Empty);
+            }
+
+            var now = DateTime.UtcNow;
+
+            var activeTokens = await dbContext.PasswordResetTokens
+                .Where(item => item.UserId == user.UserId && item.UsedAt == null && item.ExpiresAt > now)
+                .ToListAsync(cancellationToken);
+
+            foreach (var token in activeTokens)
+            {
+                token.UsedAt = now;
+            }
+
+            var rawToken = GenerateSecureToken();
+            var tokenHash = HashToken(rawToken);
+
+            dbContext.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                UserId = user.UserId,
+                TokenHash = tokenHash,
+                ExpiresAt = now.Add(PasswordResetTokenLifetime),
+                CreatedAt = now
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return (true, user.Email, user.Username, rawToken);
+        }
+
+        public async Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordWithTokenAsync(
+            string email,
+            string token,
+            string newPassword,
+            string? consumedByIp,
+            CancellationToken cancellationToken = default)
+        {
+            var cleanEmail = email.Trim();
+            var cleanToken = token.Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanEmail)
+                || string.IsNullOrWhiteSpace(cleanToken)
+                || string.IsNullOrWhiteSpace(newPassword))
+            {
+                return (false, "Invalid password reset request.");
+            }
+
+            var normalizedEmail = NormalizeEmail(cleanEmail);
+            var user = await dbContext.Users
+                .SingleOrDefaultAsync(
+                    item => item.Email == normalizedEmail && item.Status == UserStatuses.Active,
+                    cancellationToken);
+
+            if (user is null)
+            {
+                return (false, "The reset token is invalid or has expired.");
+            }
+
+            var now = DateTime.UtcNow;
+            var tokenHash = HashToken(cleanToken);
+
+            var resetToken = await dbContext.PasswordResetTokens
+                .SingleOrDefaultAsync(
+                    item => item.UserId == user.UserId
+                        && item.TokenHash == tokenHash
+                        && item.UsedAt == null
+                        && item.ExpiresAt > now,
+                    cancellationToken);
+
+            if (resetToken is null)
+            {
+                return (false, "The reset token is invalid or has expired.");
+            }
+
+            user.PasswordHash = HashPassword(newPassword);
+
+            resetToken.UsedAt = now;
+            resetToken.ConsumedByIp = string.IsNullOrWhiteSpace(consumedByIp)
+                ? null
+                : consumedByIp.Trim()[..Math.Min(consumedByIp.Trim().Length, 64)];
+
+            var otherActiveTokens = await dbContext.PasswordResetTokens
+                .Where(item => item.UserId == user.UserId
+                               && item.PasswordResetTokenId != resetToken.PasswordResetTokenId
+                               && item.UsedAt == null
+                               && item.ExpiresAt > now)
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in otherActiveTokens)
+            {
+                item.UsedAt = now;
+                item.ConsumedByIp = resetToken.ConsumedByIp;
+            }
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return (true, null);
@@ -212,7 +330,7 @@ namespace VocabLearning.Services
 
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
-                    item => item.UserId == userId && item.Status.ToUpper() == UserStatuses.Active,
+                    item => item.UserId == userId && item.Status == UserStatuses.Active,
                     cancellationToken);
 
             if (user is null)
@@ -230,7 +348,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var emailExists = await dbContext.Users
-                .AnyAsync(item => item.UserId != userId && item.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .AnyAsync(item => item.UserId != userId && item.Email == normalizedEmail, cancellationToken);
 
             if (emailExists)
             {
@@ -286,7 +404,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(email);
             var userByEmail = await dbContext.Users
-                .SingleOrDefaultAsync(user => user.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(user => user.Email == normalizedEmail, cancellationToken);
 
             return userByEmail is not null && IsUserActive(userByEmail)
                 ? userByEmail
@@ -349,7 +467,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var emailExists = await dbContext.Users
-                .AnyAsync(user => user.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .AnyAsync(user => user.Email == normalizedEmail, cancellationToken);
 
             if (emailExists)
             {
@@ -412,7 +530,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var emailExists = await dbContext.Users
-                .AnyAsync(item => item.UserId != userId && item.Email.ToUpper() == normalizedEmail, cancellationToken);
+                .AnyAsync(item => item.UserId != userId && item.Email == normalizedEmail, cancellationToken);
 
             if (emailExists)
             {
@@ -438,8 +556,8 @@ namespace VocabLearning.Services
             {
                 var adminCount = await dbContext.Users
                     .CountAsync(
-                        item => item.Role.ToUpper() == UserRoles.Admin
-                            && item.Status.ToUpper() == UserStatuses.Active,
+                        item => item.Role == UserRoles.Admin
+                            && item.Status == UserStatuses.Active,
                         cancellationToken);
 
                 if (adminCount <= 1)
@@ -485,8 +603,8 @@ namespace VocabLearning.Services
             {
                 var adminCount = await dbContext.Users
                     .CountAsync(
-                        item => item.Role.ToUpper() == UserRoles.Admin
-                            && item.Status.ToUpper() == UserStatuses.Active,
+                        item => item.Role == UserRoles.Admin
+                            && item.Status == UserStatuses.Active,
                         cancellationToken);
 
                 if (adminCount <= 1)
@@ -567,7 +685,7 @@ namespace VocabLearning.Services
 
         private static string NormalizeEmail(string email)
         {
-            return email.Trim().ToUpperInvariant();
+            return email.Trim();
         }
 
         private async Task<string> GenerateUniqueUsernameAsync(
@@ -610,6 +728,21 @@ namespace VocabLearning.Services
             return string.Create(
                 CultureInfo.InvariantCulture,
                 $"{CustomHashPrefix}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}");
+        }
+
+        private static string GenerateSecureToken()
+        {
+            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(PasswordResetTokenSize))
+                .Replace('+', '-')
+                .Replace('/', '_')
+                .TrimEnd('=');
+        }
+
+        private static string HashToken(string token)
+        {
+            var bytes = Encoding.UTF8.GetBytes(token);
+            var hash = SHA256.HashData(bytes);
+            return Convert.ToBase64String(hash);
         }
 
         private static (bool Verified, bool NeedsRehash) VerifyPassword(Users user, string password)

@@ -30,12 +30,30 @@
             </div>
             <div class="mb-3">
                 <label asp-for="Password" class="form-label"></label>
-                <input asp-for="Password" class="form-control" />
+                <div class="input-group">
+                    <input asp-for="Password" class="form-control password-toggle-input" />
+                    <button type="button"
+                            class="btn btn-outline-secondary password-toggle-btn"
+                            data-password-toggle
+                            aria-label="Show password"
+                            aria-pressed="false">
+                        <span data-password-icon>👁</span>
+                    </button>
+                </div>
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>
             <div class="mb-3">
                 <label asp-for="ConfirmPassword" class="form-label"></label>
-                <input asp-for="ConfirmPassword" class="form-control" />
+                <div class="input-group">
+                    <input asp-for="ConfirmPassword" class="form-control password-toggle-input" />
+                    <button type="button"
+                            class="btn btn-outline-secondary password-toggle-btn"
+                            data-password-toggle
+                            aria-label="Show password"
+                            aria-pressed="false">
+                        <span data-password-icon>👁</span>
+                    </button>
+                </div>
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
             <input type="submit" value="Register" class="btn btn-success w-100 p-2" />

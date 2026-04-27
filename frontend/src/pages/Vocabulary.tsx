@@ -1,14 +1,26 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Volume2, X } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
-import { playPronunciationAudio } from '../utils/audio';
 import { Badge, Button } from '../components/ui';
+import { vocabularyApi } from '../services/vocabularyApi';
+import { playPronunciationAudio } from '../utils/audio';
+import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
 
-const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, items, isLoading, topics }: any) => {
+const PAGE_SIZE = 24;
+
+const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: any) => {
+    const [items, setItems] = useState<any[]>([]);
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [selectedCefr, setSelectedCefr] = useState('ALL');
     const [selectedTopic, setSelectedTopic] = useState('ALL');
+    const [page, setPage] = useState(1);
+    const [pageInput, setPageInput] = useState('1');
+    const [totalPages, setTotalPages] = useState(0);
+    const [totalCount, setTotalCount] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const topicOptions = useMemo(() => {
         return topics
@@ -16,20 +28,94 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, items, isLo
             .sort((a: any, b: any) => a.label.localeCompare(b.label));
     }, [topics]);
 
-    const filtered = items.filter((v: any) => {
-        const matchText = v.word.toLowerCase().includes(search.toLowerCase())
-            || v.meaning.toLowerCase().includes(search.toLowerCase());
-        const matchCefr = selectedCefr === 'ALL' || v.cefr === selectedCefr;
-        const itemTopic = String(v.topicId ?? 'NONE');
-        const matchTopic = selectedTopic === 'ALL' || itemTopic === selectedTopic;
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            setDebouncedSearch(search.trim());
+        }, 250);
 
-        return matchText && matchCefr && matchTopic;
-    });
+        return () => window.clearTimeout(timeout);
+    }, [search]);
+
+    const visiblePages = useMemo(() => {
+        if (totalPages <= 0) {
+            return [] as number[];
+        }
+
+        const pages = [page, page + 1, page + 2, page + 3]
+            .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages)
+            .filter((pageNumber, index, array) => array.indexOf(pageNumber) === index);
+
+        return pages;
+    }, [page, totalPages]);
+
+    const loadPage = async (nextPage: number) => {
+        setIsLoading(true);
+
+        try {
+            const response = await vocabularyApi.getPage({
+                page: nextPage,
+                pageSize: PAGE_SIZE,
+                search: debouncedSearch,
+                cefr: selectedCefr,
+                topicId: selectedTopic === 'ALL' ? null : Number(selectedTopic)
+            });
+
+            const mappedItems = response.items.map(mapVocabularyToUiModel);
+            setItems(mappedItems);
+            setPage(response.page);
+            setPageInput(String(response.page));
+            setTotalPages(response.totalPages);
+            setTotalCount(response.totalCount);
+            setErrorMessage('');
+        } catch (error: any) {
+            setErrorMessage(error?.message || 'Không thể tải danh sách từ vựng.');
+            setItems([]);
+            setTotalCount(0);
+            setTotalPages(0);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setPage(1);
+        void loadPage(1);
+    }, [debouncedSearch, selectedCefr, selectedTopic]);
+
+    useEffect(() => {
+        if (page <= 1) {
+            return;
+        }
+
+        void loadPage(page);
+    }, [page]);
+
+    const handlePageChange = (nextPage: number) => {
+        if (nextPage < 1 || nextPage > totalPages || nextPage === page || isLoading) {
+            return;
+        }
+
+        setPage(nextPage);
+    };
+
+    const handleGoToPage = () => {
+        const nextPage = Number(pageInput);
+        if (!Number.isInteger(nextPage)) {
+            return;
+        }
+
+        handlePageChange(nextPage);
+    };
 
     return (
         <div className="max-w-6xl mx-auto px-6 py-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                <h1 className="text-4xl">Từ vựng</h1>
+                <div>
+                    <h1 className="text-4xl">Từ vựng</h1>
+                    <p className="text-sm text-text-muted mt-2">
+                        Trang {page} / {Math.max(totalPages, 1)} · Tổng {totalCount} từ vựng
+                    </p>
+                </div>
                 <div className="w-full md:w-[640px] grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="relative md:col-span-2">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
@@ -63,12 +149,23 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, items, isLo
                     </select>
                 </div>
             </div>
+
             {isLoading && (
                 <div className="text-text-muted mb-6">Đang tải danh sách từ vựng...</div>
             )}
 
+            {errorMessage && (
+                <div className="text-sm text-red-500 font-medium mb-6">{errorMessage}</div>
+            )}
+
+            {!isLoading && !errorMessage && items.length === 0 && (
+                <div className="glass-card p-8 text-center text-text-muted mb-6">
+                    Không tìm thấy từ vựng phù hợp.
+                </div>
+            )}
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filtered.map((v: any) => (
+                {items.map((v: any) => (
                     <div key={v.id} className="glass-card p-6 cursor-pointer group" onClick={() => onSelectWord(v)}>
                         <div className="flex justify-between items-start mb-4">
                             <Badge variant="purple">{v.cefr}</Badge>
@@ -89,6 +186,55 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, items, isLo
                     </div>
                 ))}
             </div>
+
+            {!isLoading && totalPages > 1 && (
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
+                    <Button variant="ghost" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
+                        Trước
+                    </Button>
+                    {visiblePages.map((pageNumber) => (
+                        <Button
+                            key={pageNumber}
+                            variant={pageNumber === page ? 'primary' : 'ghost'}
+                            onClick={() => handlePageChange(pageNumber)}
+                        >
+                            {pageNumber}
+                        </Button>
+                    ))}
+                    {!visiblePages.includes(totalPages) && (
+                        <>
+                            <span className="px-2 text-text-muted">...</span>
+                            <Button
+                                variant={totalPages === page ? 'primary' : 'ghost'}
+                                onClick={() => handlePageChange(totalPages)}
+                            >
+                                {totalPages}
+                            </Button>
+                        </>
+                    )}
+                    <Button variant="ghost" onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}>
+                        Sau
+                    </Button>
+                    <div className="flex items-center gap-2 ml-2">
+                        <input
+                            type="number"
+                            min={1}
+                            max={totalPages}
+                            value={pageInput}
+                            onChange={(e) => setPageInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleGoToPage();
+                                }
+                            }}
+                            className="w-24 px-3 py-2 bg-white/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                        />
+                        <Button variant="ghost" onClick={handleGoToPage}>
+                            Đi
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <AnimatePresence>
                 {selectedWord && (

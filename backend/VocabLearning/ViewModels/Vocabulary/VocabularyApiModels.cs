@@ -60,6 +60,8 @@ namespace VocabLearning.ViewModels.Vocabulary
         public string Description { get; set; } = string.Empty;
 
         public long? ParentTopicId { get; set; }
+
+        public int WordCount { get; set; }
     }
 
     public sealed class VocabularyLearningItemViewModel

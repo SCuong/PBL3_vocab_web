@@ -13,6 +13,9 @@ namespace ImportVocabularyPBL3
                 var schemaScriptPath =
                     ConfigurationManager.AppSettings["SchemaScriptPath"]
                     ?? @"Scripts\PBL3.bootstrap.sql";
+                var migrationScriptPath =
+                    ConfigurationManager.AppSettings["MigrationScriptPath"]
+                    ?? @"Scripts\PBL3.exercise.migration.sql";
                 var excelPath =
                     ConfigurationManager.AppSettings["ExcelPath"]
                     ?? @"Data\vocab.xlsx";
@@ -21,7 +24,7 @@ namespace ImportVocabularyPBL3
                 var importer = new VocabImportService();
 
                 Console.WriteLine("Ensuring database is ready...");
-                bootstrapper.EnsureReady(schemaScriptPath);
+                bootstrapper.EnsureReady(schemaScriptPath, migrationScriptPath);
 
                 Console.WriteLine("Importing vocabulary...");
                 importer.ImportFromExcel(ProjectFileLocator.ResolveExistingFile(excelPath));
