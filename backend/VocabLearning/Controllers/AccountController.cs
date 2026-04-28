@@ -740,6 +740,77 @@ namespace VocabLearning.Controllers
             });
         }
 
+        [HttpDelete("/api/account/delete")]
+        [Authorize]
+        public async Task<ActionResult<AuthApiResponse>> DeleteAccountApi(
+            [FromBody] DeleteAccountRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Request body is required."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password is required to delete account."
+                });
+            }
+
+            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (user is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Not authenticated."
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password is not available for this account."
+                });
+            }
+
+            var isPasswordValid = customAuthenticationService.ValidatePasswordAsync(
+                user.PasswordHash,
+                request.Password);
+
+            if (!isPasswordValid)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password is incorrect."
+                });
+            }
+
+            user.IsDeleted = true;
+            user.DeletedAt = DateTime.UtcNow;
+
+            appDbContext.Users.Update(user);
+            await appDbContext.SaveChangesAsync(cancellationToken);
+
+            await customAuthenticationService.SignOutAsync(HttpContext);
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = "Account deleted successfully."
+            });
+        }
+
         private IActionResult RedirectToLocal(string? returnUrl)
         {
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))

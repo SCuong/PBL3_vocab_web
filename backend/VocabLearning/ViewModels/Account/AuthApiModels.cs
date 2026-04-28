@@ -50,6 +50,11 @@ namespace VocabLearning.ViewModels.Account
         public string ConfirmNewPassword { get; set; } = string.Empty;
     }
 
+    public sealed class DeleteAccountRequest
+    {
+        public string Password { get; set; } = string.Empty;
+    }
+
     public sealed class AuthenticatedUserViewModel
     {
         public long UserId { get; set; }

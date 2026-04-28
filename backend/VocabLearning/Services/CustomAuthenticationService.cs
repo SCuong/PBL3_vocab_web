@@ -82,7 +82,8 @@ namespace VocabLearning.Services
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
                     item => (item.Email == normalizedInput || item.Username == input)
-                        && item.Status == UserStatuses.Active,
+                        && item.Status == UserStatuses.Active
+                        && !item.IsDeleted,
                     cancellationToken);
 
             if (user is null)
@@ -191,6 +192,13 @@ namespace VocabLearning.Services
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return (true, null);
+        }
+
+        public bool ValidatePasswordAsync(string passwordHash, string password)
+        {
+            var user = new Users { PasswordHash = passwordHash };
+            var (verified, _) = VerifyPassword(user, password);
+            return verified;
         }
 
         public async Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreatePasswordResetTokenAsync(
@@ -388,7 +396,7 @@ namespace VocabLearning.Services
             if (long.TryParse(userIdClaim, out var userId))
             {
                 var userById = await dbContext.Users
-                    .SingleOrDefaultAsync(user => user.UserId == userId, cancellationToken);
+                    .SingleOrDefaultAsync(user => user.UserId == userId && !user.IsDeleted, cancellationToken);
 
                 if (userById is not null && IsUserActive(userById))
                 {
@@ -404,7 +412,7 @@ namespace VocabLearning.Services
 
             var normalizedEmail = NormalizeEmail(email);
             var userByEmail = await dbContext.Users
-                .SingleOrDefaultAsync(user => user.Email == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(user => user.Email == normalizedEmail && !user.IsDeleted, cancellationToken);
 
             return userByEmail is not null && IsUserActive(userByEmail)
                 ? userByEmail

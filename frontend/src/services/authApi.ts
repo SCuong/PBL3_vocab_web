@@ -155,5 +155,21 @@ export const authApi = {
             method: 'POST',
             credentials: 'include'
         });
+    },
+
+    deleteAccount: async (payload: { password: string }) => {
+        const response = await fetch('/api/account/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Không thể xoá tài khoản.');
+        }
+
+        return data.message || 'Tài khoản đã bị xoá thành công.';
     }
 };

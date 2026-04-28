@@ -3,6 +3,7 @@ import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '../components/ui';
 import { StreakHeatmap } from '../components/streak';
+import { DeleteAccountModal } from '../components/account';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
 import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
@@ -38,6 +39,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
 
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [isSavingPassword, setIsSavingPassword] = useState(false);
+    const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
 
     useEffect(() => {
         setUsername(user.username || '');
@@ -272,6 +274,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                         <div className="space-y-3">
                             <Button variant="ghost" className="w-full" onClick={() => setIsEditing(true)}>Edit Profile</Button>
                             <Button variant="danger" className="w-full" onClick={onLogout}>Logout</Button>
+                            <Button variant="danger" className="w-full opacity-80" onClick={() => setIsDeleteAccountModalOpen(true)}>Delete Account</Button>
                         </div>
                     </div>
                     <div className="glass-card p-8 bg-linear-to-br from-accent/20 to-secondary/20 border-accent/30">
@@ -510,6 +513,13 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <DeleteAccountModal
+                isOpen={isDeleteAccountModalOpen}
+                onClose={() => setIsDeleteAccountModalOpen(false)}
+                onSuccess={onLogout}
+                onAddToast={onAddToast}
+            />
         </div>
     );
 };

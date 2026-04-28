@@ -28,6 +28,8 @@ BEGIN
         [role] NVARCHAR(20) NOT NULL CONSTRAINT [DF_users_role] DEFAULT N'{UserRoles.Learner}',
         [status] NVARCHAR(20) NOT NULL CONSTRAINT [DF_users_status] DEFAULT N'ACTIVE',
         [created_at] DATETIME NOT NULL CONSTRAINT [DF_users_created_at] DEFAULT GETDATE(),
+        [is_deleted] BIT NOT NULL CONSTRAINT [DF_users_is_deleted] DEFAULT ((0)),
+        [deleted_at] DATETIME NULL,
         CONSTRAINT [PK_users] PRIMARY KEY ([user_id]),
         CONSTRAINT [UQ_users_username] UNIQUE ([username]),
         CONSTRAINT [UQ_users_email] UNIQUE ([email])
@@ -86,6 +88,16 @@ BEGIN
     SET [google_subject] = LTRIM(RTRIM([google_subject]))
     WHERE [google_subject] IS NOT NULL
       AND [google_subject] <> LTRIM(RTRIM([google_subject]));
+END;",
+                @"
+IF COL_LENGTH('dbo.users', 'is_deleted') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[users] ADD [is_deleted] BIT NOT NULL CONSTRAINT [DF_users_is_deleted] DEFAULT ((0));
+END;",
+                @"
+IF COL_LENGTH('dbo.users', 'deleted_at') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[users] ADD [deleted_at] DATETIME NULL;
 END;",
                 @"
 UPDATE [dbo].[users]

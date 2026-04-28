@@ -62,6 +62,13 @@ namespace VocabLearning.Data
                     .HasColumnName("created_at")
                     .HasDefaultValueSql("GETDATE()");
 
+                entity.Property(user => user.IsDeleted)
+                    .HasColumnName("is_deleted")
+                    .HasDefaultValue(false);
+
+                entity.Property(user => user.DeletedAt)
+                    .HasColumnName("deleted_at");
+
                 entity.HasIndex(user => user.Username).IsUnique();
                 entity.HasIndex(user => user.Email).IsUnique();
                 entity.HasIndex(user => user.GoogleSubject)
