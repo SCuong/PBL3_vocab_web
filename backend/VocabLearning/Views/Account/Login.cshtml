@@ -53,7 +53,7 @@
             </div>
 
             <div class="mb-3 text-end">
-                <a asp-controller="Account" asp-action="VerifyEmail" asp-route-returnUrl="@(ViewData["ReturnUrl"])" class="text-decoration-none">Forgot password?</a>
+                <a asp-controller="PasswordReset" asp-action="VerifyEmail" asp-route-returnUrl="@(ViewData["ReturnUrl"])" class="text-decoration-none">Forgot password?</a>
             </div>
 
             <input type="submit" value="Login" class="btn btn-success w-100 p-2" />

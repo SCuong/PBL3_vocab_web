@@ -1,0 +1,31 @@
+[33m41588b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mCuong[m[33m)[m feat: update home page UI
+[33m2227947[m feat: add account deletion functionality
+[33ma8e8763[m docs: update README Docker instructions
+[33mc0a7ab5[m chore: Docker production setup with compose
+[33m48081ea[m chore: add initial Docker configuration
+[33m6648600[m chore: remove unused SQL scripts
+[33mb6bb879[m fix: correct login and register page layout
+[33mbc91b5a[m feat: add advanced learning features
+[33mb829bab[m fix: correct study history session and improve vocab animation
+[33me6442f1[m feat: add study history to profile and update minitest
+[33m6bf323a[m chore: move frontend to /frontend at repo root
+[33mb2a4e48[m feat: add smart learning and custom study mode
+[33m33dc771[m fix: correct progress dot-bar display
+[33m889a65f[m feat: update profile editing functionality
+[33m9529d3b[m feat: connect minitest exercise 1 to backend
+[33md2d3a18[m fix: correct breadcrumb navigation
+[33m5114428[m refactor: optimize frontend UI — phase 2
+[33mcfb9b1d[m refactor: optimize frontend UI — phase 1
+[33m7245965[m feat: add frontend layout and styling base
+[33mfb5d083[m docs: update README.md with project info
+[33m56ff014[m docs: create README.md
+[33m58c806c[m merge: integrate exercise system into main branch
+[33md8399f2[m feat: add frontend base without backend data
+[33m8138162[m feat: complete exercise system and admin history page
+[33m43f2e05[m feat: add exercise type and session database schema
+[33m4532548[m Merge branch 'main' of https://github.com/SCuong/PBL3_vocab_web
+[33md9b9869[m feat: add exercise type and session models
+[33m887d2cb[m docs: update Visual Studio version in README
+[33mb1dadf5[m chore: miscellaneous project structure fixes
+[33m3d95db8[m chore: remove .dotnet and duplicate directories
+[33m55ffad6[m chore: restructure project directory and fix submodule
