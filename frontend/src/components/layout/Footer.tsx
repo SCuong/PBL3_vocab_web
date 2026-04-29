@@ -1,19 +1,43 @@
 export const Footer = () => (
-    <footer className="mt-20 py-12 border-t border-primary/10 bg-white/30 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-            <div>
-                <div className="font-display font-extrabold text-2xl bg-linear-to-r from-cyan to-pink bg-clip-text text-transparent mb-2">VocabLearning</div>
-                <p className="text-text-muted text-sm tracking-wide uppercase font-bold opacity-60">© 2026 Build with Sparkles ✨</p>
+    <footer className="bg-surface border-t border-border py-8 px-8">
+        <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Brand */}
+            <div className="flex items-center gap-3 font-display font-bold text-sm text-text-primary">
+                <span
+                    className="font-display text-xl font-extrabold leading-none"
+                    style={{
+                        background: 'linear-gradient(90deg, var(--color-cyan) 0%, #e879f9 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                    }}
+                >
+                    VL
+                </span>
+                <span>VocabLearning</span>
             </div>
-            <div className="flex flex-col items-center md:items-end gap-2 text-sm">
-                <div className="font-bold text-primary uppercase tracking-[0.2em] mb-1">Contact Us</div>
+
+            {/* Contact */}
+            <div className="flex flex-col gap-1 items-center">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-[0.08em] mb-0.5">Contact us</span>
                 <a
                     href="mailto:thai.na20p0161@gmail.com"
-                    className="text-text-primary hover:text-primary transition-colors font-medium underline underline-offset-4 decoration-primary/30"
+                    className="text-sm text-primary hover:text-accent transition-colors hover:underline"
                 >
                     thai.na20p0161@gmail.com
                 </a>
+                <a
+                    href="mailto:vumanhcuongppt@gmail.com"
+                    className="text-sm text-primary hover:text-accent transition-colors hover:underline"
+                >
+                    vumanhcuongppt@gmail.com
+                </a>
             </div>
+
+            {/* Copyright */}
+            <p className="text-xs text-text-muted">
+                &copy; 2026 VocabLearning — PBL3 Project
+            </p>
         </div>
     </footer>
 );

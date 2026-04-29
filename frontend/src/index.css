@@ -1,22 +1,31 @@
+@import url('https://api.fontshare.com/v2/css?f[]=chillax@400,500,600,700&f[]=plus-jakarta-sans@400,500,600,700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Mono&display=swap');
 @import "tailwindcss";
 
 @theme {
-    --font-display: "Fredoka", "Be Vietnam Pro", sans-serif;
-    --font-sans: "Quicksand", "Be Vietnam Pro", sans-serif;
+    --font-display: "Chillax", "Plus Jakarta Sans", "Fredoka", "Be Vietnam Pro", sans-serif;
+    --font-sans: "Plus Jakarta Sans", "Quicksand", "Be Vietnam Pro", sans-serif;
     --font-mono: "Space Mono", monospace;
-    --color-primary: #CC99FF;
-    --color-secondary: #FFBBFF;
-    --color-accent: #99FFFF;
-    --color-cyan: #99FFFF;
-    --color-pink: #FFBBFF;
-    --color-purple: #CC99FF;
-    --color-bg-light: #FAF5FF;
-    --color-text-primary: #3D1A6E;
-    --color-text-secondary: #5D3A8E;
-    --color-text-muted: #8A7B9E;
+    --color-primary: #9333ea;
+    --color-primary-hover: #7e22ce;
+    --color-primary-light: #f3e8ff;
+    --color-secondary: #c084fc;
+    --color-accent: #e879f9;
+    --color-cyan: #22d3ee;
+    --color-pink: #e879f9;
+    --color-purple: #9333ea;
+    --color-bg-light: #faf5ff;
+    --color-surface: #ffffff;
+    --color-surface-2: #f3e8ff;
+    --color-border: #e9d5ff;
+    --color-text-primary: #1e1b4b;
+    --color-text-secondary: #5b5697;
+    --color-text-muted: #a78bfa;
+    --color-text-faint: #a78bfa;
     --radius-pill: 9999px;
     --radius-card: 16px;
+    --radius-xl: 1.5rem;
+    --radius-2xl: 2rem;
 
     @keyframes slide-in {
         from {
@@ -52,7 +61,20 @@
         }
     }
 
+    @keyframes slide-down {
+        from {
+            opacity: 0;
+            transform: translateY(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     --animate-slide-in: slide-in 0.4s ease-out;
+    --animate-slide-down: slide-down 0.2s ease;
     --animate-flame-pulse: flame-pulse 1.5s ease-in-out infinite;
     --animate-bounce-soft: bounce-soft 2s ease-in-out infinite;
 }
@@ -60,23 +82,32 @@
 @layer base {
     body {
         @apply bg-bg-light text-text-primary font-sans selection:bg-accent/30 overflow-x-hidden;
-        background-image: radial-gradient(at 0% 0%, rgba(204, 153, 255, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(255, 187, 255, 0.15) 0px, transparent 50%), radial-gradient(at 50% 50%, rgba(153, 255, 255, 0.1) 0px, transparent 50%);
-        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100dvh;
+        line-height: 1.65;
     }
 
     h1, h2, h3, h4, h5, h6 {
-        @apply font-display font-bold tracking-tight;
+        @apply font-display font-bold;
+        text-wrap: balance;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+    }
+
+    p, li {
+        text-wrap: pretty;
+        max-width: 68ch;
     }
 }
 
 @layer components {
     /* ─── Shared UI primitives ─────────────────────────────────────────── */
     .glass-card {
-        @apply bg-white/70 backdrop-blur-md border border-primary/20 rounded-card shadow-[0_4px_20px_rgba(204,153,255,0.25)] transition-all duration-300;
+        @apply bg-white/70 backdrop-blur-md border border-primary/20 rounded-card shadow-[0_4px_20px_rgba(147,51,234,0.12)] transition-all duration-300;
     }
 
         .glass-card:hover {
-            @apply shadow-[0_8px_30px_rgba(204,153,255,0.35)] border-primary/40;
+            @apply shadow-[0_8px_30px_rgba(147,51,234,0.16)] border-primary/40;
         }
 
     .btn-base {
@@ -84,12 +115,20 @@
     }
 
     .btn-primary {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer bg-linear-to-r from-primary to-secondary text-text-primary shadow-md hover:shadow-primary/30 hover:scale-[1.03] relative overflow-hidden;
+        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-white shadow-md relative overflow-hidden;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+        box-shadow: 0 4px 24px rgba(147,51,234,0.35);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(147,51,234,0.45);
+        filter: brightness(1.05);
     }
 
         .btn-primary::after {
             content: '';
-            @apply absolute inset-0 bg-linear-to-r from-transparent via-white/40 to-transparent -translate-x-full transition-transform duration-500;
+            @apply absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-500;
         }
 
         .btn-primary:hover::after {
@@ -97,7 +136,15 @@
         }
 
     .btn-secondary {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-primary/30 bg-white/40 backdrop-blur-sm text-text-primary hover:bg-white/60 hover:scale-[1.03];
+        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted;
+        border: 2px solid var(--color-border);
+        background: var(--color-surface);
+    }
+
+    .btn-secondary:hover {
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+        background: var(--color-primary-light);
     }
 
     .btn-ghost {
@@ -696,6 +743,205 @@
         .auth-mobile-switch {
             display: none;
         }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       HOME PAGE — matching vocablearning-home static design
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    /* ── Hero Visual ── */
+    .hv-main-card {
+        width: 300px;
+        background: var(--color-surface);
+        border-radius: var(--radius-2xl);
+        box-shadow: 0 24px 64px rgba(147,51,234,0.13), 0 4px 16px rgba(147,51,234,0.07);
+        overflow: hidden;
+        position: relative;
+        z-index: 2;
+        margin-left: 80px;
+        animation: hv-float 5s ease-in-out infinite;
+    }
+    .hv-card-spine {
+        height: 6px;
+        background: linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-cyan));
+    }
+    .hv-card-body {
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    @keyframes hv-float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-12px); }
+    }
+
+    /* ── Floating cards ── */
+    .hv-float {
+        position: absolute;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        padding: 1.25rem;
+        box-shadow: 0 12px 36px rgba(147,51,234,0.10);
+        width: 190px;
+        z-index: 3;
+    }
+    .hv-streak {
+        top: 30px;
+        left: 0;
+        transform: rotate(-4deg);
+        animation: hv-float-a 4s ease-in-out infinite;
+    }
+    .hv-review {
+        bottom: 40px;
+        left: 10px;
+        transform: rotate(3deg);
+        animation: hv-float-b 4.5s ease-in-out infinite;
+    }
+    @keyframes hv-float-a {
+        0%, 100% { transform: rotate(-4deg) translateY(0); }
+        50% { transform: rotate(-4deg) translateY(-8px); }
+    }
+    @keyframes hv-float-b {
+        0%, 100% { transform: rotate(3deg) translateY(0); }
+        50% { transform: rotate(3deg) translateY(-8px); }
+    }
+
+    /* ── Chibi mascot ── */
+    .chibi-wrap {
+        position: absolute;
+        bottom: -20px;
+        right: -20px;
+        width: 140px;
+        height: 140px;
+        z-index: 4;
+        animation: chibi-float 3s ease-in-out infinite;
+    }
+    .chibi-svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 8px 24px rgba(147,51,234,0.25));
+    }
+    .chibi-shadow {
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70%;
+        height: 10px;
+        background: rgba(147,51,234,0.12);
+        border-radius: 50%;
+        filter: blur(6px);
+    }
+    @keyframes chibi-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-15px); }
+    }
+
+    /* ── Review bar ── */
+    .hv-review-bar-wrap {
+        width: 100%;
+        height: 6px;
+        background: var(--color-primary-light);
+        border-radius: 9999px;
+        margin: 0.5rem 0;
+        overflow: hidden;
+    }
+    .hv-review-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+        border-radius: 9999px;
+    }
+
+    /* ── Orbs ── */
+    .home-orb {
+        position: absolute;
+        border-radius: 9999px;
+        filter: blur(40px);
+        pointer-events: none;
+        opacity: 0.35;
+    }
+
+    /* ── Topic card ── */
+    .home-topic-card {
+        background: var(--color-surface);
+        border: 1.5px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+    .home-topic-card:hover {
+        transform: translateY(-3px);
+    }
+
+    /* ── Step card ── */
+    .home-step-card {
+        background: #ffffff;
+        border: 1.5px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        padding: 2rem;
+        text-align: center;
+        transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 4px 20px rgba(147,51,234,0.10);
+    }
+    .home-step-card:hover {
+        border-color: var(--color-primary);
+        box-shadow: 0 4px 16px rgba(147,51,234,0.12), 0 2px 6px rgba(147,51,234,0.06);
+        transform: translateY(-4px);
+    }
+
+    /* ── CTA Section ── */
+    .home-cta-section {
+        background: linear-gradient(135deg, var(--color-primary) 0%, #7c3aed 40%, #db2777 80%, #0891b2 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    .home-cta-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    /* ── Features strip ── */
+    .home-feature-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* ── Fade-in animation ── */
+    .home-fade-in {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .home-fade-in.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* ── Responsive home ── */
+    @media (max-width: 1024px) {
+        .hv-main-card { margin-left: 0; width: 260px; }
+        .hv-float { width: 160px; }
+    }
+    @media (max-width: 768px) {
+        .hv-main-card { width: 240px; }
+        .hv-float { display: none; }
+        .chibi-wrap { width: 100px; height: 100px; }
     }
 }
 
