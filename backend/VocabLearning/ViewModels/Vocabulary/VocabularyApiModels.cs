@@ -84,6 +84,8 @@ namespace VocabLearning.ViewModels.Vocabulary
 
         public string Example { get; set; } = string.Empty;
 
+        public string ExampleVi { get; set; } = string.Empty;
+
         public string ExampleAudioUrl { get; set; } = string.Empty;
     }
 }
