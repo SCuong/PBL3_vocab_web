@@ -23,6 +23,7 @@ builder.Services.AddScoped<AdminExerciseService>();
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<LearningFlowService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
+builder.Services.AddScoped<IAIService, GeminiService>();
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {
