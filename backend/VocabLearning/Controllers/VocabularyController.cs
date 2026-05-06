@@ -126,6 +126,7 @@ namespace VocabLearning.Controllers
                         TopicName = topic.Name,
                         AudioUrl = vocabulary.AudioUrl ?? string.Empty,
                         Example = firstExample?.ExampleEn ?? string.Empty,
+                        ExampleVi = firstExample?.ExampleVi ?? string.Empty,
                         ExampleAudioUrl = firstExample?.AudioUrl ?? string.Empty
                     };
                 })
