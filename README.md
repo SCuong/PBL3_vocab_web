@@ -1,15 +1,27 @@
-# 📚 VocabLearning
+<p align="center">
+  <img src="frontend/public/logo.png" alt="VocabLearning Logo" width="140" />
+</p>
 
-> A full-stack English vocabulary learning platform built as a graduation project (PBL3).  
-> Designed with production-grade architecture: layered services, role-based access control, spaced repetition, and containerized deployment.
+<h1 align="center">VocabLearning</h1>
 
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![SQL Server](https://img.shields.io/badge/SQL%20Server-2022-CC2927?logo=microsoftsqlserver)](https://www.microsoft.com/sql-server)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://docs.docker.com/compose/)
+<p align="center">
+  <strong>An English vocabulary learning platform — helping learners master words effectively</strong>
+</p>
+
+<p align="center">
+  <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet" />
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript" />
+  <img alt="SQL Server" src="https://img.shields.io/badge/SQL%20Server-2022-CC2927?logo=microsoftsqlserver" />
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker" />
+</p>
 
 ---
+
+## Introduction
+
+**VocabLearning** is a full-stack English vocabulary learning platform developed as a PBL3 graduation project.  
+The system is designed to help learners build, review, and retain English vocabulary efficiently through structured learning paths, interactive exercises, and progress tracking.
 
 ## 📖 Table of Contents
 
