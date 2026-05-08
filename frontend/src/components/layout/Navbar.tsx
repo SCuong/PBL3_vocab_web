@@ -3,6 +3,7 @@ import { LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../ui';
 import { UserWidget } from './UserWidget';
+import { Logo } from '../../assets/Logo';
 
 type NavbarProps = {
     activePage: string;
@@ -40,17 +41,7 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                     className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-85 active:scale-95"
                     aria-label="VocabLearning home"
                 >
-                    <span
-                        className="font-display text-2xl font-extrabold leading-none"
-                        style={{
-                            background: 'linear-gradient(90deg, var(--color-cyan) 0%, #e879f9 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        }}
-                    >
-                        VL
-                    </span>
+                    <Logo size={36} />
                     <span className="font-display text-lg font-bold text-text-primary tracking-tight hidden sm:inline">
                         VocabLearning
                     </span>

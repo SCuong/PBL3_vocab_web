@@ -1,3 +1,5 @@
+import { Logo } from '../../assets/Logo';
+
 type AuthNavbarProps = {
     onNavigate: (page: string) => void;
 };
@@ -17,17 +19,7 @@ export const AuthNavbar = ({ onNavigate }: AuthNavbarProps) => (
                 className="flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
                 aria-label="VocabLearning home"
             >
-                <span
-                    className="font-display text-2xl font-extrabold leading-none"
-                    style={{
-                        background: 'linear-gradient(90deg, var(--color-cyan) 0%, #e879f9 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                    }}
-                >
-                    VL
-                </span>
+                <Logo size={36} />
                 <span className="font-display text-lg font-bold text-text-primary tracking-tight">
                     VocabLearning
                 </span>
