@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Logo } from "./assets/Logo";
 import {
   ChevronRight,
   Volume2,
@@ -2277,9 +2278,7 @@ export default function App() {
                 repeatType: "reverse",
               }}
             >
-              <div className="text-8xl font-display font-extrabold text-white mb-6">
-                VL
-              </div>
+              <Logo size={100} />
             </motion.div>
             <div className="font-display font-bold text-2xl text-cyan tracking-wider">
               VocabLearning
