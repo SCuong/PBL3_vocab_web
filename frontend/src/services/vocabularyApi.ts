@@ -38,6 +38,7 @@ export type VocabularyLearningItem = {
     topicName: string;
     audioUrl: string;
     example: string;
+    exampleVi: string;
     exampleAudioUrl: string;
 };
 

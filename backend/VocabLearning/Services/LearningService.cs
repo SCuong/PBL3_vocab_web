@@ -930,7 +930,7 @@ namespace VocabLearning.Services
             var now = DateTime.Now;
             var topicVocabularyIds = _context.Vocabularies
                 .Where(vocabulary => vocabulary.TopicId == topicId)
-                .OrderBy(vocabulary => vocabulary.Word)
+                .OrderBy(vocabulary => vocabulary.VocabId)
                 .Select(vocabulary => vocabulary.VocabId)
                 .ToList();
 

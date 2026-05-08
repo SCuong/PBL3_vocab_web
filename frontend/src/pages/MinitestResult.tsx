@@ -18,7 +18,7 @@ const MinitestResult = ({ score, total, detail, onBack }: any) => (
 
                 {detail?.bonus > 0 && (
                     <div className="mb-12 inline-block px-6 py-3 bg-linear-to-r from-yellow-400 to-orange-500 rounded-pill text-white font-bold shadow-lg animate-bounce">
-                        🔥 Perfect Reading Bonus: +50 XP
+                        🔥 Perfect Translation Bonus: +50 XP
                     </div>
                 )}
 
@@ -28,8 +28,8 @@ const MinitestResult = ({ score, total, detail, onBack }: any) => (
                         <div className="text-3xl font-bold text-primary">{detail?.fill || 0}/5</div>
                     </div>
                     <div className="p-6 bg-accent/5 rounded-2xl border border-accent/10">
-                        <div className="text-text-muted text-sm uppercase font-bold mb-2">Reading</div>
-                        <div className="text-3xl font-bold text-secondary">{detail?.reading || 0}/4</div>
+                        <div className="text-text-muted text-sm uppercase font-bold mb-2">Dịch Câu</div>
+                        <div className="text-3xl font-bold text-secondary">{detail?.translation || 0}/4</div>
                     </div>
                 </div>
 
@@ -39,6 +39,9 @@ const MinitestResult = ({ score, total, detail, onBack }: any) => (
                     </Button>
                     <Button variant="secondary" className="px-12 py-5 text-xl" onClick={() => onBack('home')}>
                         Về trang chủ
+                    </Button>
+                    <Button variant="outline" className="px-12 py-5 text-xl" onClick={() => onBack('minitest-review')}>
+                        Xem lại đáp án 📝
                     </Button>
                 </div>
             </div>

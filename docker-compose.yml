@@ -60,6 +60,7 @@ services:
       Cookie__SecurePolicy: "SameAsRequest"
       Cookie__SameSite: "Lax"
       Database__AutoMigrate: "true"
+      Gemini__ApiKey: "${Gemini__ApiKey}"
     volumes:
       - avatar_data:/app/avatars
     restart: unless-stopped

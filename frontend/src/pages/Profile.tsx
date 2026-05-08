@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '../components/ui';
-import { StreakHeatmap } from '../components/streak';
+import { StreakHeatmap } from '../components/learning/streak';
 import { DeleteAccountModal } from '../components/account';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
 import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
@@ -272,9 +272,9 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                         <h2 className="text-3xl mb-1">{user.username}</h2>
                         <p className="text-text-muted mb-8">{user.email}</p>
                         <div className="space-y-3">
-                            <Button variant="ghost" className="w-full" onClick={() => setIsEditing(true)}>Edit Profile</Button>
-                            <Button variant="danger" className="w-full" onClick={onLogout}>Logout</Button>
-                            <Button variant="danger" className="w-full opacity-80" onClick={() => setIsDeleteAccountModalOpen(true)}>Delete Account</Button>
+                            <Button variant="ghost" className="w-full" onClick={() => setIsEditing(true)}>Chỉnh sửa hồ sơ</Button>
+                            <Button variant="danger" className="w-full" onClick={onLogout}>Đăng xuất</Button>
+                            <Button variant="danger" className="w-full opacity-80" onClick={() => setIsDeleteAccountModalOpen(true)}>Xóa tài khoản</Button>
                         </div>
                     </div>
                     <div className="glass-card p-8 bg-linear-to-br from-accent/20 to-secondary/20 border-accent/30">
@@ -286,7 +286,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                 <div className="md:col-span-2 space-y-8">
                     <div className="grid grid-cols-3 gap-4">
                         {[
-                            { label: 'Words', value: user.learnedWords || 0, icon: <BookOpen className="text-cyan" /> },
+                            { label: 'Từ đã học', value: user.learnedWords || 0, icon: <BookOpen className="text-cyan" /> },
                             { label: 'Streak', value: user.streak || 0, icon: <Flame className="text-orange-500" /> },
                             { label: 'XP', value: user.xp || 0, icon: <Award className="text-pink" /> }
                         ].map((s, i) => (
@@ -298,7 +298,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                         ))}
                     </div>
                     <div className="glass-card p-8">
-                        <h3 className="text-xl mb-6">Study History</h3>
+                        <h3 className="text-xl mb-6">Lịch sử học</h3>
                         <StreakHeatmap
                             history={studyHistoryDates}
                             startDate={accountCreatedDate}
@@ -344,18 +344,18 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                     </div>
                     <div className="glass-card p-8">
                         <div className="flex items-center justify-between gap-4 mb-4">
-                            <h3 className="text-xl">Learned Words</h3>
+                            <h3 className="text-xl">Từ đã học</h3>
                             <Button
                                 variant="ghost"
                                 className="px-4 py-2"
                                 onClick={() => setShowLearnedWords((prev) => !prev)}
                             >
-                                {showLearnedWords ? 'Hide' : 'Show'}
+                                {showLearnedWords ? 'Ẩn' : 'Hiện'}
                             </Button>
                         </div>
 
                         {!showLearnedWords ? (
-                            <p className="text-sm text-text-muted">Nhấn Show để xem danh sách từ đã học.</p>
+                            <p className="text-sm text-text-muted">Nhấn Hiện để xem danh sách từ đã học.</p>
                         ) : learnedWords.length === 0 ? (
                             <p className="text-sm text-text-muted">Bạn chưa có từ nào đã học.</p>
                         ) : (
@@ -366,7 +366,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                                             <div className="font-bold">{item.word}</div>
                                             <div className="text-sm text-text-muted">{item.meaning}</div>
                                         </div>
-                                        <div className="text-xs text-text-muted">{item.topicName || 'Unknown topic'}</div>
+                                        <div className="text-xs text-text-muted">{item.topicName || 'Chủ đề khác'}</div>
                                     </div>
                                 ))}
                             </div>
@@ -391,7 +391,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                             className="glass-card bg-white/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
                         >
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-2xl font-bold">Edit Profile</h3>
+                                <h3 className="text-2xl font-bold">Chỉnh sửa hồ sơ</h3>
                                 <button
                                     className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
                                     onClick={() => setIsEditing(false)}
@@ -440,7 +440,7 @@ const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onU
                                 <input
                                     type="text"
                                     className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
-                                    placeholder="Username"
+                                    placeholder="Tên người dùng"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                 />

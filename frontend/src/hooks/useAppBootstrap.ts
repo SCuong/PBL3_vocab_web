@@ -31,6 +31,7 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
     const [selectedWord, setSelectedWord] = useState<any>(null);
     const [topicFilters, setTopicFilters] = useState<VocabularyTopicItem[]>([]);
     const [studyTopicId, setStudyTopicId] = useState<number | null>(null);
+    const [studyMode, setStudyMode] = useState<string | null>(null);
     const [studyWords, setStudyWords] = useState<any[]>([]);
     const [testResult, setTestResult] = useState<MinitestResultState | null>(null);
 
@@ -44,17 +45,21 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         }
     }, [addToast]);
 
-    const handleStartStudy = useCallback(async (topicId: number) => {
+    const handleStartStudy = useCallback(async (topicId: number, mode?: string) => {
         setStudyTopicId(topicId);
+        setStudyMode(mode ?? null);
         try {
             const items = await vocabularyApi.getLearningByTopic(topicId);
+            if (!items || items.length === 0) {
+                addToast('Chủ đề này chưa có từ vựng.', 'info');
+                return;
+            }
             setStudyWords(items.map(mapLearningVocabularyToUiModel));
+            setCurrentPage('study-session');
         } catch {
             setStudyWords([]);
             addToast('Không tải được dữ liệu học cho chủ đề này.', 'info');
         }
-
-        setCurrentPage('study-session');
     }, [addToast]);
 
     const handleSelectWord = useCallback(async (word: any) => {
@@ -114,6 +119,7 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         selectedWord,
         topicFilters,
         studyTopicId,
+        studyMode,
         studyWords,
         testResult,
         handleStartStudy,

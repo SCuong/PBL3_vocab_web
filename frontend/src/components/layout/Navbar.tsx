@@ -11,9 +11,10 @@ type NavbarProps = {
     gameData: any;
     onLogout: () => void;
     onStreakClick: () => void;
+    reviewCount?: number;
 };
 
-export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout, onStreakClick }: NavbarProps) => {
+export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout, onStreakClick, reviewCount = 0 }: NavbarProps) => {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const navLinks = [
@@ -36,7 +37,7 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                 {/* Logo */}
                 <button
                     onClick={() => onNavigate('home')}
-                    className="flex items-center gap-3 flex-shrink-0"
+                    className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-85 active:scale-95"
                     aria-label="VocabLearning home"
                 >
                     <span
@@ -61,13 +62,20 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                         <button
                             key={link.id}
                             onClick={() => onNavigate(link.id)}
-                            className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors ${
+                            className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors cursor-pointer ${
                                 activePage === link.id
                                     ? 'text-primary font-semibold'
                                     : 'text-text-muted hover:text-text-primary hover:bg-primary-light'
                             }`}
                         >
-                            {link.label}
+                            <span className="flex items-center gap-1.5">
+                                {link.label}
+                                {link.id === 'learning-topics' && currentUser && reviewCount > 0 && (
+                                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-purple text-white text-[10px] font-bold leading-none">
+                                        {reviewCount > 99 ? '99+' : reviewCount}
+                                    </span>
+                                )}
+                            </span>
                             {activePage === link.id && (
                                 <motion.div
                                     layoutId="nav-active"
@@ -91,13 +99,13 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                         <>
                             <button
                                 onClick={() => onNavigate('auth')}
-                                className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:text-text-primary hover:bg-primary-light transition-colors"
+                                className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:text-text-primary hover:bg-primary-light transition-colors cursor-pointer"
                             >
                                 Đăng nhập
                             </button>
                             <button
                                 onClick={() => onNavigate('register')}
-                                className="text-sm font-bold text-white bg-primary px-5 py-2 rounded-full transition-all hover:bg-primary-hover hover:-translate-y-px"
+                                className="text-sm font-bold text-white bg-primary px-5 py-2 rounded-full transition-all hover:bg-primary-hover hover:-translate-y-px cursor-pointer"
                                 style={{ boxShadow: '0 2px 12px rgba(147,51,234,0.3)' }}
                             >
                                 Đăng ký
@@ -108,7 +116,7 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
 
                 {/* Hamburger (mobile) */}
                 <button
-                    className="md:hidden flex flex-col gap-[5px] p-2 ml-auto"
+                    className="md:hidden flex flex-col gap-[5px] p-2 ml-auto cursor-pointer rounded-lg hover:bg-primary/10 transition-colors"
                     onClick={() => setMobileOpen(!mobileOpen)}
                     aria-label="Mở menu"
                     aria-expanded={mobileOpen}
@@ -126,11 +134,16 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                         <button
                             key={link.id}
                             onClick={() => { onNavigate(link.id); setMobileOpen(false); }}
-                            className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                            className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
                                 activePage === link.id ? 'text-primary bg-primary-light font-semibold' : 'text-text-muted hover:bg-primary-light'
                             }`}
                         >
                             {link.label}
+                            {link.id === 'learning-topics' && currentUser && reviewCount > 0 && (
+                                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-purple text-white text-[10px] font-bold leading-none">
+                                    {reviewCount > 99 ? '99+' : reviewCount}
+                                </span>
+                            )}
                         </button>
                     ))}
                     <div className="flex items-center gap-2 mt-2 px-4">
@@ -142,13 +155,13 @@ export const Navbar = ({ activePage, onNavigate, currentUser, gameData, onLogout
                             <>
                                 <button
                                     onClick={() => { onNavigate('auth'); setMobileOpen(false); }}
-                                    className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:bg-primary-light"
+                                    className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:bg-primary-light cursor-pointer transition-colors"
                                 >
                                     Đăng nhập
                                 </button>
                                 <button
                                     onClick={() => { onNavigate('register'); setMobileOpen(false); }}
-                                    className="text-sm font-bold text-white bg-primary px-5 py-2 rounded-full"
+                                    className="text-sm font-bold text-white bg-primary px-5 py-2 rounded-full cursor-pointer transition-all hover:bg-primary-hover"
                                 >
                                     Đăng ký
                                 </button>

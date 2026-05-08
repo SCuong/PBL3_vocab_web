@@ -420,7 +420,7 @@
     }
 
     .auth-eye-btn {
-        @apply absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform;
+        @apply absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform cursor-pointer;
     }
 
     .auth-error {
@@ -441,7 +441,7 @@
         width: 95%;
         max-width: 900px;
         /* Height is controlled by the tallest panel; use min-height as floor */
-        min-height: 560px;
+        min-height: 660px;
         border-radius: 24px;
         box-shadow: 0 14px 40px -10px rgba(204, 153, 255, 0.35), 0 10px 20px -10px rgba(153, 255, 255, 0.15);
         transform-style: preserve-3d;
@@ -459,6 +459,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        overflow-y: auto;
         background: rgba(255, 255, 255, 0.82);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -473,11 +474,12 @@
         right: 0;
         border-radius: 0 24px 24px 0;
         z-index: 1;
+        justify-content: flex-start;
     }
 
     .auth-panel-content {
         width: 100%;
-        padding: 2rem 2.5rem;
+        padding: 2rem 2.5rem 1.5rem;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -552,12 +554,12 @@
     }
 
     .auth-page-front {
-        background: linear-gradient(-25deg, #c084fc 0%, #e879f9 50%, #99ffff 100%);
+        background: linear-gradient(140deg, #6d28d9 0%, #9333ea 45%, #c026d3 100%);
         z-index: 3;
     }
 
     .auth-page-back {
-        background: linear-gradient(135deg, #a855f7 0%, #db2777 50%, #06b6d4 100%);
+        background: linear-gradient(140deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
         z-index: 2;
     }
 
@@ -743,6 +745,45 @@
         .auth-mobile-switch {
             display: none;
         }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       GLOBAL INTERACTION UTILITIES — consistent clickable UX
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    /* Anything clickable that isn't a Button component */
+    .clickable {
+        @apply cursor-pointer transition-all duration-200;
+    }
+
+    /* Selectable card — answer blocks, matching cards, vocab cards */
+    .selectable-card {
+        @apply cursor-pointer transition-all duration-150 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] active:translate-y-0;
+    }
+
+    /* Selected state for selectable cards */
+    .selectable-card.selected {
+        @apply border-primary shadow-md -translate-y-0.5;
+    }
+
+    /* Interactive card — topic cards, leaderboard rows */
+    .interactive-card {
+        @apply cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30;
+    }
+
+    /* Icon button — volume, eye, back, etc. */
+    .icon-btn {
+        @apply cursor-pointer transition-all duration-150 hover:opacity-80 hover:scale-110 active:scale-95;
+    }
+
+    /* Text link — switch between forms, inline actions */
+    .text-link {
+        @apply cursor-pointer transition-opacity duration-150 hover:opacity-70 underline-offset-2;
+    }
+
+    /* Disabled state — universal */
+    .is-disabled {
+        @apply opacity-50 cursor-not-allowed pointer-events-none;
     }
 
     /* ═══════════════════════════════════════════════════════════════════════

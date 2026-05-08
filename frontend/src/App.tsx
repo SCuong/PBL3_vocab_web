@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   ChevronRight,
   Volume2,
   ArrowLeft,
   Shield,
   ChevronLeft,
+  Sparkles,
+  Check,
+  List,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -14,7 +17,7 @@ import {
   type LearningProgressState,
 } from "./services/learningProgressApi";
 import { EMPTY_CURRENT_USER_GAME_DATA } from "./constants/appConstants";
-import { mockData, readingPassages } from "./mocks/mockData";
+import { mockData } from "./mocks/mockData";
 import {
   loadCurrentUserGameData,
   saveCurrentUserGameData,
@@ -25,10 +28,11 @@ import { useToasts } from "./hooks/useToasts";
 import { useGameProgress } from "./hooks/useGameProgress";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { Badge, Button, Toast } from "./components/ui";
-import { Footer, Navbar } from "./components/layout";
-import { StreakModal } from "./components/streak";
+import { Footer, Navbar, AuthNavbar } from "./components/layout";
+import { StreakModal } from "./components/learning/streak";
 import { AppRoutes } from "./AppRoutes";
 import { buildMinitestFillQuestions } from "./utils/minitestQuestions";
+import { buildTranslationQuestions, type TranslationQuestion } from "./utils/translationQuestions";
 import {
   appendStudyDate,
   appendStudySessionDetail,
@@ -61,6 +65,10 @@ const LearningTopics = ({
     : Number.isFinite(currentUser?.streak)
       ? currentUser.streak
       : 0;
+
+  const totalReviewCount = isGuest ? 0 : topicGroups.reduce(
+    (sum: number, cat: any) => sum + cat.topics.reduce((s: number, t: any) => s + (t.stats?.review || 0), 0), 0
+  );
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12 relative">
@@ -118,6 +126,22 @@ const LearningTopics = ({
             đa dạng từ cơ bản đến nâng cao.
           </p>
         </header>
+      )}
+
+      {!isGuest && totalReviewCount > 0 && (
+        <div className={`mb-8 p-4 rounded-2xl flex items-center gap-4 border animate-fade-in ${
+          totalReviewCount > 10
+            ? 'bg-red-50 border-red-200 text-red-700'
+            : 'bg-purple/10 border-purple/30 text-[#4B1F8A]'
+        }`}>
+          <div className="text-3xl flex-shrink-0">🔔</div>
+          <div>
+            <p className="font-bold text-lg">
+              Hôm nay bạn có <span className="underline">{totalReviewCount} từ</span> cần ôn tập!
+            </p>
+            <p className="text-sm opacity-80">Ôn tập đúng hạn giúp ghi nhớ lâu hơn theo phương pháp Spaced Repetition.</p>
+          </div>
+        </div>
       )}
 
       <div className="space-y-6">
@@ -254,21 +278,39 @@ const LearningTopics = ({
                               </div>
                             )}
 
-                            <Button
-                              variant={isLearnedOut ? "ghost" : "primary"}
-                              className={`w-full group/btn ${isLearnedOut ? "cursor-not-allowed opacity-40" : ""}`}
-                              onClick={() =>
-                                !isLearnedOut && onStartStudy(topic.id)
-                              }
-                              disabled={isTopicLocked}
-                              title={
-                                isLearnedOut
-                                  ? "Bạn đã học hết chủ đề này! Chờ ngày ôn tiếp theo."
-                                  : ""
-                              }
-                            >
-                              {isLearnedOut ? "Đã hoàn thành" : "Bắt đầu →"}
-                            </Button>
+                            {isLearnedOut ? (
+                              <Button
+                                variant="ghost"
+                                className="w-full cursor-not-allowed opacity-40"
+                                disabled
+                                title="Bạn đã học hết chủ đề này! Chờ ngày ôn tiếp theo."
+                              >
+                                Đã hoàn thành
+                              </Button>
+                            ) : (
+                              <div className="space-y-2">
+                                {topic.stats.new > 0 && (
+                                  <Button
+                                    variant="primary"
+                                    className="w-full group/btn"
+                                    onClick={() => onStartStudy(topic.id)}
+                                    disabled={isTopicLocked}
+                                  >
+                                    {topic.stats.review > 0 ? "🆕 Học từ mới" : "Bắt đầu →"}
+                                  </Button>
+                                )}
+                                {topic.stats.review > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    className="w-full border border-purple/50 text-purple hover:bg-purple/10"
+                                    onClick={() => onStartStudy(topic.id, 'review')}
+                                    disabled={isTopicLocked}
+                                  >
+                                    🔔 Ôn tập ngay ({topic.stats.review})
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -316,143 +358,208 @@ const LearningTopics = ({
   );
 };
 
+const MATCH_PAIRS_PER_ROUND = 8;
+
+type MatchCard = { uid: string; id: number; kind: 'word' | 'meaning'; content: string };
+
+const buildMatchBoard = (roundWords: any[], type: string): MatchCard[] => {
+  const validWords = type === 'ipa'
+    ? roundWords.filter((w: any) => w.transcription?.trim())
+    : roundWords;
+  const wordCards: MatchCard[] = validWords.map((w: any) => ({
+    uid: `${w.id}-word`,
+    id: w.id,
+    kind: 'word',
+    content: type === 'word' ? w.word : w.transcription,
+  }));
+  const meaningCards: MatchCard[] = validWords.map((w: any) => ({
+    uid: `${w.id}-meaning`,
+    id: w.id,
+    kind: 'meaning',
+    content: w.meaning,
+  }));
+  return [...wordCards, ...meaningCards].sort(() => Math.random() - 0.5);
+};
+
 const MatchingGame = ({ words, type, onFinish }: any) => {
-  const [leftItems, setLeftItems] = useState<any[]>([]);
-  const [rightItems, setRightItems] = useState<any[]>([]);
-  const [selectedLeft, setSelectedLeft] = useState<number | null>(null);
-  const [selectedRight, setSelectedRight] = useState<number | null>(null);
-  const [matches, setMatches] = useState<Record<number, number>>({});
-  const [wrongPairs, setWrongPairs] = useState<[number, number][]>([]);
+  const totalRounds = Math.ceil(words.length / MATCH_PAIRS_PER_ROUND);
+  const [round, setRound] = useState(0);
+  const [board, setBoard] = useState<MatchCard[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [matched, setMatched] = useState<Set<string>>(new Set());
+  const [wrong, setWrong] = useState<Set<string>>(new Set());
+  const [roundDone, setRoundDone] = useState(false);
+  const [totalCorrect, setTotalCorrect] = useState(0);
   const [startTime] = useState(Date.now());
 
-  useEffect(() => {
-    const left = words.map((w: any) => ({
-      id: w.id,
-      content: type === "word" ? w.word : w.transcription,
-    }));
-    const right = words.map((w: any) => ({ id: w.id, content: w.meaning }));
-    setLeftItems([...left].sort(() => Math.random() - 0.5));
-    setRightItems([...right].sort(() => Math.random() - 0.5));
-  }, [words, type]);
+  const roundWords = useMemo(
+    () => words.slice(round * MATCH_PAIRS_PER_ROUND, (round + 1) * MATCH_PAIRS_PER_ROUND),
+    [words, round],
+  );
 
   useEffect(() => {
-    if (selectedLeft !== null && selectedRight !== null) {
-      if (selectedLeft === selectedRight) {
-        setMatches((prev) => ({ ...prev, [selectedLeft]: selectedRight }));
-        setSelectedLeft(null);
-        setSelectedRight(null);
-      } else {
-        setWrongPairs([[selectedLeft, selectedRight]]);
-        setTimeout(() => {
-          setWrongPairs([]);
-          setSelectedLeft(null);
-          setSelectedRight(null);
-        }, 1000);
+    setBoard(buildMatchBoard(roundWords, type));
+    setSelected(null);
+    setMatched(new Set());
+    setWrong(new Set());
+    setRoundDone(false);
+  }, [roundWords, type]);
+
+  const handleCardClick = (uid: string) => {
+    if (matched.has(uid) || wrong.size > 0) return;
+
+    if (!selected) {
+      setSelected(uid);
+      return;
+    }
+    if (selected === uid) {
+      setSelected(null);
+      return;
+    }
+
+    const selCard = board.find((c) => c.uid === selected)!;
+    const clickCard = board.find((c) => c.uid === uid)!;
+
+    if (selCard.id === clickCard.id && selCard.kind !== clickCard.kind) {
+      const newMatched = new Set(matched);
+      newMatched.add(selCard.uid);
+      newMatched.add(clickCard.uid);
+      setMatched(newMatched);
+      setSelected(null);
+
+      const newTotal = totalCorrect + 1;
+      setTotalCorrect(newTotal);
+
+      if (newMatched.size === roundWords.length * 2) {
+        const allDone = round + 1 >= totalRounds;
+        if (allDone) {
+          setTimeout(
+            () => onFinish(words.length, words.length, Math.round((Date.now() - startTime) / 1000)),
+            600,
+          );
+        } else {
+          setTimeout(() => setRoundDone(true), 400);
+        }
       }
+    } else {
+      const newWrong = new Set([selCard.uid, clickCard.uid]);
+      setWrong(newWrong);
+      setTimeout(() => {
+        setWrong(new Set());
+        setSelected(null);
+      }, 800);
     }
-  }, [selectedLeft, selectedRight]);
+  };
 
-  useEffect(() => {
-    if (Object.keys(matches).length === words.length) {
-      const duration = Math.round((Date.now() - startTime) / 1000);
-      setTimeout(() => onFinish(words.length, words.length, duration), 500);
-    }
-  }, [matches, words.length, startTime, onFinish]);
+  const totalMatchedPairs = round * MATCH_PAIRS_PER_ROUND + matched.size / 2;
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      <div className="grid grid-cols-2 gap-12">
-        <div className="space-y-4">
-          <h3 className="font-bold text-center mb-6 text-primary">
-            {type === "word" ? "Từ vựng / IPA" : "Phiên âm IPA"}
-          </h3>
-          {leftItems.map((item) => (
-            <button
-              key={item.id}
-              disabled={matches[item.id] !== undefined}
-              onClick={() => setSelectedLeft(item.id)}
-              className={`w-full p-6 h-20 flex items-center justify-center rounded-2xl border-2 transition-all font-bold text-lg
-                ${
-                  matches[item.id] !== undefined
-                    ? "bg-accent/20 border-accent/40 text-text-muted opacity-50"
-                    : selectedLeft === item.id
-                      ? "border-primary bg-primary/5 shadow-md scale-105"
-                      : wrongPairs.some((p) => p[0] === item.id)
-                        ? "border-red-400 bg-red-50 animate-shake"
-                        : "bg-white border-primary/10 hover:border-primary/40"
-                }
-              `}
-            >
-              {item.content}
-            </button>
-          ))}
+    <div className="max-w-4xl mx-auto py-6">
+      {/* Progress */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-sm font-medium text-text-muted">
+          {totalRounds > 1 && (
+            <span className="mr-3 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+              Vòng {round + 1}/{totalRounds}
+            </span>
+          )}
+          <span className="text-text-primary font-bold">
+            {Math.round(totalMatchedPairs)}/{words.length} cặp
+          </span>
         </div>
-        <div className="space-y-4">
-          <h3 className="font-bold text-center mb-6 text-secondary">
-            Nghĩa tiếng Việt
-          </h3>
-          {rightItems.map((item) => (
-            <button
-              key={item.id}
-              disabled={Object.values(matches).includes(item.id)}
-              onClick={() => setSelectedRight(item.id)}
-              className={`w-full p-6 h-20 flex items-center justify-center rounded-2xl border-2 transition-all font-bold text-lg
-                ${
-                  Object.values(matches).includes(item.id)
-                    ? "bg-accent/20 border-accent/40 text-text-muted opacity-50"
-                    : selectedRight === item.id
-                      ? "border-secondary bg-secondary/5 shadow-md scale-105"
-                      : wrongPairs.some((p) => p[1] === item.id)
-                        ? "border-red-400 bg-red-50 animate-shake"
-                        : "bg-white border-primary/10 hover:border-primary/40"
-                }
-              `}
-            >
-              {item.content}
-            </button>
-          ))}
+        <div className="h-2 w-40 bg-primary/10 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-linear-to-r from-primary to-accent transition-all duration-500"
+            style={{ width: `${(totalMatchedPairs / words.length) * 100}%` }}
+          />
         </div>
       </div>
+
+      {roundDone ? (
+        <div className="glass-card p-12 text-center space-y-6 animate-fade-in">
+          <div className="text-5xl">🎉</div>
+          <h3 className="text-2xl font-bold">Vòng {round + 1} hoàn thành!</h3>
+          <p className="text-text-muted">
+            Còn {words.length - (round + 1) * MATCH_PAIRS_PER_ROUND} từ trong vòng tiếp theo.
+          </p>
+          <Button variant="primary" className="px-10 py-4 text-lg" onClick={() => setRound((r) => r + 1)}>
+            Vòng tiếp theo →
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {board.map((card) => {
+            const isMatched = matched.has(card.uid);
+            const isSelected = selected === card.uid;
+            const isWrong = wrong.has(card.uid);
+            const isWord = card.kind === 'word';
+            return (
+              <button
+                key={card.uid}
+                disabled={isMatched || wrong.size > 0}
+                onClick={() => handleCardClick(card.uid)}
+                className={`min-h-[80px] p-4 rounded-2xl border-2 font-semibold text-base
+                  flex items-center justify-center text-center transition-all duration-200 disabled:cursor-not-allowed
+                  ${isMatched
+                    ? 'bg-green-50 border-green-400 text-green-700 opacity-60 cursor-default'
+                    : isWrong
+                      ? 'bg-red-50 border-red-400 text-red-700 animate-shake'
+                      : isSelected
+                        ? isWord
+                          ? 'bg-primary/10 border-primary shadow-lg scale-105'
+                          : 'bg-purple/10 border-purple shadow-lg scale-105'
+                        : isWord
+                          ? 'bg-white border-primary/15 hover:border-primary/50 hover:bg-primary/5 cursor-pointer'
+                          : 'bg-white border-purple/20 hover:border-purple/50 hover:bg-purple/5 cursor-pointer'
+                  }`}
+              >
+                {card.content}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
-const Minitest = ({ topicId, learnedWords, topicWords, onFinish }: any) => {
+const Minitest = ({ topicId, sessionWords, topicWords, onFinish }: any) => {
+  const isLocked = !Array.isArray(sessionWords) || sessionWords.length < 5;
   const [fillAnswers, setFillAnswers] = useState<string[]>([]);
-  const [readingAnswers, setReadingAnswers] = useState<(number | null)[]>([]);
+  const [translationAnswers, setTranslationAnswers] = useState<(number | string | null)[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showingPart2, setShowingPart2] = useState(false);
 
   const fillQuestions = useMemo(() => {
     return buildMinitestFillQuestions(
-      Array.isArray(learnedWords) ? learnedWords : [],
+      Array.isArray(sessionWords) ? sessionWords : [],
       Array.isArray(topicWords) ? topicWords : [],
       5,
     );
-  }, [learnedWords, topicWords]);
+  }, [sessionWords, topicWords]);
 
-  const passage = useMemo(() => {
-    return (
-      readingPassages.find((p) => p.topicId === topicId) || readingPassages[0]
-    );
-  }, [topicId]);
+  const translationQuestions = useMemo(() => {
+    const wordsWithTranslation = (Array.isArray(sessionWords) ? sessionWords : [])
+      .filter(w => w && w.example && w.translation);
+    return buildTranslationQuestions(wordsWithTranslation, wordsWithTranslation, 4);
+  }, [sessionWords]);
 
   useEffect(() => {
     setFillAnswers(new Array(fillQuestions.length).fill(""));
-    setReadingAnswers(new Array(passage.questions.length).fill(null));
+    setTranslationAnswers(new Array(translationQuestions.length).fill(null));
     setIsSubmitted(false);
     setShowingPart2(false);
-  }, [fillQuestions, passage]);
+  }, [fillQuestions, translationQuestions]);
 
   const answeredCount =
     fillAnswers.filter((a) => a !== "").length +
-    readingAnswers.filter((a) => a !== null).length;
-  const totalQuestions = fillQuestions.length + passage.questions.length;
+    translationAnswers.filter((a) => a !== null && a !== "").length;
+  const totalQuestions = fillQuestions.length + translationQuestions.length;
 
   const handleSubmit = () => {
     setIsSubmitted(true);
     let sFill = 0;
-    let sReading = 0;
+    let sTranslation = 0;
 
     fillAnswers.forEach((ans, i) => {
       if (ans.trim().toLowerCase() === fillQuestions[i].a.toLowerCase()) {
@@ -460,28 +567,46 @@ const Minitest = ({ topicId, learnedWords, topicWords, onFinish }: any) => {
       }
     });
 
-    readingAnswers.forEach((ans, i) => {
-      if (ans === passage.questions[i].correct) {
-        sReading++;
+    translationAnswers.forEach((ans, i) => {
+      if (translationQuestions[i].questionType === 'multiple-choice') {
+        if (ans === translationQuestions[i].correctTranslation) {
+          sTranslation++;
+        }
+      } else {
+        if (typeof ans === 'string' && ans.trim().toLowerCase() === translationQuestions[i].correctTranslation.toLowerCase()) {
+          sTranslation++;
+        }
       }
     });
 
-    const bonus = sReading === passage.questions.length ? 50 : 0;
+    const bonus = sTranslation === translationQuestions.length ? 50 : 0;
 
     if (bonus > 0) {
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     }
 
-    onFinish(sFill + sReading, totalQuestions, {
+    const translationReview = translationQuestions.map((q: TranslationQuestion, index: number) => {
+      const answer = translationAnswers[index];
+      const normalizedAnswer = typeof answer === 'string' ? answer.trim() : '';
+      const isCorrect = q.questionType === 'multiple-choice'
+        ? answer === q.correctTranslation
+        : normalizedAnswer.toLowerCase() === q.correctTranslation.toLowerCase();
+
+      return {
+        englishSentence: q.englishSentence,
+        correctTranslation: q.correctTranslation,
+        userAnswer: typeof answer === 'string' ? answer : '',
+        isCorrect
+      };
+    });
+
+    onFinish(sFill + sTranslation, totalQuestions, {
       fill: sFill,
-      reading: sReading,
+      translation: sTranslation,
       bonus,
+      review: translationReview
     });
   };
-
-  if (!passage) {
-    return null;
-  }
 
   return (
     <div className="max-w-5xl mx-auto pb-24 relative">
@@ -601,7 +726,7 @@ const Minitest = ({ topicId, learnedWords, topicWords, onFinish }: any) => {
               );
             })}
           </div>
-          {!isSubmitted && !showingPart2 && (
+          {!isLocked && !isSubmitted && !showingPart2 && (
             <div className="mt-12 flex justify-center">
               <Button
                 variant="accent"
@@ -618,64 +743,104 @@ const Minitest = ({ topicId, learnedWords, topicWords, onFinish }: any) => {
           <section id="part2">
             <header className="flex items-center gap-6 mb-12">
               <Badge variant="accent" className="py-3 px-6 text-base font-bold">
-                Bài 2: Đọc hiểu
+                Bài 2: Dịch câu
               </Badge>
               <div className="flex-1 h-px bg-accent/20" />
             </header>
-            <div className="glass-card mb-16 p-12 bg-linear-to-br from-bg-light to-white border-accent/20">
-              <h4 className="text-3xl font-display font-bold mb-10 text-center text-accent">
-                {passage.title}
-              </h4>
-              <div className="prose prose-purple max-w-none text-text-secondary leading-[2.2] text-xl whitespace-pre-wrap font-serif">
-                {passage.content}
+            {translationQuestions.length === 0 && (
+              <div className="glass-card p-8 text-center text-text-secondary">
+                Không có câu nào có bản dịch để làm bài tập này.
               </div>
-            </div>
+            )}
             <div className="grid gap-12">
-              {passage.questions.map((q: any, qi: number) => (
-                <div
-                  key={qi}
-                  className={`glass-card p-10 border-2 transition-all ${isSubmitted ? (readingAnswers[qi] === q.correct ? "border-green-500 bg-green-50" : "border-red-500 bg-red-50") : "border-transparent bg-white shadow-xl"}`}
-                >
-                  <div className="font-bold text-2xl mb-12 leading-relaxed text-text-primary">
-                    {q.q}
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-6">
-                    {q.options.map((opt: string, oi: number) => (
-                      <label
-                        key={oi}
-                        className={`flex items-center gap-6 p-6 border-2 rounded-3xl cursor-pointer transition-all ${readingAnswers[qi] === oi ? "border-primary bg-primary/5 shadow-inner" : "border-primary/5 hover:border-primary/20 bg-white"} ${isSubmitted && oi === q.correct ? "border-green-500 bg-green-100 text-green-900 font-bold scale-[1.02]" : ""} ${isSubmitted && readingAnswers[qi] === oi && oi !== q.correct ? "border-red-500 bg-red-100 text-red-900" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          checked={readingAnswers[qi] === oi}
-                          disabled={isSubmitted}
-                          onChange={() => {
-                            const next = [...readingAnswers];
-                            next[qi] = oi;
-                            setReadingAnswers(next);
-                          }}
-                          className="w-6 h-6 accent-primary"
-                        />
-                        <span className="text-xl">{opt}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {isSubmitted && (
-                    <div className="mt-12 pt-10 border-t border-primary/10">
-                      <p className="text-lg text-text-secondary italic leading-loose">
-                        💡 Giải thích: {q.explanation}
-                      </p>
+              {translationQuestions.map((q: TranslationQuestion, qi: number) => {
+                const userAnswer = translationAnswers[qi];
+                const isCorrect = isSubmitted && (
+                  q.questionType === 'multiple-choice'
+                    ? userAnswer === q.correctTranslation
+                    : typeof userAnswer === 'string' && userAnswer.trim().toLowerCase() === q.correctTranslation.toLowerCase()
+                );
+
+                return (
+                  <div
+                    key={q.id}
+                    className={`glass-card p-10 border-2 transition-all ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50" : "border-red-500 bg-red-50") : "border-transparent bg-white shadow-xl"}`}
+                  >
+                    <div className="flex items-center gap-4 mb-6">
+                      <span className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center font-bold text-accent">
+                        {qi + 1}
+                      </span>
+                      <span className="text-sm font-bold text-accent uppercase tracking-wider">
+                        {q.questionType === 'multiple-choice' ? 'Trắc nghiệm' : 'Điền từ'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="text-2xl font-medium mb-8 leading-relaxed italic text-text-primary">
+                      {q.englishSentence}
+                    </div>
+                    {q.questionType === 'multiple-choice' && q.options && (
+                      <div className="grid sm:grid-cols-2 gap-6">
+                        {q.options.map((opt: string, oi: number) => {
+                          const isSelected = userAnswer === opt;
+                          const isCorrectOption = isSubmitted && opt === q.correctTranslation;
+                          const isWrongSelected = isSubmitted && isSelected && opt !== q.correctTranslation;
+
+                          return (
+                            <label
+                              key={oi}
+                              className={`flex items-center gap-6 p-6 border-2 rounded-3xl cursor-pointer transition-all ${isSubmitted ? (isCorrectOption ? "border-green-500 bg-green-100 text-green-900 font-bold scale-[1.02]" : isWrongSelected ? "border-red-500 bg-red-100 text-red-900" : "border-primary/5 bg-white") : isSelected ? "border-primary bg-primary/5 shadow-inner" : "border-primary/5 hover:border-primary/20 bg-white"}`}
+                            >
+                              <input
+                                type="radio"
+                                checked={isSelected}
+                                disabled={isSubmitted}
+                                onChange={() => {
+                                  const next = [...translationAnswers];
+                                  next[qi] = opt;
+                                  setTranslationAnswers(next);
+                                }}
+                                className="w-6 h-6 accent-primary"
+                              />
+                              <span className="text-xl">{opt}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {q.questionType === 'fill-in' && (
+                      <div className="mt-4">
+                        <input
+                          type="text"
+                          value={typeof userAnswer === 'string' ? userAnswer : ''}
+                          disabled={isSubmitted}
+                          onChange={(e) => {
+                            const next = [...translationAnswers];
+                            next[qi] = e.target.value;
+                            setTranslationAnswers(next);
+                          }}
+                          placeholder="Nhập bản dịch tiếng Việt..."
+                          className="w-full p-4 text-xl border-2 border-primary/20 rounded-2xl focus:border-primary focus:outline-none transition-all disabled:bg-gray-50"
+                        />
+                      </div>
+                    )}
+                    {isSubmitted && (
+                      <div className={`mt-8 pt-6 border-t border-primary/10 font-display font-bold text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}>
+                        {isCorrect ? "✓ Chính xác!" : `Đáp án đúng: ${q.correctTranslation}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
       </div>
 
       <footer className="mt-24 pt-24 border-t border-primary/10 text-center">
-        {!isSubmitted ? (
+        {isLocked ? (
+          <div className="glass-card p-8 text-center text-text-secondary">
+            Bạn cần học ít nhất 5 từ trong chủ đề này để làm bài kiểm tra.
+          </div>
+        ) : !isSubmitted ? (
           <Button
             variant="primary"
             className="px-24 py-6 text-3xl shadow-2xl"
@@ -733,23 +898,67 @@ const StudySession = ({
   onAddToast,
   onWordsLearned,
   onRecordStudyHistory,
+  initialMode,
 }: any) => {
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
     "flashcard",
   );
   const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
   const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
-  const [customTab, setCustomTab] = useState<"new" | "review">("new");
   const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
+  const [ipaFallback, setIpaFallback] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [reviewPage, setReviewPage] = useState(0);
+  const [customNewPage, setCustomNewPage] = useState(0);
+  const [customReviewPage, setCustomReviewPage] = useState(0);
+  const [activePreset, setActivePreset] = useState<number | null>(null);
+  const [jumpSearch, setJumpSearch] = useState('');
+  const [recentWordIds, setRecentWordIds] = useState<number[]>([]);
+  const [showJumpList, setShowJumpList] = useState(false);
+
+  const [aiResponses, setAiResponses] = useState<Record<number, string>>({});
+  const [loadingAiIds, setLoadingAiIds] = useState<Set<number>>(new Set());
+
+  const handleAskAi = async (word: any, e: any) => {
+    e.stopPropagation();
+    if (!word || loadingAiIds.has(word.id)) return;
+    
+    setLoadingAiIds(prev => new Set(prev).add(word.id));
+    
+    try {
+        const formData = new FormData();
+        formData.append('word', word.word);
+        formData.append('context', word.meaning);
+
+        const response = await fetch('/api/AI/Explain', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const htmlContent = await response.text();
+            setAiResponses(prev => ({ ...prev, [word.id]: htmlContent }));
+        } else {
+            setAiResponses(prev => ({ ...prev, [word.id]: "<div class='text-red-500'>Có lỗi xảy ra khi gọi AI. Vui lòng thử lại.</div>" }));
+        }
+    } catch (error: any) {
+        setAiResponses(prev => ({ ...prev, [word.id]: `<div class='text-red-500'>Lỗi kết nối mạng: ${error.message}</div>` }));
+    } finally {
+        setLoadingAiIds(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(word.id);
+            return newSet;
+        });
+    }
+  };
 
   const words = useMemo(
     () =>
       studyWords && studyWords.length > 0
         ? studyWords
-        : mockData.vocabulary.filter((v) => v.topicId === topicId),
+        : mockData.vocabulary.filter((v: any) => v.topicId === topicId),
     [studyWords, topicId],
   );
   const currentTopicGroup = useMemo(
@@ -792,15 +1001,25 @@ const StudySession = ({
   const newWords = useMemo(
     () =>
       words
-        .filter((w: any) => !learnedWordIdSet.has(w.id))
-        .sort(sortByCefrThenWord),
+        .filter((w: any) => !learnedWordIdSet.has(w.id)),
     [words, learnedWordIdSet],
   );
 
   const reviewWords = useMemo(
-    () => words.filter((w: any) => reviewWordIdSet.has(w.id)).sort(sortByCefrThenWord),
+    () => words.filter((w: any) => reviewWordIdSet.has(w.id)),
     [words, reviewWordIdSet],
   );
+
+  const didApplyInitialMode = useRef(false);
+  const jumpListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!didApplyInitialMode.current && initialMode === 'review' && reviewWords.length > 0) {
+      didApplyInitialMode.current = true;
+      setTab('learn');
+      setSelectedWordIds(reviewWords.map((w: any) => w.id));
+    }
+  }, [initialMode, reviewWords]);
 
   const wordMapById = useMemo(
     () => new Map(words.map((w: any) => [w.id, w])),
@@ -814,6 +1033,10 @@ const StudySession = ({
         .filter((w): w is any => Boolean(w)),
     [selectedWordIds, wordMapById],
   );
+  const ipaValidWords = useMemo(
+    () => selectedWords.filter((w: any) => w.transcription?.trim()),
+    [selectedWords],
+  );
   const selectedReviewCount = useMemo(
     () => selectedWords.filter((w: any) => learnedWordIdSet.has(w.id)).length,
     [selectedWords, learnedWordIdSet],
@@ -822,21 +1045,20 @@ const StudySession = ({
   const customNewWords = useMemo(
     () =>
       words
-        .filter((w: any) => !learnedWordIdSet.has(w.id))
-        .sort(sortByCefrThenWord),
+        .filter((w: any) => !learnedWordIdSet.has(w.id)),
     [words, learnedWordIdSet],
   );
   const customReviewWords = useMemo(
     () =>
       words
-        .filter((w: any) => learnedWordIdSet.has(w.id))
-        .sort(sortByCefrThenWord),
+        .filter((w: any) => learnedWordIdSet.has(w.id)),
     [words, learnedWordIdSet],
   );
-  const customSelectableWords = useMemo(
-    () => (customTab === "new" ? customNewWords : customReviewWords),
-    [customTab, customNewWords, customReviewWords],
-  );
+  const CUSTOM_PAGE_SIZE = 10;
+  const customNewTotalPages = Math.ceil(customNewWords.length / CUSTOM_PAGE_SIZE);
+  const pagedCustomNewWords = customNewWords.slice(customNewPage * CUSTOM_PAGE_SIZE, (customNewPage + 1) * CUSTOM_PAGE_SIZE);
+  const customReviewTotalPages = Math.ceil(customReviewWords.length / CUSTOM_PAGE_SIZE);
+  const pagedCustomReviewWords = customReviewWords.slice(customReviewPage * CUSTOM_PAGE_SIZE, (customReviewPage + 1) * CUSTOM_PAGE_SIZE);
   const learnedWordsForMinitest = useMemo(() => {
     if (!topicId || !learningProgressState?.topics) {
       return [];
@@ -878,6 +1100,43 @@ const StudySession = ({
     return () => window.removeEventListener("keydown", handleKey);
   }, [tab, learnStep, words.length, selectedWords.length]);
 
+  // Avoid out-of-bounds when selection changes (prevents blank/crash).
+  useEffect(() => {
+    const max =
+      (tab === "flashcard" ? words.length : selectedWords.length) - 1;
+    if (max < 0) {
+      if (currentIndex !== 0) setCurrentIndex(0);
+      return;
+    }
+    if (currentIndex > max) {
+      setCurrentIndex(max);
+      setIsFlipped(false);
+    }
+  }, [tab, words.length, selectedWords.length, currentIndex]);
+
+  // Track recently viewed flashcards for jump panel
+  useEffect(() => {
+    if (tab === 'flashcard' && words[currentIndex]) {
+      const id = words[currentIndex].id;
+      setRecentWordIds(prev => {
+        const filtered = prev.filter(i => i !== id);
+        return [id, ...filtered].slice(0, 6);
+      });
+    }
+  }, [currentIndex, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close jump list on click outside
+  useEffect(() => {
+    if (!showJumpList) return;
+    const handler = (e: MouseEvent) => {
+      if (jumpListRef.current && !jumpListRef.current.contains(e.target as Node)) {
+        setShowJumpList(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showJumpList]);
+
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
       const remainingNewIds = newWords
@@ -888,13 +1147,12 @@ const StudySession = ({
     });
   }, [newWords]);
 
-  const applySmartPreset = useCallback((newWordCount: number) => {
-    const presetIds = [
-      ...reviewWords.map((w: any) => w.id),
-      ...newWords.slice(0, newWordCount).map((w: any) => w.id),
-    ];
+  const applySmartPreset = useCallback((count: number) => {
+    const presetIds = initialMode === 'review'
+      ? reviewWords.slice(0, count).map((w: any) => w.id)
+      : newWords.slice(0, count).map((w: any) => w.id);
     setSelectedWordIds(presetIds);
-  }, [reviewWords, newWords]);
+  }, [reviewWords, newWords, initialMode]);
 
   const handleFinishMatching = async (
     correct: number,
@@ -906,17 +1164,19 @@ const StudySession = ({
     if (topicId && selectedWordIds.length > 0) {
       await onWordsLearned(topicId, selectedWordIds);
 
-      onRecordStudyHistory?.({
-        topicId,
-        topicTitle,
-        xp: gainedXp,
-        words: selectedWords.map((word: any) => ({
-          id: word.id,
-          word: word.word,
-          meaning: word.meaning,
-        })),
-        timeSpentSeconds: time,
-      });
+      onRecordStudyHistory && onRecordStudyHistory(
+        {
+          topicId,
+          topicTitle,
+          xp: gainedXp,
+          words: selectedWords.map((word: any) => ({
+            id: word.id,
+            word: word.word,
+            meaning: word.meaning,
+          })),
+          timeSpentSeconds: time,
+        }
+      );
     }
 
     onAddXP(gainedXp);
@@ -935,6 +1195,28 @@ const StudySession = ({
         Không tìm thấy từ vựng cho chủ đề này.
       </div>
     );
+
+  const SMART_PAGE_SIZE = 10;
+  const smartDisplayWords = initialMode === 'review' ? reviewWords : newWords;
+  const smartTotalPages = Math.ceil(smartDisplayWords.length / SMART_PAGE_SIZE);
+  const pagedSmartWords = smartDisplayWords.slice(
+    reviewPage * SMART_PAGE_SIZE,
+    (reviewPage + 1) * SMART_PAGE_SIZE,
+  );
+
+  const filteredJumpWords = useMemo(() => {
+    if (!jumpSearch.trim()) return words;
+    const q = jumpSearch.toLowerCase();
+    return words.filter((w: any) =>
+      w.word?.toLowerCase().includes(q) || w.meaning?.toLowerCase().includes(q)
+    );
+  }, [jumpSearch, words]);
+
+  const recentJumpWords = useMemo(() =>
+    recentWordIds
+      .map(id => { const idx = words.findIndex((w: any) => w.id === id); return idx >= 0 ? { idx, word: words[idx] } : null; })
+      .filter((x): x is { idx: number; word: any } => x !== null)
+  , [recentWordIds, words]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -969,7 +1251,7 @@ const StudySession = ({
             <h1 className="text-5xl mb-2 font-display font-extrabold text-text-primary">
               {topicTitle}
             </h1>{" "}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Badge variant="cyan" className="text-xs">
                 🆕 {topicStats?.new ?? 0}
               </Badge>
@@ -979,10 +1261,15 @@ const StudySession = ({
               <Badge variant="green" className="text-xs font-bold">
                 ✅ {topicStats?.learned ?? 0}
               </Badge>
+              {initialMode === 'review' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple/20 border border-purple/50 text-[#4B1F8A] text-xs font-bold">
+                  🔔 Chế độ ôn tập
+                </span>
+              )}
             </div>
           </div>
         </div>
-        <div className="flex gap-2 p-1 bg-white/50 backdrop-blur-md rounded-pill border-2 border-primary/10">
+        <div className="flex items-center gap-1 p-1 bg-white/50 backdrop-blur-md rounded-pill border-2 border-primary/10">
           {(["flashcard", "learn", "minitest"] as const).map((t) => (
             <button
               key={t}
@@ -991,11 +1278,11 @@ const StudySession = ({
                 setCurrentIndex(0);
                 setIsFlipped(false);
               }}
-              className={`px-8 py-3 rounded-pill font-bold transition-all flex items-center gap-2 ${tab === t ? "bg-primary text-text-primary shadow-xl scale-105" : "text-text-muted hover:text-primary"}`}
+              className={`h-10 px-5 rounded-pill font-bold transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-primary text-white shadow-md" : "text-text-muted hover:text-primary"}`}
             >
               {t === "flashcard" && "📇 Flashcard"}
-              {t === "learn" && "📖 Learn"}
-              {t === "minitest" && "🧪 Minitest"}
+              {t === "learn" && "📖 Học"}
+              {t === "minitest" && "🧪 Kiểm tra"}
             </button>
           ))}
         </div>
@@ -1010,7 +1297,86 @@ const StudySession = ({
             key="flashcard-tab"
             className="w-full"
           >
-            <div className="relative h-[480px] perspective-1000 mb-12 max-w-2xl mx-auto">
+            <div className="max-w-3xl mx-auto w-full">
+            {/* ── Flex row: left arrow + bordered container + right arrow ── */}
+            <div className="flex items-center gap-4 w-full">
+              {/* Left arrow — outside border */}
+              <button
+                onClick={() => { setCurrentIndex((p) => Math.max(0, p - 1)); setIsFlipped(false); }}
+                disabled={currentIndex === 0}
+                className="w-11 h-11 rounded-full border-2 border-primary/20 bg-white/80 flex items-center justify-center hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed flex-shrink-0 font-bold text-lg shadow-sm"
+              >
+                ←
+              </button>
+            {/* ── Outer bordered container ─────────────────────────────── */}
+            <div className="flex-1 border-2 border-primary/10 rounded-3xl overflow-visible bg-white/30">
+
+            {/* Search + jump row */}
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-primary/10 bg-white/40 rounded-t-3xl">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Tìm từ vựng..."
+                  value={jumpSearch}
+                  onChange={e => { setJumpSearch(e.target.value); setShowJumpList(true); }}
+                  onFocus={() => setShowJumpList(true)}
+                  className="w-full pl-4 pr-9 py-2 text-sm rounded-xl border border-primary/20 bg-white/80 focus:border-primary/40 outline-none transition-all placeholder:text-text-muted cursor-text"
+                />
+                <ChevronLeft
+                  size={15}
+                  className="-rotate-90 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+                />
+              </div>
+              <div className="relative" ref={jumpListRef}>
+                <button
+                  onClick={() => setShowJumpList(p => !p)}
+                  className="p-2 rounded-xl border border-primary/20 bg-white/80 hover:bg-primary/10 transition-colors cursor-pointer"
+                  title="Danh sách từ"
+                >
+                  <List size={16} className="text-text-muted" />
+                </button>
+                {showJumpList && (
+                  <div className="absolute right-0 top-full mt-1 w-72 bg-white/95 backdrop-blur-xl border border-primary/15 shadow-2xl z-50 rounded-2xl overflow-hidden">
+                    <div className="max-h-[320px] overflow-y-auto p-2 space-y-0.5">
+                      {!jumpSearch && recentJumpWords.length > 0 && (
+                        <>
+                          <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-2 py-1.5">Gần đây</p>
+                          {recentJumpWords.map(({ idx, word }) => (
+                            <button key={`r-${word.id}`}
+                              onClick={() => { setCurrentIndex(idx); setIsFlipped(false); setShowJumpList(false); }}
+                              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors ${idx === currentIndex ? 'bg-primary/15 text-primary font-semibold' : 'hover:bg-primary/10 text-text-primary'}`}>
+                              <div className="font-medium">{word.word}</div>
+                              <div className="text-[11px] text-text-muted">{word.meaning}</div>
+                            </button>
+                          ))}
+                          <div className="border-t border-primary/10 my-1" />
+                        </>
+                      )}
+                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider px-2 py-1.5">
+                        {jumpSearch ? `Kết quả (${filteredJumpWords.length})` : 'Tất cả từ'}
+                      </p>
+                      {filteredJumpWords.map((w: any) => {
+                        const idx = words.findIndex((x: any) => x.id === w.id);
+                        return (
+                          <button key={w.id}
+                            onClick={() => { setCurrentIndex(idx); setIsFlipped(false); setShowJumpList(false); setJumpSearch(''); }}
+                            className={`w-full text-left px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors ${idx === currentIndex ? 'bg-primary/15 text-primary font-semibold' : 'hover:bg-primary/10 text-text-primary'}`}>
+                            <div className="font-medium">{w.word}</div>
+                            <div className="text-[11px] text-text-muted">{w.meaning}</div>
+                          </button>
+                        );
+                      })}
+                      {filteredJumpWords.length === 0 && (
+                        <p className="text-sm text-text-muted text-center py-4">Không tìm thấy từ</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Flashcard — full width inside border */}
+            <div className="relative h-[480px] perspective-1000 mx-5 mb-5 mt-2">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`flashcard-${currentIndex}`}
@@ -1028,13 +1394,13 @@ const StudySession = ({
                   >
                     <div className="absolute inset-0 backface-hidden glass-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-white">
                       <Badge variant="purple" className="mb-12 scale-125">
-                        Vocabulary Card
+                        Thẻ từ vựng
                       </Badge>
                       <div className="text-7xl font-display font-extrabold mb-4 text-primary">
-                        {words[currentIndex].word}
+                        {words[currentIndex]?.word}
                       </div>
                       <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
-                        {words[currentIndex].transcription}
+                        {words[currentIndex]?.transcription}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -1043,8 +1409,8 @@ const StudySession = ({
                           onClick={(e: any) => {
                             e.stopPropagation();
                             playPronunciationAudio(
-                              words[currentIndex].audioUrl,
-                              words[currentIndex].word,
+                              words[currentIndex]?.audioUrl,
+                              words[currentIndex]?.word,
                             );
                           }}
                         >
@@ -1058,75 +1424,90 @@ const StudySession = ({
                         </Button>
                       </div>
                     </div>
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
-                      <Badge variant="pink" className="mb-12 scale-125">
-                        Meaning
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
+                      <Badge variant="pink" className="mb-6 scale-125 flex-shrink-0">
+                        Nghĩa
                       </Badge>
-                      <div className="text-5xl font-bold mb-10 text-text-primary">
-                        {words[currentIndex].meaning}
+                      <div className="text-4xl font-bold mb-6 text-text-primary flex-shrink-0">
+                        {words[currentIndex]?.meaning}
                       </div>
-                      <Button
-                        variant="ghost"
-                        className="p-2 min-h-0 rounded-full mb-4"
-                        onClick={(e: any) => {
-                          e.stopPropagation();
-                          playPronunciationAudio(
-                            words[currentIndex].exampleAudioUrl,
-                            words[currentIndex].example,
-                          );
-                        }}
-                      >
-                        <Volume2 size={18} />
-                      </Button>
-                      <div className="bg-white/70 p-8 rounded-3xl italic border-2 border-purple/20 w-full shadow-inner font-serif text-xl leading-loose">
-                        "{words[currentIndex].example}"
+                      <div className="flex gap-2 mb-4 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          className="p-2 min-h-0 rounded-full"
+                          onClick={(e: any) => {
+                            e.stopPropagation();
+                            playPronunciationAudio(
+                              words[currentIndex]?.exampleAudioUrl,
+                              words[currentIndex]?.example,
+                            );
+                          }}
+                        >
+                          <Volume2 size={18} />
+                        </Button>
+                        <Button
+                          variant="accent"
+                          className="px-4 py-2 text-sm flex items-center gap-2"
+                          onClick={(e: any) => handleAskAi(words[currentIndex], e)}
+                          disabled={loadingAiIds.has(words[currentIndex]?.id)}
+                        >
+                          {loadingAiIds.has(words[currentIndex]?.id) ? (
+                              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          ) : (
+                              <Sparkles size={16} />
+                          )}
+                          Hỏi AI ✨
+                        </Button>
                       </div>
+                      <div className="bg-white/70 p-6 rounded-2xl border-2 border-purple/20 w-full shadow-inner flex-shrink-0">
+                        <p className="italic font-serif text-lg leading-loose">"{words[currentIndex]?.example}"</p>
+                        {words[currentIndex]?.translation && (
+                          <p className="text-sm text-text-muted mt-3 italic">"{words[currentIndex].translation}"</p>
+                        )}
+                      </div>
+                      {(loadingAiIds.has(words[currentIndex]?.id) || aiResponses[words[currentIndex]?.id]) && (
+                          <div className="mt-4 p-4 bg-white/90 rounded-2xl border-2 border-cyan-500/30 w-full text-left overflow-y-auto" onClick={e => e.stopPropagation()}>
+                              <h4 className="text-cyan-600 font-bold mb-2 flex items-center gap-2 text-sm"><Sparkles size={16}/> Giải thích từ AI</h4>
+                              {loadingAiIds.has(words[currentIndex]?.id) ? (
+                                  <div className="text-center text-cyan-500 py-4"><div className="inline-block w-6 h-6 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"/></div>
+                              ) : (
+                                  <div className="text-sm prose prose-cyan max-w-none" dangerouslySetInnerHTML={{ __html: aiResponses[words[currentIndex]?.id] }} />
+                              )}
+                          </div>
+                      )}
                     </div>
                   </motion.div>
                 </motion.div>
               </AnimatePresence>
-            </div>
-            <div className="grid gap-4 md:gap-6 grid-cols-[1fr_1fr_1fr] items-center w-full">
-              <div className="justify-self-start">
-                <Button
-                  variant="ghost"
-                  className="px-10 py-4 w-full md:w-auto"
-                  onClick={() => {
-                    setCurrentIndex((p) => Math.max(0, p - 1));
-                    setIsFlipped(false);
-                  }}
-                  disabled={currentIndex === 0}
-                >
-                  ← Trước
-                </Button>
-              </div>
-              <div className="flex flex-col items-center gap-3 justify-self-center">
-                <div className="flex justify-center gap-2">
-                  {words.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-3 rounded-full transition-all duration-300 ${i === currentIndex ? "w-8 bg-primary" : "w-3 bg-primary/10"}`}
-                    />
-                  ))}
-                </div>
-                <span className="text-xs font-bold text-text-muted uppercase">
-                  {currentIndex + 1} / {words.length}
-                </span>
-              </div>
-              <div className="justify-self-end">
-                <Button
-                  variant="primary"
-                  className="px-10 py-4 w-full md:w-auto"
-                  onClick={() => {
-                    setCurrentIndex((p) => Math.min(words.length - 1, p + 1));
-                    setIsFlipped(false);
-                  }}
-                  disabled={currentIndex === words.length - 1}
-                >
-                  Tiếp theo →
-                </Button>
+            </div>{/* end flashcard */}
+            </div>{/* end outer bordered container */}
+              {/* Right arrow — outside border */}
+              <button
+                onClick={() => { setCurrentIndex((p) => Math.min(words.length - 1, p + 1)); setIsFlipped(false); }}
+                disabled={currentIndex === words.length - 1}
+                className="w-11 h-11 rounded-full border-2 border-primary/20 bg-white/80 flex items-center justify-center hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed flex-shrink-0 font-bold text-lg shadow-sm"
+              >
+                →
+              </button>
+            </div>{/* end flex row */}
+
+            {/* ── Dot progress ──────────────────────────────────────────── */}
+            <div className="flex flex-col items-center gap-2 mt-4">
+              <span className="text-xs font-bold text-text-muted uppercase tracking-wide">
+                {currentIndex + 1} / {words.length}
+              </span>
+              <div className="flex justify-center gap-1.5 flex-wrap">
+                {words.map((_, i) => (
+                  <div
+                    key={i}
+                    onClick={() => { setCurrentIndex(i); setIsFlipped(false); }}
+                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${i === currentIndex ? "w-7 bg-primary" : "w-2.5 bg-primary/15 hover:bg-primary/30"}`}
+                  />
+                ))}
               </div>
             </div>
+
+            </div>{/* end max-w-3xl */}
           </motion.div>
         )}
 
@@ -1137,23 +1518,53 @@ const StudySession = ({
             exit={{ opacity: 0 }}
             key="learn-tab"
           >
-            <div className="max-w-3xl mx-auto mb-16 relative">
-              <div className="absolute top-1/2 left-0 right-0 h-1 bg-primary/10 -translate-y-1/2 -z-10" />
-              <div className="flex justify-between">
-                {[1, 2, 3].map((s) => (
-                  <div key={s} className="flex flex-col items-center gap-3">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all ${learnStep >= s ? "bg-primary border-primary text-white" : "bg-white border-primary/10 text-text-muted"}`}
-                    >
-                      {s}
-                    </div>
-                    <span
-                      className={`text-xs font-bold uppercase ${learnStep >= s ? "text-primary" : "text-text-muted"}`}
-                    >
-                      {s === 1 ? "Chọn từ" : s === 2 ? "Xem qua" : "Luyện tập"}
-                    </span>
+            <div className="max-w-3xl mx-auto mb-16">
+              <div className="flex items-start">
+                {/* Step 1 */}
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-300 ${learnStep >= 1 ? "bg-primary border-primary text-white" : "bg-white border-primary/10 text-text-muted"}`}>
+                    {learnStep > 1 ? <Check size={18} /> : 1}
                   </div>
-                ))}
+                  <span className={`text-xs font-bold uppercase mt-3 ${learnStep >= 1 ? "text-primary" : "text-text-muted"}`}>Chọn từ</span>
+                </div>
+
+                {/* Segment 1: filled when step ≥ 2 */}
+                <div className="flex-1 h-1 bg-primary/10 mx-3 mt-6 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: learnStep >= 2 ? '100%' : '0%' }}
+                  />
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-300 ${learnStep >= 2 ? "bg-primary border-primary text-white" : "bg-white border-primary/10 text-text-muted"}`}>
+                    {learnStep > 2 ? <Check size={18} /> : 2}
+                  </div>
+                  <span className={`text-xs font-bold uppercase mt-3 ${learnStep >= 2 ? "text-primary" : "text-text-muted"}`}>Xem qua</span>
+                </div>
+
+                {/* Segment 2: dynamic fill based on flashcard progress */}
+                <div className="flex-1 h-1 bg-primary/10 mx-3 mt-6 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{
+                      width: learnStep >= 3
+                        ? '100%'
+                        : learnStep === 2
+                          ? `${Math.round(((currentIndex + 1) / Math.max(selectedWords.length, 1)) * 100)}%`
+                          : '0%',
+                    }}
+                  />
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-300 ${learnStep >= 3 ? "bg-primary border-primary text-white" : "bg-white border-primary/10 text-text-muted"}`}>
+                    3
+                  </div>
+                  <span className={`text-xs font-bold uppercase mt-3 ${learnStep >= 3 ? "text-primary" : "text-text-muted"}`}>Luyện tập</span>
+                </div>
               </div>
             </div>
 
@@ -1175,183 +1586,241 @@ const StudySession = ({
                     onClick={() => setLearnMode("custom")}
                     className={`text-left glass-card p-5 border-2 transition-all ${learnMode === "custom" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
                   >
-                    <div className="font-bold text-lg mb-1">🛠️ Custom</div>
+                    <div className="font-bold text-lg mb-1">🛠️ Tùy chỉnh</div>
                     <p className="text-sm text-text-muted">
-                      Tự chọn từng từ vựng để học theo nhu cầu của learner.
+                      Tự chọn từng từ vựng để học theo nhu cầu của học viên.
                     </p>
                   </button>
                 </div>
 
                 {learnMode === "custom" ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-8">
-                      <h3 className="text-2xl font-bold">
-                        {selectedWordIds.length} từ đã chọn
-                      </h3>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={customTab === "new" ? "primary" : "ghost"}
-                          onClick={() => setCustomTab("new")}
-                        >
-                          🆕 New
-                        </Button>
-                        <Button
-                          variant={customTab === "review" ? "secondary" : "ghost"}
-                          onClick={() => setCustomTab("review")}
-                        >
-                          🔔 Review
-                        </Button>
+                  <div className="mb-16">
+                    <div className="space-y-4">
+                      {/* Action bar */}
+                      <div className="border-t-2 border-primary/15 pt-5 mt-2">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-xs font-bold text-primary uppercase tracking-widest">✦ Sẵn sàng học</span>
+                        <div className="flex-1 h-px bg-primary/15" />
                       </div>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="primary"
-                          disabled={selectedWordIds.length === 0}
-                          onClick={() => {
-                            setLearnStep(2);
-                            setCurrentIndex(0);
-                          }}
-                        >
-                          Bắt đầu học →
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onClick={() =>
-                            setSelectedWordIds((prev) =>
-                              Array.from(
-                                new Set([
-                                  ...prev,
-                                  ...customSelectableWords.map((w: any) => w.id),
-                                ]),
-                              ),
-                            )
-                          }
-                        >
-                          Chọn tất cả
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onClick={() => setSelectedWordIds([])}
-                        >
-                          Bỏ chọn
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-16">
-                      {customSelectableWords.map((w: any) => {
-                        const isSel = selectedWordIds.includes(w.id);
-
-                        return (
-                          <div
-                            key={w.id}
-                            onClick={() =>
-                              setSelectedWordIds((p) =>
-                                isSel
-                                  ? p.filter((id) => id !== w.id)
-                                  : [...p, w.id],
-                              )
-                            }
-                            className={`glass-card p-6 cursor-pointer relative transition-all border-4 ${isSel ? "border-green-500 bg-green-50 scale-105" : "border-transparent hover:border-primary/20"}`}
-                          >
-                            <div className="text-2xl font-bold mb-1">{w.word}</div>
-                            <div className="text-xs text-text-muted font-mono">
-                              {w.transcription}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {customSelectableWords.length === 0 && (
-                      <div className="glass-card p-6 text-sm text-text-muted text-center mb-16">
-                        {customTab === "new"
-                          ? "Không còn từ mới trong chủ đề này."
-                          : "Chưa có từ đã học để ôn tập."}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid lg:grid-cols-[1fr_320px] gap-6 mb-16 items-start">
-                    <div className="space-y-6">
-                      <div className="grid md:grid-cols-2 gap-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-lg">🆕 New</h4>
-                            <span className="text-sm text-text-muted">
-                              {newWords.length} từ
-                            </span>
-                          </div>
-                          <div className="grid gap-4">
-                            {newWords.map((w: any) => {
-                              const isSel = selectedWordIds.includes(w.id);
-
-                              return (
-                                <div
-                                  key={w.id}
-                                  className={`glass-card p-5 transition-all border-4 cursor-not-allowed opacity-60 ${isSel ? "border-green-500 bg-green-50" : "border-transparent hover:border-primary/20"}`}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="text-xl font-bold">{w.word}</div>
-                                    <Badge
-                                      variant="cyan"
-                                      className="text-[10px]"
-                                    >
-                                      {w.cefr || "-"}
-                                    </Badge>
-                                  </div>
-                                  <div className="text-xs text-text-muted font-mono mt-1">
-                                    {w.transcription}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <h3 className="text-xl font-bold">
+                            Đã chọn: <span className="text-primary">{selectedNewCount} từ mới</span> + <span className="text-[#4B1F8A]">{selectedReviewCount} từ ôn</span>
+                          </h3>
                         </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="primary"
+                            disabled={selectedWordIds.length === 0}
+                            onClick={() => { setLearnStep(2); setCurrentIndex(0); }}
+                          >
+                            Bắt đầu học →
+                          </Button>
+                          <Button variant="ghost" onClick={() => setSelectedWordIds([])}>
+                            Bỏ chọn tất cả
+                          </Button>
+                        </div>
+                      </div>
+                      </div>
 
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-lg">🔔 Review</h4>
-                            <span className="text-sm text-text-muted">
-                              {reviewWords.length} từ
-                            </span>
-                          </div>
-                          {reviewWords.length > 0 ? (
-                            <div className="grid gap-4">
-                              {reviewWords.map((w: any) => {
+                      {/* Two sections side by side */}
+                      <div className={`grid gap-8 ${initialMode !== 'review' ? 'lg:grid-cols-2' : ''}`}>
+                        {/* New words section — hidden in review mode */}
+                        {initialMode !== 'review' && (
+                          <div className="space-y-3 lg:pr-4 lg:border-r lg:border-border">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-bold flex items-center gap-2">
+                                🆕 Từ mới
+                                <span className="text-sm font-normal text-text-muted">({customNewWords.length})</span>
+                              </h4>
+                              <button
+                                className="text-xs text-primary hover:underline"
+                                onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customNewWords.map((w: any) => w.id)])))}
+                              >
+                                Chọn tất cả
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {pagedCustomNewWords.map((w: any) => {
                                 const isSel = selectedWordIds.includes(w.id);
-
                                 return (
                                   <div
                                     key={w.id}
-                                    className={`glass-card p-5 transition-all border-4 cursor-not-allowed opacity-60 ${isSel ? "border-purple-500 bg-purple-50" : "border-transparent hover:border-primary/20"}`}
+                                    onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
+                                    className={`glass-card p-3 cursor-pointer border-2 transition-all overflow-hidden ${isSel ? "border-green-500 bg-green-50" : "border-transparent hover:border-green-300"}`}
                                   >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="text-xl font-bold">{w.word}</div>
-                                      <Badge
-                                        variant="purple"
-                                        className="text-[10px]"
-                                      >
-                                        {w.cefr || "-"}
-                                      </Badge>
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                      <div className="text-lg font-bold">{w.word}</div>
+                                      <Badge variant="green" className="text-[10px] flex-shrink-0">{w.cefr || "-"}</Badge>
                                     </div>
-                                    <div className="text-xs text-text-muted font-mono mt-1">
-                                      {w.transcription}
-                                    </div>
+                                    <div className="text-xs text-text-muted font-mono mt-0.5">{w.transcription}</div>
                                   </div>
                                 );
                               })}
+                              {customNewWords.length === 0 && (
+                                <div className="col-span-2 glass-card p-4 text-sm text-text-muted text-center">
+                                  Không còn từ mới trong chủ đề này.
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="glass-card p-6 text-sm text-text-muted text-center">
-                              Hiện chưa có từ đến hạn ôn.
+                            {customNewTotalPages > 1 && (
+                              <div className="flex items-center justify-center gap-2 pt-1">
+                                <button
+                                  onClick={() => setCustomNewPage((p) => Math.max(0, p - 1))}
+                                  disabled={customNewPage === 0}
+                                  className="px-3 py-1 rounded-lg border border-primary/20 text-sm disabled:opacity-30 hover:bg-primary/5 transition-colors"
+                                >
+                                  ← Trước
+                                </button>
+                                <span className="text-xs text-text-muted">{customNewPage + 1} / {customNewTotalPages}</span>
+                                <button
+                                  onClick={() => setCustomNewPage((p) => Math.min(customNewTotalPages - 1, p + 1))}
+                                  disabled={customNewPage === customNewTotalPages - 1}
+                                  className="px-3 py-1 rounded-lg border border-primary/20 text-sm disabled:opacity-30 hover:bg-primary/5 transition-colors"
+                                >
+                                  Tiếp →
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Review words section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold flex items-center gap-2">
+                              🔔 Ôn tập
+                              <span className="text-sm font-normal text-text-muted">({customReviewWords.length})</span>
+                            </h4>
+                            <button
+                              className="text-xs text-[#4B1F8A] hover:underline"
+                              onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customReviewWords.map((w: any) => w.id)])))}
+                            >
+                              Chọn tất cả
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {pagedCustomReviewWords.map((w: any) => {
+                              const isSel = selectedWordIds.includes(w.id);
+                              return (
+                                <div
+                                  key={w.id}
+                                  onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
+                                  className={`glass-card p-3 cursor-pointer border-2 transition-all overflow-hidden ${isSel ? "border-purple/50 bg-purple/10" : "border-transparent hover:border-purple/20"}`}
+                                >
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="text-lg font-bold">{w.word}</div>
+                                    <Badge variant="purple" className="text-[10px] flex-shrink-0">{w.cefr || "-"}</Badge>
+                                  </div>
+                                  <div className="text-xs text-text-muted font-mono mt-0.5">{w.transcription}</div>
+                                </div>
+                              );
+                            })}
+                            {customReviewWords.length === 0 && (
+                              <div className="col-span-2 glass-card p-4 text-sm text-text-muted text-center">
+                                Chưa có từ đã học để ôn tập.
+                              </div>
+                            )}
+                          </div>
+                          {customReviewTotalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 pt-1">
+                              <button
+                                onClick={() => setCustomReviewPage((p) => Math.max(0, p - 1))}
+                                disabled={customReviewPage === 0}
+                                className="px-3 py-1 rounded-lg border border-purple/30 text-sm disabled:opacity-30 hover:bg-purple/5 transition-colors"
+                              >
+                                ← Trước
+                              </button>
+                              <span className="text-xs text-text-muted">{customReviewPage + 1} / {customReviewTotalPages}</span>
+                              <button
+                                onClick={() => setCustomReviewPage((p) => Math.min(customReviewTotalPages - 1, p + 1))}
+                                disabled={customReviewPage === customReviewTotalPages - 1}
+                                className="px-3 py-1 rounded-lg border border-purple/30 text-sm disabled:opacity-30 hover:bg-purple/5 transition-colors"
+                              >
+                                Tiếp →
+                              </button>
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <aside className="glass-card p-5 sticky top-[96px] space-y-4">
-                      <div className="text-sm text-text-muted">Đã chọn realtime</div>
-                      <div className="font-bold text-lg">
-                        {selectedWordIds.length} từ ({selectedNewCount} new, {selectedReviewCount} review)
+                  </div>
+                ) : (
+                  <div className="grid lg:grid-cols-[1fr_320px] gap-6 mb-16 items-start">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-lg">
+                          {initialMode === 'review' ? '🔔 Từ cần ôn tập' : '🆕 Từ mới'}
+                        </h4>
+                        <span className="text-sm text-text-muted">
+                          {smartDisplayWords.length} từ
+                        </span>
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {pagedSmartWords.map((w: any) => {
+                          const isSel = selectedWordIds.includes(w.id);
+                          const isReview = initialMode === 'review';
+                          return (
+                            <div
+                              key={w.id}
+                              className={`glass-card p-4 transition-all border-2 ${
+                                isSel
+                                  ? isReview
+                                    ? "border-purple/50 bg-purple/10"
+                                    : "border-green-400 bg-green-50"
+                                  : "border-transparent opacity-50"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-lg font-bold">{w.word}</div>
+                                <Badge
+                                  variant={isReview ? "purple" : "cyan"}
+                                  className="text-[10px] flex-shrink-0"
+                                >
+                                  {w.cefr || "-"}
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-text-muted font-mono mt-0.5">{w.transcription}</div>
+                            </div>
+                          );
+                        })}
+                        {smartDisplayWords.length === 0 && (
+                          <div className="col-span-2 glass-card p-6 text-sm text-text-muted text-center">
+                            {initialMode === 'review' ? 'Hiện chưa có từ đến hạn ôn.' : 'Không còn từ mới trong chủ đề này.'}
+                          </div>
+                        )}
+                      </div>
+                      {smartTotalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 pt-1">
+                          <button
+                            onClick={() => setReviewPage((p) => Math.max(0, p - 1))}
+                            disabled={reviewPage === 0}
+                            className="px-3 py-1 rounded-lg border border-primary/30 text-sm disabled:opacity-30 hover:bg-primary/5 transition-colors"
+                          >
+                            ← Trước
+                          </button>
+                          <span className="text-xs text-text-muted">{reviewPage + 1} / {smartTotalPages}</span>
+                          <button
+                            onClick={() => setReviewPage((p) => Math.min(smartTotalPages - 1, p + 1))}
+                            disabled={reviewPage === smartTotalPages - 1}
+                            className="px-3 py-1 rounded-lg border border-primary/30 text-sm disabled:opacity-30 hover:bg-primary/5 transition-colors"
+                          >
+                            Tiếp →
+                          </button>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <aside className="sticky top-[96px] rounded-2xl border-2 border-primary/25 overflow-hidden shadow-lg">
+                      <div className="bg-primary/8 px-5 py-3 border-b-2 border-primary/15 flex items-center gap-2">
+                        <span className="text-xs font-bold text-primary uppercase tracking-widest">✦ Sẵn sàng học</span>
+                      </div>
+                      <div className="p-5 space-y-4">
+                      <div className="font-bold text-xl text-primary">
+                        {selectedWordIds.length} <span className="text-text-muted font-normal text-base">/ {smartDisplayWords.length} từ đã chọn</span>
                       </div>
 
                       <Button
@@ -1363,31 +1832,42 @@ const StudySession = ({
                           setCurrentIndex(0);
                         }}
                       >
-                        Bắt đầu học
+                        Bắt đầu học →
                       </Button>
 
+                      <div className="border-t border-primary/15" />
+
                       <div className="space-y-2">
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => applySmartPreset(5)}
-                        >
-                          Nhanh 5 phút
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => applySmartPreset(10)}
-                        >
-                          Tiêu chuẩn
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => applySmartPreset(15)}
-                        >
-                          Tăng tốc
-                        </Button>
+                        {initialMode === 'review' ? (
+                          <>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 5 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(5); setActivePreset(5); }} disabled={reviewWords.length === 0}>
+                              ⚡ Nhanh 5 phút (5 từ)
+                            </Button>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 10 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(10); setActivePreset(10); }} disabled={reviewWords.length === 0}>
+                              📘 Tiêu chuẩn (10 từ)
+                            </Button>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 15 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(15); setActivePreset(15); }} disabled={reviewWords.length === 0}>
+                              🚀 Tăng tốc (15 từ)
+                            </Button>
+                            <div className="border-t border-primary/15" />
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === -1 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { setSelectedWordIds(reviewWords.map((w: any) => w.id)); setActivePreset(-1); }}>
+                              🔥 Full Review ({reviewWords.length} từ)
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 5 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(5); setActivePreset(5); }}>
+                              ⚡ Nhanh 5 phút (5 từ)
+                            </Button>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 10 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(10); setActivePreset(10); }}>
+                              📘 Tiêu chuẩn (10 từ)
+                            </Button>
+                            <Button variant="ghost" className={`w-full justify-start ${activePreset === 15 ? "bg-primary/10 border border-primary/30 text-primary font-bold" : ""}`} onClick={() => { applySmartPreset(15); setActivePreset(15); }}>
+                              🚀 Tăng tốc (15 từ)
+                            </Button>
+                            <div className="border-t border-primary/15" />
+                          </>
+                        )}
                       </div>
 
                       <Button
@@ -1397,6 +1877,7 @@ const StudySession = ({
                       >
                         Bỏ chọn tất cả
                       </Button>
+                      </div>
                     </aside>
                   </div>
                 )}
@@ -1405,6 +1886,12 @@ const StudySession = ({
 
             {learnStep === 2 && (
               <div className="max-w-2xl mx-auto">
+                {selectedWords.length === 0 ? (
+                  <div className="p-8 text-center text-text-muted">
+                    Bạn chưa chọn từ nào. Hãy quay lại bước 1 để chọn từ.
+                  </div>
+                ) : (
+                <>
                 <div className="relative h-[480px] perspective-1000 mb-12">
                   <motion.div
                     onClick={() => setIsFlipped(!isFlipped)}
@@ -1416,13 +1903,13 @@ const StudySession = ({
                   >
                     <div className="absolute inset-0 backface-hidden glass-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-white">
                       <Badge variant="purple" className="mb-12 scale-125">
-                        Vocabulary Card
+                        Thẻ từ vựng
                       </Badge>
                       <div className="text-7xl font-display font-extrabold mb-4 text-primary">
-                        {selectedWords[currentIndex].word}
+                        {selectedWords[currentIndex]?.word}
                       </div>
                       <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
-                        {selectedWords[currentIndex].transcription}
+                        {selectedWords[currentIndex]?.transcription}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -1431,8 +1918,8 @@ const StudySession = ({
                           onClick={(e: any) => {
                             e.stopPropagation();
                             playPronunciationAudio(
-                              selectedWords[currentIndex].audioUrl,
-                              selectedWords[currentIndex].word,
+                              selectedWords[currentIndex]?.audioUrl,
+                              selectedWords[currentIndex]?.word,
                             );
                           }}
                         >
@@ -1446,29 +1933,57 @@ const StudySession = ({
                         </Button>
                       </div>
                     </div>
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
-                      <Badge variant="pink" className="mb-12 scale-125">
-                        Meaning
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-8 text-center h-full overflow-y-auto">
+                      <Badge variant="pink" className="mb-6 scale-125 flex-shrink-0">
+                        Nghĩa
                       </Badge>
-                      <div className="text-5xl font-bold mb-10 text-text-primary">
-                        {selectedWords[currentIndex].meaning}
+                      <div className="text-4xl font-bold mb-6 text-text-primary flex-shrink-0">
+                        {selectedWords[currentIndex]?.meaning}
                       </div>
-                      <Button
-                        variant="ghost"
-                        className="p-2 min-h-0 rounded-full mb-4"
-                        onClick={(e: any) => {
-                          e.stopPropagation();
-                          playPronunciationAudio(
-                            selectedWords[currentIndex].exampleAudioUrl,
-                            selectedWords[currentIndex].example,
-                          );
-                        }}
-                      >
-                        <Volume2 size={18} />
-                      </Button>
-                      <div className="bg-white/70 p-8 rounded-3xl italic border-2 border-purple/20 w-full shadow-inner font-serif text-xl leading-loose">
-                        "{selectedWords[currentIndex].example}"
+                      <div className="flex gap-2 mb-4 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          className="p-2 min-h-0 rounded-full"
+                          onClick={(e: any) => {
+                            e.stopPropagation();
+                            playPronunciationAudio(
+                              selectedWords[currentIndex]?.exampleAudioUrl,
+                              selectedWords[currentIndex]?.example,
+                            );
+                          }}
+                        >
+                          <Volume2 size={18} />
+                        </Button>
+                        <Button
+                          variant="accent"
+                          className="px-4 py-2 text-sm flex items-center gap-2"
+                          onClick={(e: any) => handleAskAi(selectedWords[currentIndex], e)}
+                          disabled={loadingAiIds.has(selectedWords[currentIndex]?.id)}
+                        >
+                          {loadingAiIds.has(selectedWords[currentIndex]?.id) ? (
+                              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          ) : (
+                              <Sparkles size={16} />
+                          )}
+                          Hỏi AI ✨
+                        </Button>
                       </div>
+                      <div className="bg-white/70 p-6 rounded-2xl border-2 border-purple/20 w-full shadow-inner flex-shrink-0">
+                        <p className="italic font-serif text-lg leading-loose">"{selectedWords[currentIndex]?.example}"</p>
+                        {selectedWords[currentIndex]?.translation && (
+                          <p className="text-sm text-text-muted mt-3 italic">"{selectedWords[currentIndex].translation}"</p>
+                        )}
+                      </div>
+                      {(loadingAiIds.has(selectedWords[currentIndex]?.id) || aiResponses[selectedWords[currentIndex]?.id]) && (
+                          <div className="mt-4 p-4 bg-white/90 rounded-2xl border-2 border-cyan-500/30 w-full text-left overflow-y-auto" onClick={e => e.stopPropagation()}>
+                              <h4 className="text-cyan-600 font-bold mb-2 flex items-center gap-2 text-sm"><Sparkles size={16}/> Giải thích từ AI</h4>
+                              {loadingAiIds.has(selectedWords[currentIndex]?.id) ? (
+                                  <div className="text-center text-cyan-500 py-4"><div className="inline-block w-6 h-6 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"/></div>
+                              ) : (
+                                  <div className="text-sm prose prose-cyan max-w-none" dangerouslySetInnerHTML={{ __html: aiResponses[selectedWords[currentIndex]?.id] }} />
+                              )}
+                          </div>
+                      )}
                     </div>
                   </motion.div>
                 </div>
@@ -1508,6 +2023,8 @@ const StudySession = ({
                     </Button>
                   )}
                 </div>
+                </>
+                )}
               </div>
             )}
 
@@ -1518,26 +2035,42 @@ const StudySession = ({
                     <h3 className="text-3xl font-bold mb-8">
                       Chọn kiểu luyện tập
                     </h3>
+                    {ipaFallback && (
+                      <div className="mb-6 mx-auto max-w-md px-4 py-3 rounded-2xl bg-orange-50 border border-orange-200 text-orange-700 text-sm">
+                        Chưa đủ dữ liệu IPA — đã chuyển sang chế độ Từ ↔ Nghĩa.
+                      </div>
+                    )}
                     <div className="flex justify-center gap-6">
                       <Button
                         variant="primary"
                         className="px-10 py-5 text-lg"
-                        onClick={() => setMatchType("word")}
+                        onClick={() => { setIpaFallback(false); setMatchType("word"); }}
                       >
                         Từ ↔ Nghĩa
                       </Button>
                       <Button
                         variant="secondary"
                         className="px-10 py-5 text-lg"
-                        onClick={() => setMatchType("ipa")}
+                        onClick={() => {
+                          if (ipaValidWords.length < 3) {
+                            setIpaFallback(true);
+                            setMatchType("word");
+                          } else {
+                            setIpaFallback(false);
+                            setMatchType("ipa");
+                          }
+                        }}
                       >
                         IPA ↔ Nghĩa
+                        {ipaValidWords.length < 3 && (
+                          <span className="ml-2 text-xs opacity-60">({ipaValidWords.length} từ)</span>
+                        )}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <MatchingGame
-                    words={selectedWords}
+                    words={matchType === 'ipa' ? ipaValidWords : selectedWords}
                     type={matchType}
                     onFinish={handleFinishMatching}
                   />
@@ -1554,12 +2087,18 @@ const StudySession = ({
             exit={{ opacity: 0 }}
             key="minitest-tab"
           >
-            <Minitest
-              topicId={topicId}
-              learnedWords={learnedWordsForMinitest}
-              topicWords={words}
-              onFinish={onFinish}
-            />
+            {learningProgressState === null ? (
+              <div className="flex items-center justify-center py-24 text-text-muted text-lg">
+                Đang tải tiến độ học...
+              </div>
+            ) : (
+              <Minitest
+                topicId={topicId}
+                sessionWords={learnedWordsForMinitest}
+                topicWords={words}
+                onFinish={onFinish}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1598,6 +2137,7 @@ export default function App() {
         selectedWord,
         topicFilters,
         studyTopicId,
+        studyMode,
         studyWords,
         testResult,
     handleStartStudy,
@@ -1614,6 +2154,13 @@ export default function App() {
             ),
         [topicFilters, learningProgressState],
     );
+
+  const totalReviewCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return learningTopicGroups.reduce(
+      (sum: number, cat: any) => sum + cat.topics.reduce((s: number, t: any) => s + (t.stats?.review || 0), 0), 0
+    );
+  }, [learningTopicGroups, currentUser]);
 
     const learnedWordIds = useMemo(
         () => Array.isArray(learningProgressState?.topics)
@@ -1741,16 +2288,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <Navbar
-        activePage={currentPage}
-        onNavigate={setCurrentPage}
-        currentUser={currentUser}
-        gameData={gameData.currentUser}
-        onLogout={handleLogout}
-        onStreakClick={() => setShowStreakModal(true)}
-      />
+      {['auth', 'register'].includes(currentPage) ? (
+        <AuthNavbar onNavigate={setCurrentPage} />
+      ) : (
+        <Navbar
+          activePage={currentPage}
+          onNavigate={setCurrentPage}
+          currentUser={currentUser}
+          gameData={gameData.currentUser}
+          onLogout={handleLogout}
+          onStreakClick={() => setShowStreakModal(true)}
+          reviewCount={totalReviewCount}
+        />
+      )}
 
-      <main className="pb-24">
+      <main className={['auth', 'register'].includes(currentPage) ? '' : 'pb-24'}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentPage}
@@ -1774,6 +2326,7 @@ export default function App() {
               learningTopicGroups={learningTopicGroups}
               learningProgressState={learningProgressState}
               studyTopicId={studyTopicId}
+              studyMode={studyMode}
               studyWords={studyWords}
               handleFinishStudy={handleFinishStudy}
               addXP={addXP}
@@ -1858,7 +2411,8 @@ export default function App() {
         ))}
       </AnimatePresence>
 
-      <Footer />
+      {!['auth', 'register'].includes(currentPage) && <Footer />}
     </div>
   );
 }
+
