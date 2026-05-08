@@ -131,7 +131,7 @@ namespace VocabLearning.Services
         {
             var items = _context.Vocabularies
                 .Where(vocabulary => vocabulary.TopicId == topicId)
-                .OrderBy(vocabulary => vocabulary.Word)
+                .OrderBy(vocabulary => vocabulary.VocabId)
                 .ToList();
 
             foreach (var item in items)

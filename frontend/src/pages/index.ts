@@ -6,3 +6,4 @@ export { default as Profile } from './Profile';
 export { default as Leaderboard } from './Leaderboard';
 export { default as AdminDashboard } from './AdminDashboard';
 export { default as MinitestResult } from './MinitestResult';
+export { default as MinitestReview } from './MinitestReview';

@@ -6,6 +6,29 @@ using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
 
+// Load .env for local dev (Docker sets these as real env vars)
+// Try multiple paths since CWD differs between dotnet run / dotnet watch / IDE
+var envFile = new[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"),          // run from backend/VocabLearning/
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env"),     // run from bin/Debug/
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),                      // run from repo root
+}
+.Select(Path.GetFullPath)
+.FirstOrDefault(File.Exists);
+if (envFile != null)
+{
+    foreach (var line in File.ReadAllLines(envFile))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#')) continue;
+        var idx = line.IndexOf('=');
+        if (idx < 0) continue;
+        var key = line[..idx].Trim();
+        var val = line[(idx + 1)..].Trim();
+        Environment.SetEnvironmentVariable(key, val);
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -23,6 +46,11 @@ builder.Services.AddScoped<AdminExerciseService>();
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<LearningFlowService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
+builder.Services.AddHttpClient<IAIService, GeminiService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(35);
+    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+});
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {

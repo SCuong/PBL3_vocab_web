@@ -30,12 +30,36 @@
             <div class="text-muted small">@Model.TopicDescription</div>
         </div>
 
-        <h1 class="display-5 mb-2">@Model.CurrentWord.Word</h1>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-2">
+            <h1 class="display-5 mb-0">@Model.CurrentWord.Word</h1>
+            <button id="btn-ask-ai" class="btn btn-outline-info btn-sm" data-word="@Model.CurrentWord.Word" data-topic="@Model.TopicName" title="Giải thích bằng AI">
+                Hỏi AI ✨
+            </button>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(Model.CurrentWord.Ipa))
         {
             <p class="text-muted fs-5 mb-3">@Model.CurrentWord.Ipa</p>
         }
+
+        <div id="ai-response-container" class="d-none mb-4">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0 fs-6">Trợ lý AI 🤖</h5>
+                </div>
+                <div class="card-body">
+                    <div id="ai-loading" class="d-none text-center p-2">
+                        <div class="spinner-border spinner-border-sm text-info" role="status">
+                            <span class="visually-hidden">Đang phân tích...</span>
+                        </div>
+                        <span class="ms-2 small">Đang phân tích...</span>
+                    </div>
+                    <div id="ai-result" class="d-none small">
+                        <!-- Nội dung AI sẽ được chèn vào đây -->
+                    </div>
+                </div>
+            </div>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(Model.CurrentWord.AudioUrl))
         {
@@ -114,6 +138,8 @@
     </div>
 </div>
 
+@Html.AntiForgeryToken()
+
 @section Scripts {
     <script>
         (function () {
@@ -128,6 +154,56 @@
                 answerPanel.classList.remove("d-none");
                 showAnswerButton.classList.add("d-none");
             });
+
+            // AI Assistant Logic
+            const btnAskAi = document.getElementById('btn-ask-ai');
+            if (btnAskAi) {
+                btnAskAi.addEventListener('click', async function () {
+                    var btn = this;
+                    var word = btn.getAttribute('data-word');
+                    var topic = btn.getAttribute('data-topic');
+                    var container = document.getElementById('ai-response-container');
+                    var loading = document.getElementById('ai-loading');
+                    var result = document.getElementById('ai-result');
+
+                    // Show container and loading
+                    container.classList.remove('d-none');
+                    btn.disabled = true;
+                    result.classList.add('d-none');
+                    loading.classList.remove('d-none');
+
+                    var formData = new FormData();
+                    formData.append('word', word);
+                    formData.append('context', topic);
+
+                    var tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                    if (tokenInput) {
+                        formData.append('__RequestVerificationToken', tokenInput.value);
+                    }
+
+                    try {
+                        var response = await fetch('/api/AI/Explain', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            var htmlContent = await response.text();
+                            result.innerHTML = htmlContent;
+                            result.classList.remove('d-none');
+                        } else {
+                            result.innerHTML = "<div class='text-danger'>Có lỗi xảy ra khi gọi AI. Vui lòng thử lại.</div>";
+                            result.classList.remove('d-none');
+                        }
+                    } catch (error) {
+                        result.innerHTML = "<div class='text-danger'>Lỗi kết nối mạng: " + error.message + "</div>";
+                        result.classList.remove('d-none');
+                    } finally {
+                        loading.classList.add('d-none');
+                        btn.disabled = false;
+                    }
+                });
+            }
         })();
     </script>
 }

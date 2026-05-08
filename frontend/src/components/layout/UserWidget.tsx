@@ -21,7 +21,7 @@ export const UserWidget = ({ user, gameData, onNavigate, onStreakClick }: UserWi
 
         const preferences = loadProfilePreferences(user.userId);
         setAvatarUrl(normalizeAvatarUrl(preferences.avatarUrl));
-    }, [user?.userId]);
+    }, [user]);
 
     return (
         <div className="flex items-center gap-4 bg-white/40 backdrop-blur-md border border-primary/20 rounded-pill px-4 py-1.5 shadow-sm">

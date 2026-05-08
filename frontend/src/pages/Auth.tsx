@@ -313,9 +313,6 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                 <div className="auth-panel auth-panel-login">
                     <div className="auth-panel-content">
                         <div className="text-center mb-6">
-                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
-                                <span className="text-2xl">👤</span>
-                            </div>
                             <h2 className="text-3xl font-bold text-text-primary">Đăng nhập</h2>
                             <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
                         </div>
@@ -354,7 +351,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
 
                             <button
                                 type="button"
-                                className="w-full text-primary text-sm font-semibold py-2 px-4 rounded-lg hover:bg-primary/10 transition-colors"
+                                className="w-full text-primary text-sm font-semibold py-2 px-4 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
                                 onClick={() => {
                                     setIsForgotPasswordMode(true);
                                     resetForgotPasswordState();
@@ -370,7 +367,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                         {/* Mobile-only switch to register */}
                         <p className="auth-mobile-switch">
                             Chưa có tài khoản?{' '}
-                            <button type="button" className="text-primary font-bold hover:underline" onClick={switchToRegister}>
+                            <button type="button" className="text-primary font-bold hover:underline cursor-pointer transition-opacity hover:opacity-75" onClick={switchToRegister}>
                                 Đăng ký ngay
                             </button>
                         </p>
@@ -380,15 +377,12 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                 {/* ── Register panel (RIGHT) ─────────────────────────────── */}
                 <div className="auth-panel auth-panel-register">
                     <div className="auth-panel-content">
-                        <div className="text-center mb-6">
-                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
-                                <span className="text-2xl">✨</span>
-                            </div>
+                        <div className="text-center mb-3">
                             <h2 className="text-3xl font-bold text-text-primary">Đăng ký</h2>
                             <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
                         </div>
 
-                        <div className="space-y-3 w-full">
+                        <div className="space-y-2 w-full">
                             <input type="text" placeholder="Tên hiển thị"
                                 className="auth-input"
                                 value={name} onChange={(e) => setName(e.target.value)} />
@@ -417,8 +411,8 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                             </div>
 
                             {/* Password policy checklist */}
-                            <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs text-text-secondary space-y-1.5 text-left">
-                                <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                            <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
+                                <p className="font-semibold text-text-primary mb-0.5">Yêu cầu mật khẩu:</p>
                                 {[
                                     [passwordPolicy.minLength, 'Tối thiểu 8 ký tự'],
                                     [passwordPolicy.maxLength, 'Tối đa 15 ký tự'],
@@ -447,7 +441,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                         {/* Mobile-only switch to login */}
                         <p className="auth-mobile-switch">
                             Đã có tài khoản?{' '}
-                            <button type="button" className="text-primary font-bold hover:underline" onClick={switchToLogin}>
+                            <button type="button" className="text-primary font-bold hover:underline cursor-pointer transition-opacity hover:opacity-75" onClick={switchToLogin}>
                                 Đăng nhập
                             </button>
                         </p>
@@ -458,7 +452,6 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                 {/* Flips OUT (rotateY -180°) when .active, flips back IN when .close   */}
                 <div className="auth-page auth-page-front">
                     <div className="auth-page-content">
-                        <span className="auth-page-icon animate-float">📚</span>
                         <h3 className="text-4xl font-bold mb-3">Xin chào!</h3>
                         <p className="text-white/90 text-sm leading-relaxed text-center">
                             Tạo tài khoản để bắt đầu hành trình học từ vựng tiếng Anh của bạn.
@@ -473,7 +466,6 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                 {/* Flips IN (rotateY -180°) when .active, flips back OUT when .close   */}
                 <div className="auth-page auth-page-back">
                     <div className="auth-page-content auth-page-back-content">
-                        <span className="auth-page-icon animate-float">🚀</span>
                         <h3 className="text-4xl font-bold mb-3">Chào mừng trở lại!</h3>
                         <p className="text-white/90 text-sm leading-relaxed text-center">
                             Đăng nhập để tiếp tục bài học và nâng cao kỹ năng của bạn.

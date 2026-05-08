@@ -1,0 +1,6 @@
+# Hide legacy MVC static assets from GitHub language stats.
+# Files remain in repo and fully functional at runtime.
+
+backend/VocabLearning/wwwroot/js/*.js linguist-vendored
+backend/VocabLearning/wwwroot/css/*.css linguist-vendored
+backend/VocabLearning/Views/**/*.css linguist-vendored

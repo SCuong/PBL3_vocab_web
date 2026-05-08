@@ -1,6 +1,6 @@
 import { Check, Calendar, XCircle, Trophy, Users, PlusCircle, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Badge, Button } from '../ui';
+import { Badge, Button } from '../../ui';
 import { StreakHeatmap } from './StreakHeatmap';
 
 type StreakModalProps = {

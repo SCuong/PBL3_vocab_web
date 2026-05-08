@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Volume2, X } from 'lucide-react';
+import { Search, Volume2, X, Sparkles, Loader2 } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { Badge, Button } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
@@ -21,6 +21,42 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    
+    // AI State
+    const [aiResponse, setAiResponse] = useState<string | null>(null);
+    const [isLoadingAi, setIsLoadingAi] = useState(false);
+
+    // Reset AI response when word changes
+    useEffect(() => {
+        setAiResponse(null);
+        setIsLoadingAi(false);
+    }, [selectedWord]);
+
+    const handleAskAi = async () => {
+        if (!selectedWord) return;
+        setIsLoadingAi(true);
+        try {
+            const formData = new FormData();
+            formData.append('word', selectedWord.word);
+            formData.append('context', selectedWord.meaning);
+
+            const response = await fetch('/api/AI/Explain', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const htmlContent = await response.text();
+                setAiResponse(htmlContent);
+            } else {
+                setAiResponse("<div class='text-red-500'>Có lỗi xảy ra khi gọi AI. Vui lòng thử lại.</div>");
+            }
+        } catch (error: any) {
+            setAiResponse(`<div class='text-red-500'>Lỗi kết nối mạng: ${error.message}</div>`);
+        } finally {
+            setIsLoadingAi(false);
+        }
+    };
 
     const topicOptions = useMemo(() => {
         return topics
@@ -37,15 +73,12 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
     }, [search]);
 
     const visiblePages = useMemo(() => {
-        if (totalPages <= 0) {
-            return [] as number[];
-        }
-
-        const pages = [page, page + 1, page + 2, page + 3]
-            .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages)
-            .filter((pageNumber, index, array) => array.indexOf(pageNumber) === index);
-
-        return pages;
+        if (totalPages <= 0) return [] as number[];
+        const left = Math.max(2, page - 2);
+        const right = Math.min(totalPages - 1, page + 2);
+        const range: number[] = [];
+        for (let i = left; i <= right; i++) range.push(i);
+        return range;
     }, [page, totalPages]);
 
     const loadPage = async (nextPage: number) => {
@@ -192,6 +225,18 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
                     <Button variant="ghost" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
                         Trước
                     </Button>
+
+                    {/* Always page 1 */}
+                    <Button variant={page === 1 ? 'primary' : 'ghost'} onClick={() => handlePageChange(1)}>
+                        1
+                    </Button>
+
+                    {/* Ellipsis before window */}
+                    {visiblePages.length > 0 && visiblePages[0] > 2 && (
+                        <span className="px-2 text-text-muted">...</span>
+                    )}
+
+                    {/* Window around current (excludes 1 and last) */}
                     {visiblePages.map((pageNumber) => (
                         <Button
                             key={pageNumber}
@@ -201,17 +246,19 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
                             {pageNumber}
                         </Button>
                     ))}
-                    {!visiblePages.includes(totalPages) && (
-                        <>
-                            <span className="px-2 text-text-muted">...</span>
-                            <Button
-                                variant={totalPages === page ? 'primary' : 'ghost'}
-                                onClick={() => handlePageChange(totalPages)}
-                            >
-                                {totalPages}
-                            </Button>
-                        </>
+
+                    {/* Ellipsis after window */}
+                    {visiblePages.length > 0 && visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+                        <span className="px-2 text-text-muted">...</span>
                     )}
+
+                    {/* Always last page */}
+                    {totalPages > 1 && (
+                        <Button variant={page === totalPages ? 'primary' : 'ghost'} onClick={() => handlePageChange(totalPages)}>
+                            {totalPages}
+                        </Button>
+                    )}
+
                     <Button variant="ghost" onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}>
                         Sau
                     </Button>
@@ -285,6 +332,15 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
                                         <Volume2 size={18} /> Nghe ví dụ
                                     </Button>
                                 )}
+                                <Button
+                                    variant="accent"
+                                    className="px-6"
+                                    onClick={handleAskAi}
+                                    disabled={isLoadingAi}
+                                >
+                                    {isLoadingAi ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />} 
+                                    {isLoadingAi ? "Đang xử lý..." : "Hỏi AI ✨"}
+                                </Button>
                             </div>
 
                             <div className="bg-white/60 p-5 rounded-card border border-primary/10">
@@ -294,7 +350,28 @@ const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: a
                                     <>
                                         <h3 className="text-lg font-bold text-purple mb-2">Ví dụ</h3>
                                         <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
+                                        {selectedWord.translation && (
+                                            <p className="text-sm text-text-muted mt-2 italic">"{selectedWord.translation}"</p>
+                                        )}
                                     </>
+                                )}
+
+                                {(isLoadingAi || aiResponse) && (
+                                    <div className="mt-6 pt-4 border-t border-primary/10">
+                                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-cyan-600">
+                                            <Sparkles size={18} /> Giải thích từ AI 🤖
+                                        </h3>
+                                        {isLoadingAi ? (
+                                            <div className="flex justify-center p-4">
+                                                <Loader2 size={24} className="animate-spin text-cyan-500" />
+                                            </div>
+                                        ) : (
+                                            <div 
+                                                className="text-sm leading-relaxed prose prose-cyan max-w-none" 
+                                                dangerouslySetInnerHTML={{ __html: aiResponse || '' }} 
+                                            />
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </motion.div>
