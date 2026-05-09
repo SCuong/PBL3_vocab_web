@@ -1,5 +1,5 @@
 import React from 'react';
-import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, Profile, Vocabulary } from './pages';
+import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, MinitestReview, Profile, Vocabulary } from './pages';
 import type { AuthenticatedUser } from './services/authApi';
 
 type AppRoutesProps = {
@@ -89,6 +89,7 @@ export const AppRoutes = ({
         'learning-topics': <LearningTopicsComponent onStartStudy={handleStartStudy} currentUser={currentUser} gameData={gameData.currentUser} onNavigate={setCurrentPage} topicGroups={learningTopicGroups} />,
         'study-session': <StudySessionComponent topicId={studyTopicId} studyWords={studyWords} topicGroups={learningTopicGroups} learningProgressState={learningProgressState} onFinish={handleFinishStudy} onAddXP={addXP} onStreakCheck={triggerStreakCheck} onAddToast={addToast} onWordsLearned={handleWordsLearned} onRecordStudyHistory={onRecordStudyHistory} />,
         'minitest-result': <MinitestResult score={testResult?.score} total={testResult?.total} detail={testResult?.detail} onBack={setCurrentPage} />,
+        'minitest-review': <MinitestReview detail={testResult?.detail} onBack={setCurrentPage} />,
         profile: <Profile user={profileUser} learnedWordIds={learnedWordIds} onLogout={handleLogout} onOpenStreak={onOpenStreak} onAddToast={addToast} onUserUpdated={onUserUpdated} />,
         leaderboard: <Leaderboard gameData={gameData} />,
         admin: <AdminDashboard />
