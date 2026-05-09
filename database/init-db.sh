@@ -8,10 +8,10 @@ echo "Creating database PBL3..."
   -S localhost -U sa -P "$SA_PASSWORD" \
   -C -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'PBL3') CREATE DATABASE PBL3;"
 
-echo "Running init.sql..."
+echo "Running script.sql..."
 /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P "$SA_PASSWORD" \
   -C -d PBL3 \
-  -i /init.sql
+  -i /script.sql
 
-echo "Database init complete."
+echo "Database script complete."
