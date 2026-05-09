@@ -30,3 +30,9 @@ obj/
 # IDE
 .vscode/
 .idea/
+
+# Ignore import tool folder
+ImportVocabularyPBL3/
+
+# Ignore SQL dump
+init.sql
