@@ -32,7 +32,7 @@ obj/
 .idea/
 
 # Ignore import tool folder
-ImportVocabularyPBL3/
+database/ImportVocabularyPBL3/
 
 # Ignore SQL dump
-init.sql
+database/init.sql
