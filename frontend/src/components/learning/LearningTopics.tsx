@@ -1,16 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "../ui";
+import { useAppContext } from "../../context/AppContext";
+import { PATHS } from "../../routes/paths";
+import { vocabularyApi } from "../../services/vocabularyApi";
+import { mapLearningVocabularyToUiModel } from "../../utils/vocabularyMapper";
 
-const LearningTopics = ({
-  onStartStudy,
-  currentUser,
-  gameData,
-  topicGroups,
-}: any) => {
+const LearningTopics = () => {
   const navigate = useNavigate();
+  const { currentUser, gameData, learningTopicGroups: topicGroups, addToast } = useAppContext();
+
+  const onStartStudy = useCallback(async (topicId: number, mode?: string) => {
+    try {
+      const items = await vocabularyApi.getLearningByTopic(topicId);
+      if (!items || items.length === 0) {
+        addToast('Chủ đề này chưa có từ vựng.', 'info');
+        return;
+      }
+      navigate(PATHS.learningStudy, {
+        state: { topicId, words: items.map(mapLearningVocabularyToUiModel), mode: mode ?? null },
+      });
+    } catch {
+      addToast('Không tải được dữ liệu học cho chủ đề này.', 'info');
+    }
+  }, [navigate, addToast]);
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
   const [hasInitializedAccordion, setHasInitializedAccordion] = useState(false);
   const isGuest = !currentUser;
@@ -22,11 +37,7 @@ const LearningTopics = ({
     }
   }, [expandedCat, hasInitializedAccordion, topicGroups]);
 
-  const streakDays = Number.isFinite(gameData?.streak)
-    ? gameData.streak
-    : Number.isFinite(currentUser?.streak)
-      ? currentUser.streak
-      : 0;
+  const streakDays = Number.isFinite(gameData?.streak) ? gameData.streak : 0;
 
   const totalReviewCount = isGuest ? 0 : topicGroups.reduce(
     (sum: number, cat: any) => sum + cat.topics.reduce((s: number, t: any) => s + (t.stats?.review || 0), 0), 0

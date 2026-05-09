@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using VocabLearning.Services;
 using VocabLearning.ViewModels.Account;
 
@@ -30,6 +31,7 @@ namespace VocabLearning.Controllers
 
         [HttpPost("/api/auth/forgot-password")]
         [AllowAnonymous]
+        [EnableRateLimiting("forgot-password")]
         public async Task<ActionResult<AuthApiResponse>> ForgotPasswordApi(
             [FromBody] ForgotPasswordApiRequest? request,
             CancellationToken cancellationToken)
@@ -252,7 +254,7 @@ namespace VocabLearning.Controllers
             {
                 var encodedEmail = Uri.EscapeDataString(email);
                 var encodedToken = Uri.EscapeDataString(token);
-                return $"{frontendOrigin.TrimEnd('/')}/?mode=reset&email={encodedEmail}&token={encodedToken}";
+                return $"{frontendOrigin.TrimEnd('/')}/login?mode=reset&email={encodedEmail}&token={encodedToken}";
             }
 
             var resetPath = Url.Action(

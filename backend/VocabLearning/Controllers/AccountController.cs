@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using VocabLearning.Constants;
 using VocabLearning.Data;
@@ -93,6 +94,7 @@ namespace VocabLearning.Controllers
 
         [HttpPost("/api/auth/login")]
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthApiResponse>> LoginApi(
             [FromBody] LoginApiRequest? request,
             CancellationToken cancellationToken)
@@ -225,6 +227,7 @@ namespace VocabLearning.Controllers
 
         [HttpPost("/api/auth/register")]
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthApiResponse>> RegisterApi(
             [FromBody] RegisterApiRequest? request,
             CancellationToken cancellationToken)

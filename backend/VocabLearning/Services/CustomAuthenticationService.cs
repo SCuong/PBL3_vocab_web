@@ -19,6 +19,8 @@ namespace VocabLearning.Services
         private const int KeySize = 32;
         private const int Iterations = 120_000;
         private const int PasswordResetTokenSize = 32;
+        private const int PasswordMinLength = 6;
+        private const int PasswordMaxLength = 128;
         private static readonly TimeSpan PasswordResetTokenLifetime = TimeSpan.FromMinutes(30);
         private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
         private static readonly PasswordHasher<Users> LegacyPasswordHasher = new();
@@ -38,6 +40,9 @@ namespace VocabLearning.Services
         {
             var cleanUsername = username.Trim();
             var cleanEmail = email.Trim();
+
+            if (password.Length < PasswordMinLength || password.Length > PasswordMaxLength)
+                return (false, $"Password must be between {PasswordMinLength} and {PasswordMaxLength} characters.", null);
 
             var usernameExists = await dbContext.Users
                 .AnyAsync(user => user.Username == cleanUsername, cancellationToken);
@@ -59,7 +64,7 @@ namespace VocabLearning.Services
             var user = new Users
             {
                 Username = cleanUsername,
-                Email = cleanEmail,
+                Email = normalizedEmail,
                 PasswordHash = HashPassword(password),
                 Role = UserRoles.Learner,
                 Status = UserStatuses.Active,
@@ -188,6 +193,9 @@ namespace VocabLearning.Services
                 return (false, "Current password is incorrect.");
             }
 
+            if (newPassword.Length < PasswordMinLength || newPassword.Length > PasswordMaxLength)
+                return (false, $"Password must be between {PasswordMinLength} and {PasswordMaxLength} characters.");
+
             user.PasswordHash = HashPassword(newPassword);
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -293,6 +301,9 @@ namespace VocabLearning.Services
                 return (false, "The reset token is invalid or has expired.");
             }
 
+            if (newPassword.Length < PasswordMinLength || newPassword.Length > PasswordMaxLength)
+                return (false, $"Password must be between {PasswordMinLength} and {PasswordMaxLength} characters.");
+
             user.PasswordHash = HashPassword(newPassword);
 
             resetToken.UsedAt = now;
@@ -364,7 +375,7 @@ namespace VocabLearning.Services
             }
 
             user.Username = cleanUsername;
-            user.Email = cleanEmail;
+            user.Email = normalizedEmail;
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return (true, null, user);
@@ -465,6 +476,9 @@ namespace VocabLearning.Services
                 return (false, "Password is required.", null);
             }
 
+            if (password.Length < PasswordMinLength || password.Length > PasswordMaxLength)
+                return (false, $"Password must be between {PasswordMinLength} and {PasswordMaxLength} characters.", null);
+
             var usernameExists = await dbContext.Users
                 .AnyAsync(user => user.Username == cleanUsername, cancellationToken);
 
@@ -485,7 +499,7 @@ namespace VocabLearning.Services
             var user = new Users
             {
                 Username = cleanUsername,
-                Email = cleanEmail,
+                Email = normalizedEmail,
                 PasswordHash = HashPassword(password),
                 Role = normalizedRole,
                 Status = normalizedStatus,
@@ -691,10 +705,8 @@ namespace VocabLearning.Services
             return new ClaimsPrincipal(identity);
         }
 
-        private static string NormalizeEmail(string email)
-        {
-            return email.Trim();
-        }
+        private static string NormalizeEmail(string email) =>
+            email.Trim().ToLowerInvariant();
 
         private async Task<string> GenerateUniqueUsernameAsync(
             string? displayName,

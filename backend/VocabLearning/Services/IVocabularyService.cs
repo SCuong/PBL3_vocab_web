@@ -41,5 +41,7 @@ namespace VocabLearning.Services
         bool DeleteExample(long id);
 
         bool DeleteVocabulary(long id);
+
+        List<Example> GetExamplesForVocabIds(IReadOnlyList<long> vocabIds);
     }
 }

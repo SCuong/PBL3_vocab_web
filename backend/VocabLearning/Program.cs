@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using System.Threading.RateLimiting;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
@@ -42,7 +45,6 @@ var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localho
 builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<CustomAuthenticationService>();
 builder.Services.AddScoped<AdminDataService>();
-builder.Services.AddScoped<AdminExerciseService>();
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<LearningFlowService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
@@ -130,6 +132,48 @@ builder.Services.AddControllersWithViews();
 
 // Authorization
 builder.Services.AddAuthorization();
+
+// Forwarded headers — trust Nginx in Docker (172.16.0.0/12) and loopback (dev)
+// ForwardLimit = 1: single Nginx hop — prevents X-Forwarded-For prefix spoofing
+// KnownIPNetworks replaces KnownNetworks (.NET 10); System.Net.IPNetwork avoids ambiguity with legacy type
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12)); // Docker bridge
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));    // cloud VPC / overlay
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("127.0.0.0"), 8));   // loopback (dev)
+    options.ForwardLimit = 1;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+            }));
+
+    options.AddPolicy("forgot-password", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(5),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+            }));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendClient", policy =>
@@ -192,11 +236,14 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
         throw;
     }
 }
+// Must be first: rewrites RemoteIpAddress from X-Forwarded-For before rate limiter and auth read it.
+// HTTPS is terminated at Nginx — UseHttpsRedirection is intentionally disabled.
+app.UseForwardedHeaders();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -232,6 +279,7 @@ else
 
 app.UseRouting();
 app.UseCors("FrontendClient");
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

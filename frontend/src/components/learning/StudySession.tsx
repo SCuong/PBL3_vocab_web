@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "../ui";
@@ -13,6 +13,8 @@ import { playPronunciationAudio } from "../../utils/audio";
 import { mockData } from "../../mocks/mockData";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
+import { useAppContext } from "../../context/AppContext";
+import { PATHS } from "../../routes/paths";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const REVIEW_PAGE_SIZE = 10;
@@ -32,20 +34,31 @@ const sortByCefrThenWord = (a: any, b: any) => {
   return (a.word || "").localeCompare(b.word || "");
 };
 
-const StudySession = ({
-  topicId,
-  studyWords,
-  topicGroups,
-  learningProgressState,
-  onFinish,
-  onAddXP,
-  onStreakCheck,
-  onAddToast,
-  onWordsLearned,
-  onRecordStudyHistory,
-}: any) => {
-  const [searchParams] = useSearchParams();
-  const isReviewMode = searchParams.get('mode') === 'review';
+const StudySession = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    learningTopicGroups: topicGroups,
+    learningProgressState,
+    addXP: onAddXP,
+    triggerStreakCheck: onStreakCheck,
+    addToast: onAddToast,
+    handleWordsLearned: onWordsLearned,
+    handleRecordStudyHistory: onRecordStudyHistory,
+  } = useAppContext();
+
+  const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
+  const topicId = locationState?.topicId;
+  const studyWords = locationState?.words;
+  const isReviewMode = locationState?.mode === 'review';
+
+  const onFinish = useCallback((score?: number, total?: number, detail?: any) => {
+    if (score !== undefined && total !== undefined) {
+      navigate(PATHS.learningResult, { state: { score, total, detail } });
+    } else {
+      navigate(PATHS.learning);
+    }
+  }, [navigate]);
 
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
     isReviewMode ? "learn" : "flashcard",
@@ -323,6 +336,8 @@ const StudySession = ({
     setIpaFallbackNotice(false);
     setLearnStep(1);
   };
+
+  if (!topicId || !studyWords) return <Navigate to={PATHS.learning} replace />;
 
   if (words.length === 0)
     return (
