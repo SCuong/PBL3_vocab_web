@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Layers, Brain, Activity, ChevronRight, Play, Volume2 } from 'lucide-react';
+import { PATHS } from '../routes/paths';
 
 /* ── Chibi Mascot (SVG) ─────────────────────────────────────────────── */
 const ChibiMascot = () => (
@@ -125,7 +127,8 @@ function useFadeIn() {
 }
 
 /* ── Main Home Component ────────────────────────────────────────────── */
-const Home = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
+const Home = () => {
+    const navigate = useNavigate();
     const fadeRef = useFadeIn();
 
     return (
@@ -158,14 +161,14 @@ const Home = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 
                         <div className="flex items-center gap-4 flex-wrap">
                             <button
-                                onClick={() => onNavigate('learning-topics')}
+                                onClick={() => navigate(PATHS.learning)}
                                 className="btn-primary !px-8 !py-4 !text-sm !font-bold"
                             >
                                 Bắt đầu học ngay
                                 <ChevronRight size={16} />
                             </button>
                             <button
-                                onClick={() => onNavigate('vocabulary')}
+                                onClick={() => navigate(PATHS.vocabulary)}
                                 className="btn-secondary !px-5 !py-3 !text-sm !font-semibold inline-flex items-center gap-3"
                             >
                                 <span className="w-7 h-7 bg-primary-light rounded-full flex items-center justify-center text-primary flex-shrink-0">
@@ -223,7 +226,7 @@ const Home = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                         {topics.map((topic, i) => (
                             <button
                                 key={i}
-                                onClick={() => onNavigate('vocabulary')}
+                                onClick={() => navigate(PATHS.vocabulary)}
                                 className="home-fade-in home-topic-card group text-left"
                                 style={{ transitionDelay: `${i * 60}ms`, '--tc': topic.tc, '--tl': topic.tl } as React.CSSProperties}
                                 onMouseEnter={e => {
@@ -243,7 +246,7 @@ const Home = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                             </button>
                         ))}
                         <button
-                            onClick={() => onNavigate('vocabulary')}
+                            onClick={() => navigate(PATHS.vocabulary)}
                             className="home-fade-in home-topic-card text-left"
                             style={{ transitionDelay: `${topics.length * 60}ms`, borderStyle: 'dashed' }}
                         >
@@ -302,14 +305,14 @@ const Home = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     </p>
                     <div className="flex justify-center items-center gap-4 flex-wrap">
                         <button
-                            onClick={() => onNavigate('register')}
+                            onClick={() => navigate(PATHS.register)}
                             className="inline-flex items-center font-display font-bold text-base text-primary bg-white rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:brightness-[0.97] hover:-translate-y-0.5 transition-all"
                             style={{ padding: '1rem 2.5rem' }}
                         >
                             Tạo tài khoản miễn phí
                         </button>
                         <button
-                            onClick={() => onNavigate('vocabulary')}
+                            onClick={() => navigate(PATHS.vocabulary)}
                             className="inline-flex items-center font-display font-bold text-sm text-white border-2 border-white/50 rounded-full hover:border-white hover:bg-white/15 transition-all"
                             style={{ padding: '1rem 2rem' }}
                         >

@@ -13,6 +13,7 @@ export const mapVocabularyToUiModel = (item: VocabularyListItem | VocabularyDeta
     topicId: item.topicId,
     topicName: item.topicName,
     example: 'examples' in item ? (item.examples[0]?.exampleEn || '') : '',
+    translation: 'examples' in item ? (item.examples[0]?.exampleVi || '') : '',
     exampleAudioUrl: 'examples' in item ? (item.examples[0]?.audioUrl?.trim() || '') : '',
     audioUrl: item.audioUrl?.trim() || ''
 });
@@ -26,6 +27,7 @@ export const mapLearningVocabularyToUiModel = (item: VocabularyLearningItem) => 
     topicId: item.topicId,
     topicName: item.topicName,
     example: item.example || '',
+    translation: item.exampleVi || '',
     exampleAudioUrl: item.exampleAudioUrl?.trim() || '',
     audioUrl: item.audioUrl?.trim() || ''
 });

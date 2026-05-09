@@ -48,13 +48,16 @@ export const useAppBootstrap = ({ addToast, syncUserGameData }: UseAppBootstrapP
         setStudyTopicId(topicId);
         try {
             const items = await vocabularyApi.getLearningByTopic(topicId);
+            if (!items || items.length === 0) {
+                addToast('Chủ đề này chưa có từ vựng.', 'info');
+                return;
+            }
             setStudyWords(items.map(mapLearningVocabularyToUiModel));
+            setCurrentPage('study-session');
         } catch {
             setStudyWords([]);
             addToast('Không tải được dữ liệu học cho chủ đề này.', 'info');
         }
-
-        setCurrentPage('study-session');
     }, [addToast]);
 
     const handleSelectWord = useCallback(async (word: any) => {
