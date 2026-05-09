@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Models;
 
@@ -228,6 +229,7 @@ namespace VocabLearning.Services
             {
                 _context.Vocabularies.Add(vocabulary);
                 _context.SaveChanges();
+                ProvisionStandardExercises(vocabulary.VocabId, vocabulary.Ipa);
                 return (true, null);
             }
             catch (DbUpdateException)
@@ -284,6 +286,19 @@ namespace VocabLearning.Services
             }
         }
 
+        public List<Example> GetExamplesForVocabIds(IReadOnlyList<long> vocabIds)
+        {
+            if (vocabIds.Count == 0)
+                return new List<Example>();
+
+            return _context.Examples
+                .AsNoTracking()
+                .Where(e => vocabIds.Contains(e.VocabId))
+                .OrderBy(e => e.VocabId)
+                .ThenBy(e => e.ExampleId)
+                .ToList();
+        }
+
         public Example? GetExampleById(long id)
         {
             return _context.Examples.FirstOrDefault(example => example.ExampleId == id);
@@ -300,6 +315,7 @@ namespace VocabLearning.Services
 
             _context.Examples.Add(example);
             _context.SaveChanges();
+            ProvisionFillingExerciseIfApplicable(example.VocabId, example.ExampleEn);
             return true;
         }
 
@@ -378,6 +394,63 @@ namespace VocabLearning.Services
             {
                 return false;
             }
+        }
+
+        private void ProvisionStandardExercises(long vocabId, string? ipa)
+        {
+            var existing = _context.Exercises
+                .Where(e => e.VocabId == vocabId)
+                .Select(e => new { e.Type, e.MatchMode })
+                .ToList();
+
+            bool Has(string type, string? mode) =>
+                existing.Any(e =>
+                    string.Equals(e.Type, type, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(e.MatchMode ?? string.Empty, mode ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+
+            var toAdd = new List<Exercise>();
+            var now = DateTime.Now;
+
+            if (!Has(ExerciseTypes.MatchMeaning, ExerciseMatchModes.MatchMeaning))
+                toAdd.Add(new Exercise { VocabId = vocabId, Type = ExerciseTypes.MatchMeaning, MatchMode = ExerciseMatchModes.MatchMeaning, CreatedAt = now });
+
+            if (!string.IsNullOrWhiteSpace(ipa) && !Has(ExerciseTypes.MatchMeaning, ExerciseMatchModes.MatchIpa))
+                toAdd.Add(new Exercise { VocabId = vocabId, Type = ExerciseTypes.MatchMeaning, MatchMode = ExerciseMatchModes.MatchIpa, CreatedAt = now });
+
+            if (toAdd.Count == 0) return;
+
+            _context.Exercises.AddRange(toAdd);
+            try { _context.SaveChanges(); }
+            catch (DbUpdateException) { }
+        }
+
+        private void ProvisionFillingExerciseIfApplicable(long vocabId, string? exampleEn)
+        {
+            if (string.IsNullOrWhiteSpace(exampleEn)) return;
+
+            var word = _context.Vocabularies
+                .Where(v => v.VocabId == vocabId)
+                .Select(v => v.Word)
+                .FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(word)) return;
+            if (!exampleEn.Contains(word, StringComparison.OrdinalIgnoreCase)) return;
+
+            var alreadyExists = _context.Exercises.Any(e =>
+                e.VocabId == vocabId &&
+                string.Equals(e.Type, ExerciseTypes.Filling, StringComparison.OrdinalIgnoreCase));
+
+            if (alreadyExists) return;
+
+            _context.Exercises.Add(new Exercise
+            {
+                VocabId = vocabId,
+                Type = ExerciseTypes.Filling,
+                MatchMode = null,
+                CreatedAt = DateTime.Now
+            });
+            try { _context.SaveChanges(); }
+            catch (DbUpdateException) { }
         }
 
         private static string NormalizeAudioUrl(string? value)

@@ -1,4 +1,7 @@
-const Leaderboard = ({ gameData }: any) => {
+import { useAppContext } from '../context/AppContext';
+
+const Leaderboard = () => {
+    const { fullGameData: gameData } = useAppContext();
     const leaderboard = gameData?.leaderboard || [];
     const top3 = leaderboard.slice(0, 3);
 

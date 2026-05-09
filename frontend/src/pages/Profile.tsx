@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { StreakHeatmap } from '../components/learning/streak';
 import { DeleteAccountModal } from '../components/account';
@@ -9,19 +10,31 @@ import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyAp
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
 import { buildStudyDaySummary } from '../utils/studyHistory';
+import { useAppContext } from '../context/AppContext';
+import { PATHS } from '../routes/paths';
 
 const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(value));
 
-type ProfileProps = {
-    user: any;
-    learnedWordIds?: number[];
-    onLogout: () => void;
-    onOpenStreak: () => void;
-    onAddToast?: (message: string, type?: string) => void;
-    onUserUpdated: (user: AuthenticatedUser) => void;
-};
+const Profile = () => {
+    const {
+        currentUser,
+        gameData,
+        learnedWordIds,
+        handleLogout,
+        setShowStreakModal,
+        addToast: onAddToast,
+        handleUserUpdated: onUserUpdated,
+    } = useAppContext();
+    const navigate = useNavigate();
 
-const Profile = ({ user, learnedWordIds, onLogout, onOpenStreak, onAddToast, onUserUpdated }: ProfileProps) => {
+    const user = {
+        ...currentUser!,
+        ...gameData,
+        learnedWords: Array.isArray(learnedWordIds) ? learnedWordIds.length : (gameData?.learnedWords ?? 0),
+    };
+
+    const onLogout = async () => { await handleLogout(); navigate(PATHS.home); };
+    const onOpenStreak = () => setShowStreakModal(true);
     const [isEditing, setIsEditing] = useState(false);
     const [username, setUsername] = useState(user.username || '');
     const [email, setEmail] = useState(user.email || '');

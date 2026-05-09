@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { authApi } from '../services/authApi';
+import { useAppContext } from '../context/AppContext';
+import { PATHS } from '../routes/paths';
 
-type AuthMode = 'login' | 'register';
-
-type AuthProps = {
-    onLogin: (user: any) => void;
-    onAddToast?: (message: string, type?: string) => void;
-    initialMode?: AuthMode;
-};
-
-const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
+const Auth = () => {
+    const { syncUserGameData, addToast } = useAppContext();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialMode = location.pathname === PATHS.register ? 'register' : 'login';
     const [isLogin, setIsLogin] = useState(initialMode !== 'register');
     const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
     const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
@@ -58,8 +58,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
     }, [initialMode]);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const mode = (params.get('mode') || '').toLowerCase();
+        const mode = (searchParams.get('mode') || '').toLowerCase();
 
         if (mode === 'reset') {
             setIsLogin(true);
@@ -67,10 +66,10 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
             setIsForgotPasswordMode(false);
             setIsResetPasswordMode(true);
             resetForgotPasswordState();
-            setForgotEmail(params.get('email') || '');
-            setResetToken(params.get('token') || '');
+            setForgotEmail(searchParams.get('email') || '');
+            setResetToken(searchParams.get('token') || '');
         }
-    }, []);
+    }, [searchParams]);
 
     const goBackToLogin = () => {
         setIsForgotPasswordMode(false);
@@ -84,7 +83,7 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         setConfirmPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
-        window.history.replaceState({}, document.title, window.location.pathname);
+        setSearchParams({}, { replace: true });
     };
 
     const passwordPolicy = {
@@ -107,8 +106,9 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         try {
             if (isLogin) {
                 const user = await authApi.login({ usernameOrEmail, password, rememberMe: true });
-                onLogin(user);
-                onAddToast?.('Đăng nhập thành công!', 'success');
+                syncUserGameData(user);
+                addToast('Đăng nhập thành công!', 'success');
+                navigate(PATHS.home);
             } else {
                 if (!isPasswordValid) {
                     setErrorMessage('Mật khẩu chưa đúng định dạng yêu cầu.');
@@ -119,13 +119,14 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
                     return;
                 }
                 const user = await authApi.register({ name, email, password });
-                onLogin(user);
-                onAddToast?.('Đăng ký thành công!', 'success');
+                syncUserGameData(user);
+                addToast('Đăng ký thành công!', 'success');
+                navigate(PATHS.home);
             }
         } catch (error: any) {
             const message = error?.message || 'Không thể kết nối tới hệ thống xác thực.';
             setErrorMessage(message);
-            onAddToast?.(message, 'info');
+            addToast(message, 'info');
         } finally {
             setIsSubmitting(false);
         }
@@ -158,11 +159,11 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
             setForgotPasswordResetLink(result.resetLink);
             setForgotPasswordUsedFallback(result.usedFallbackLink);
             setSuccessMessage(result.message);
-            onAddToast?.(result.message, result.usedFallbackLink ? 'info' : 'success');
+            addToast(result.message, result.usedFallbackLink ? 'info' : 'success');
         } catch (error: any) {
             const message = error?.message || 'Không thể gửi yêu cầu quên mật khẩu.';
             setErrorMessage(message);
-            onAddToast?.(message, 'info');
+            addToast(message, 'info');
         } finally {
             setIsSubmitting(false);
         }
@@ -178,13 +179,13 @@ const Auth = ({ onLogin, onAddToast, initialMode = 'login' }: AuthProps) => {
         setErrorMessage(''); setSuccessMessage(''); setIsSubmitting(true);
         try {
             const message = await authApi.resetPassword({ email: forgotEmail.trim(), token: resetToken.trim(), newPassword, confirmNewPassword });
-            onAddToast?.(message, 'success');
+            addToast(message, 'success');
             goBackToLogin();
             setSuccessMessage('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.');
         } catch (error: any) {
             const message = error?.message || 'Đặt lại mật khẩu thất bại.';
             setErrorMessage(message);
-            onAddToast?.(message, 'info');
+            addToast(message, 'info');
         } finally {
             setIsSubmitting(false);
         }

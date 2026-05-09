@@ -6,10 +6,22 @@ import { Badge, Button } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { playPronunciationAudio } from '../utils/audio';
 import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
+import { useAppContext } from '../context/AppContext';
 
 const PAGE_SIZE = 24;
 
-const Vocabulary = ({ onSelectWord, onCloseWordDetail, selectedWord, topics }: any) => {
+const Vocabulary = () => {
+    const { topicFilters: topics } = useAppContext();
+    const [selectedWord, setSelectedWord] = useState<any>(null);
+    const onSelectWord = async (word: any) => {
+        try {
+            const detail = await vocabularyApi.getById(word.id);
+            setSelectedWord(mapVocabularyToUiModel(detail));
+        } catch {
+            setSelectedWord(word);
+        }
+    };
+    const onCloseWordDetail = () => setSelectedWord(null);
     const [items, setItems] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');

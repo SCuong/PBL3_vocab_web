@@ -842,7 +842,18 @@ namespace VocabLearning.Services
                         };
 
                         _context.Exercises.Add(exercise);
-                        _context.SaveChanges();
+                        try
+                        {
+                            _context.SaveChanges();
+                        }
+                        catch (DbUpdateException)
+                        {
+                            _context.Entry(exercise).State = EntityState.Detached;
+                            exercise = _context.Exercises.First(item =>
+                                item.VocabId == vocabularyId
+                                && string.Equals(item.Type, submittedExerciseType, StringComparison.OrdinalIgnoreCase)
+                                && string.Equals(item.MatchMode ?? string.Empty, submittedMatchMode ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+                        }
                         existingExercises.Add(exercise);
                     }
 
