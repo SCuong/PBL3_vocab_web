@@ -12,6 +12,8 @@ namespace VocabLearning.Models
 
         public bool IsCorrect { get; set; }
 
+        public int Quality { get; set; }
+
         public DateTime AnsweredAt { get; set; }
     }
 }

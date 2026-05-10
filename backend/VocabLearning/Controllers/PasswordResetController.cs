@@ -6,7 +6,8 @@ using VocabLearning.ViewModels.Account;
 
 namespace VocabLearning.Controllers
 {
-    public class PasswordResetController : Controller
+    [ApiController]
+    public class PasswordResetController : ControllerBase
     {
         private const string GenericForgotPasswordMessage = "Nếu email tồn tại, hệ thống đã gửi liên kết đặt lại mật khẩu.";
         private readonly IConfiguration configuration;
@@ -125,73 +126,6 @@ namespace VocabLearning.Controllers
             });
         }
 
-        [AllowAnonymous]
-        public IActionResult VerifyEmail(string? returnUrl = null)
-        {
-            ViewData["ReturnUrl"] = returnUrl;
-            return View(new VerifyEmailViewModel());
-        }
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> VerifyEmail(VerifyEmailViewModel model, string? returnUrl = null, CancellationToken cancellationToken = default)
-        {
-            ViewData["ReturnUrl"] = returnUrl;
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var deliveryResult = await IssuePasswordResetAsync(model.Email, cancellationToken);
-            if (!deliveryResult.Succeeded)
-            {
-                ModelState.AddModelError(string.Empty, "Email service is temporarily unavailable. Please try again later.");
-                return View(model);
-            }
-
-            TempData["InfoMessage"] = deliveryResult.Message;
-            return RedirectToAction("Login", "Account", new { returnUrl });
-        }
-
-        [AllowAnonymous]
-        public IActionResult ResetPassword(string? email = null, string? token = null)
-        {
-            return View(new ResetPasswordViewModel
-            {
-                Email = email?.Trim() ?? string.Empty,
-                Token = token?.Trim() ?? string.Empty
-            });
-        }
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model, CancellationToken cancellationToken)
-        {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var result = await customAuthenticationService.ResetPasswordWithTokenAsync(
-                model.Email,
-                model.Token,
-                model.NewPassword,
-                HttpContext.Connection.RemoteIpAddress?.ToString(),
-                cancellationToken);
-
-            if (!result.Succeeded)
-            {
-                ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Password reset failed.");
-                return View(model);
-            }
-
-            TempData["InfoMessage"] = "Password reset successfully. Please sign in.";
-            return RedirectToAction("Login", "Account");
-        }
-
         private async Task<PasswordResetDeliveryResult> IssuePasswordResetAsync(string email, CancellationToken cancellationToken)
         {
             var result = await customAuthenticationService.CreatePasswordResetTokenAsync(email, cancellationToken);
@@ -257,21 +191,9 @@ namespace VocabLearning.Controllers
                 return $"{frontendOrigin.TrimEnd('/')}/login?mode=reset&email={encodedEmail}&token={encodedToken}";
             }
 
-            var resetPath = Url.Action(
-                nameof(ResetPassword),
-                "PasswordReset",
-                new { email, token },
-                protocol: Request.Scheme,
-                host: Request.Host.ToString());
-
-            if (!string.IsNullOrWhiteSpace(resetPath))
-            {
-                return resetPath;
-            }
-
             var fallbackEmail = Uri.EscapeDataString(email);
             var fallbackToken = Uri.EscapeDataString(token);
-            return $"{Request.Scheme}://{Request.Host}/PasswordReset/ResetPassword?email={fallbackEmail}&token={fallbackToken}";
+            return $"{Request.Scheme}://{Request.Host}/login?mode=reset&email={fallbackEmail}&token={fallbackToken}";
         }
 
         private bool ShouldExposeResetLinkFallback()

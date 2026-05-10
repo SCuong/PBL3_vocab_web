@@ -5,7 +5,8 @@ using VocabLearning.ViewModels.Vocabulary;
 
 namespace VocabLearning.Controllers
 {
-    public class VocabularyController : Controller
+    [ApiController]
+    public class VocabularyController : ControllerBase
     {
         private readonly VocabularyService _service;
 

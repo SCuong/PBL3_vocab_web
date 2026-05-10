@@ -227,6 +227,7 @@ namespace VocabLearning.Data
                 entity.Property(result => result.ExerciseId).HasColumnName("exercise_id");
                 entity.Property(result => result.UserId).HasColumnName("user_id");
                 entity.Property(result => result.IsCorrect).HasColumnName("is_correct");
+                entity.Property(result => result.Quality).HasColumnName("quality");
                 entity.Property(result => result.AnsweredAt).HasColumnName("answered_at");
 
                 entity.HasOne<Users>()
