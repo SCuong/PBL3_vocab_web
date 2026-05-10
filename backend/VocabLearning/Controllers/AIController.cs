@@ -5,7 +5,7 @@ namespace VocabLearning.Controllers
 {
     [Route("api/AI")]
     [ApiController]
-    public class AIController : Controller
+    public class AIController : ControllerBase
     {
         private readonly IAIService _aiService;
         private readonly ILogger<AIController> _logger;
@@ -37,42 +37,5 @@ namespace VocabLearning.Controllers
             }
         }
 
-        /// <summary>
-        /// Connectivity diagnostic — call GET /api/AI/Test to check if backend can reach Gemini.
-        /// Returns JSON: { reachable, httpStatus, bodyPreview } or { reachable=false, errorType, message }.
-        /// </summary>
-        [HttpGet("Test")]
-        public async Task<IActionResult> Test()
-        {
-            const string testUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=test_key_connectivity_check";
-            _logger.LogInformation("Gemini connectivity test starting. URL={Url}", testUrl);
-
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            try
-            {
-                var response = await client.GetAsync(testUrl);
-                var body = await response.Content.ReadAsStringAsync();
-                var preview = body.Length > 300 ? body[..300] + "..." : body;
-                _logger.LogInformation("Gemini connectivity test OK. Status={Status}", response.StatusCode);
-                return Ok(new
-                {
-                    reachable = true,
-                    httpStatus = (int)response.StatusCode,
-                    bodyPreview = preview
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Gemini connectivity test FAILED. Type={Type}, Message={Msg}",
-                    ex.GetType().Name, ex.Message);
-                return Ok(new
-                {
-                    reachable = false,
-                    errorType = ex.GetType().Name,
-                    message = ex.Message,
-                    innerMessage = ex.InnerException?.Message
-                });
-            }
-        }
     }
 }

@@ -28,7 +28,7 @@ namespace VocabLearning.Tests.Helpers
             var context = Create(databaseName);
 
             context.Users.AddRange(
-                new User
+                new Users
                 {
                     UserId = 1,
                     Username = "admin",
@@ -38,7 +38,7 @@ namespace VocabLearning.Tests.Helpers
                     Status = UserStatuses.Active,
                     CreatedAt = DateTime.Now
                 },
-                new User
+                new Users
                 {
                     UserId = 2,
                     Username = "learner1",
@@ -48,7 +48,7 @@ namespace VocabLearning.Tests.Helpers
                     Status = UserStatuses.Active,
                     CreatedAt = DateTime.Now
                 },
-                new User
+                new Users
                 {
                     UserId = 3,
                     Username = "inactive_user",

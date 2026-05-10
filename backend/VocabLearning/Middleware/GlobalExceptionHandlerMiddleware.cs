@@ -58,7 +58,17 @@ namespace VocabLearning.Middleware
             }
             else
             {
-                context.Response.Redirect("/Home/Error");
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    error = "An unexpected error occurred.",
+                    status = 500
+                };
+
+                var json = JsonSerializer.Serialize(response);
+                await context.Response.WriteAsync(json);
             }
         }
     }

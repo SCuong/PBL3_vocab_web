@@ -20,7 +20,6 @@
   <ItemGroup>
     <Folder Include="Migrations\" />
     <Folder Include="ViewModels\Meaning\" />
-    <Folder Include="Views\Meaning\" />
   </ItemGroup>
 
   <ItemGroup>

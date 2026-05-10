@@ -3,9 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Moq;
 using VocabLearning.Constants;
 using VocabLearning.Controllers;
@@ -27,17 +25,7 @@ namespace VocabLearning.Tests.Controllers
             _context = TestDbContextFactory.Create();
             _authService = new CustomAuthenticationService(_context);
 
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Authentication:Google:ClientId"] = "",
-                    ["Authentication:Google:ClientSecret"] = ""
-                })
-                .Build();
-
-            var logger = Mock.Of<ILogger<AccountController>>();
-
-            _controller = new AccountController(configuration, _authService, _context, logger);
+            _controller = new AccountController(_authService, _context);
 
             // Set up HttpContext with a mock IAuthenticationService so SignInAsync works
             var authServiceMock = new Mock<IAuthenticationService>();

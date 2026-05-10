@@ -46,7 +46,6 @@ builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<CustomAuthenticationService>();
 builder.Services.AddScoped<AdminDataService>();
 builder.Services.AddScoped<LearningService>();
-builder.Services.AddScoped<LearningFlowService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
 builder.Services.AddHttpClient<IAIService, GeminiService>(client =>
 {
@@ -62,9 +61,9 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
     })
     .AddCookie(AuthenticationSchemeNames.Application, options =>
     {
-        options.LoginPath = "/Account/Login";
-        options.LogoutPath = "/Account/Logout";
-        options.AccessDeniedPath = "/Account/Login";
+        options.LoginPath = "/login";
+        options.LogoutPath = "/login";
+        options.AccessDeniedPath = "/login";
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromDays(14);
         options.Cookie.HttpOnly = true;
@@ -127,8 +126,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     });
 }
 
-// MVC
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllers();
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -240,10 +238,11 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 // HTTPS is terminated at Nginx — UseHttpsRedirection is intentionally disabled.
 app.UseForwardedHeaders();
 
+app.UseMiddleware<VocabLearning.Middleware.GlobalExceptionHandlerMiddleware>();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 
@@ -285,10 +284,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
+app.MapControllers();
 
 app.Run();
