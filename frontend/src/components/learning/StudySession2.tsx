@@ -6,21 +6,18 @@ import React, {
   useRef,
 } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "../ui";
 import { playPronunciationAudio } from "../../utils/audio";
 import { mockData } from "../../mocks/mockData";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
-import { SM2ReviewButtons } from "./SM2ReviewButtons";
 import { useAppContext } from "../../context/AppContext";
-import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
 import { PATHS } from "../../routes/paths";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const REVIEW_PAGE_SIZE = 10;
-
 
 const getCefrRank = (cefr?: string) => {
   const normalized = (cefr || "").toUpperCase();
@@ -51,25 +48,9 @@ const StudySession = () => {
   } = useAppContext();
 
   const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
-
-  // Restore from sessionStorage when page is refreshed (F5) and locationState is lost
-  const [savedSession] = useState<{
-    topicId: number; words: any[]; mode: string | null;
-    tab: string; learnStep: number; selectedWordIds: number[]; currentIndex: number; ts: number;
-  } | null>(() => {
-    if (locationState?.topicId) return null;
-    try {
-      const raw = sessionStorage.getItem('ss_study_v1');
-      if (!raw) return null;
-      const s = JSON.parse(raw);
-      if (Date.now() - s.ts > 7_200_000) { sessionStorage.removeItem('ss_study_v1'); return null; }
-      return s;
-    } catch { return null; }
-  });
-
-  const topicId = locationState?.topicId ?? savedSession?.topicId;
-  const studyWords = locationState?.words ?? savedSession?.words;
-  const isReviewMode = (locationState?.mode ?? savedSession?.mode ?? null) === 'review';
+  const topicId = locationState?.topicId;
+  const studyWords = locationState?.words;
+  const isReviewMode = locationState?.mode === 'review';
 
   const onFinish = useCallback((score?: number, total?: number, detail?: any) => {
     if (score !== undefined && total !== undefined) {
@@ -80,26 +61,24 @@ const StudySession = () => {
   }, [navigate]);
 
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
-    (savedSession?.tab as "flashcard" | "learn" | "minitest" | undefined) ?? (isReviewMode ? "learn" : "flashcard"),
+    isReviewMode ? "learn" : "flashcard",
   );
-  const [learnStep, setLearnStep] = useState<1 | 2 | 3>((savedSession?.learnStep as 1 | 2 | 3 | undefined) ?? 1);
+  const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
   const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
   const [customTab, setCustomTab] = useState<"new" | "review">("new");
-  const [selectedWordIds, setSelectedWordIds] = useState<number[]>(savedSession?.selectedWordIds ?? []);
+  const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
   const [reviewPage, setReviewPage] = useState(0);
   const [smartPage, setSmartPage] = useState(0);
   const [customNewPage, setCustomNewPage] = useState(0);
   const [customReviewPage, setCustomReviewPage] = useState(0);
-  const hasAutoSelectedReview = useRef(Boolean(savedSession?.selectedWordIds?.length));
+  const hasAutoSelectedReview = useRef(false);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
   const [ipaFallbackNotice, setIpaFallbackNotice] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(savedSession?.currentIndex ?? 0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flashcardSearch, setFlashcardSearch] = useState('');
   const [showWordList, setShowWordList] = useState(false);
   const [recentIndices, setRecentIndices] = useState<number[]>([]);
-  const [reviewOptionsMap, setReviewOptionsMap] = useState<Record<number, ReviewOptionItem[]>>({});
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const words = useMemo(
     () =>
@@ -235,81 +214,34 @@ const StudySession = () => {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (tab === "flashcard") {
+      if (tab === "flashcard" || (tab === "learn" && learnStep === 2)) {
         if (e.code === "Space") {
           e.preventDefault();
           setIsFlipped((f) => !f);
-        } else if (e.code === "ArrowLeft") {
-          setCurrentIndex((i) => Math.max(0, i - 1));
-          setIsFlipped(false);
-        } else if (e.code === "ArrowRight") {
-          setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
+        }
+        if (e.code === "ArrowRight") {
+          setCurrentIndex((prev) => {
+            const max =
+              (tab === "flashcard" ? words : selectedWords).length - 1;
+            return prev < max ? prev + 1 : prev;
+          });
           setIsFlipped(false);
         }
-      } else if (tab === "learn" && learnStep === 2) {
-        if (e.code === "Space") {
-          e.preventDefault();
-          setIsFlipped((f) => !f);
+        if (e.code === "ArrowLeft") {
+          setCurrentIndex((prev) => Math.max(0, prev - 1));
+          setIsFlipped(false);
         }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [tab, learnStep, words.length]);
+  }, [tab, learnStep, words.length, selectedWords.length]);
 
   useEffect(() => {
     if (tab !== 'flashcard') return;
     setRecentIndices(prev => [currentIndex, ...prev.filter(i => i !== currentIndex)].slice(0, 6));
   }, [currentIndex, tab]);
 
-  // Persist session state so F5 refresh can resume from current position
-  const sessionMode = locationState?.mode ?? savedSession?.mode ?? null;
-  useEffect(() => {
-    if (!topicId || !studyWords || studyWords.length === 0 || tab !== 'learn' || learnStep < 2) return;
-    try {
-      sessionStorage.setItem('ss_study_v1', JSON.stringify({
-        topicId, words: studyWords, mode: sessionMode,
-        tab, learnStep, selectedWordIds, currentIndex, ts: Date.now(),
-      }));
-    } catch {}
-  }, [topicId, studyWords, sessionMode, tab, learnStep, selectedWordIds, currentIndex]);
-
-  useEffect(() => {
-    if (tab === 'learn' && learnStep === 2 && selectedWords.length > 0) {
-      learningProgressApi.getBatchReviewOptions(selectedWords.map((w: any) => w.id))
-        .then(map => setReviewOptionsMap(map))
-        .catch(() => {});
-    }
-  }, [tab, learnStep, selectedWords]);
-
-  const handleReviewQuality = useCallback(async (
-    quality: number,
-    wordId: number,
-    wordList: any[],
-    index: number,
-    onLast: () => void,
-  ) => {
-    if (reviewSubmitting || !topicId) return;
-    setReviewSubmitting(true);
-    try {
-      await learningProgressApi.submitSingleReview(wordId, topicId, quality);
-      onAddToast("Đã lưu tiến trình học tập", "success");
-      // Refresh options map so next words reflect updated SM-2 state
-      learningProgressApi.getBatchReviewOptions(wordList.map((w: any) => w.id))
-        .then(map => setReviewOptionsMap(map))
-        .catch(() => {});
-      if (index < wordList.length - 1) {
-        setCurrentIndex(index + 1);
-        setIsFlipped(false);
-      } else {
-        onLast();
-      }
-    } catch {
-      onAddToast("Không thể lưu tiến trình. Vui lòng thử lại.", "error");
-    } finally {
-      setReviewSubmitting(false);
-    }
-  }, [reviewSubmitting, topicId, onAddToast]);
 
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
@@ -376,7 +308,6 @@ const StudySession = () => {
     total: number,
     time: number,
   ) => {
-    sessionStorage.removeItem('ss_study_v1');
     const gainedXp = correct * 5;
 
     if (topicId && selectedWordIds.length > 0) {
@@ -398,7 +329,7 @@ const StudySession = () => {
     onAddXP(gainedXp);
     onStreakCheck();
     onAddToast(
-      `Hoàn thành! +${gainedXp} XP 🎉`,
+      `Hoàn thành Matching trong ${time}s! +${gainedXp} XP`,
       "success",
     );
     setMatchType(null);
@@ -499,14 +430,17 @@ const StudySession = () => {
           >
             <div className="w-full">
 
-              {/* ── Flashcard carousel ────────────────────────────── */}
+              {/* ── Flashcard carousel with side arrows ───────────── */}
               <div className="flex items-center justify-center gap-6 mb-8 max-w-4xl mx-auto">
-                {/* Left arrow */}
+                {/* LEFT ARROW */}
                 <button
                   type="button"
+                  onClick={() => {
+                    setCurrentIndex((p) => Math.max(0, p - 1));
+                    setIsFlipped(false);
+                  }}
                   disabled={currentIndex === 0}
-                  onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-white/60 backdrop-blur-sm hover:bg-white hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full border-2 border-primary/20 text-primary hover:bg-primary/5 transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ArrowLeft size={24} />
                 </button>
@@ -611,12 +545,15 @@ const StudySession = () => {
                 </div>
                 </div>
 
-                {/* Right arrow */}
+                {/* RIGHT ARROW */}
                 <button
                   type="button"
+                  onClick={() => {
+                    setCurrentIndex((p) => Math.min(words.length - 1, p + 1));
+                    setIsFlipped(false);
+                  }}
                   disabled={currentIndex === words.length - 1}
-                  onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-white/60 backdrop-blur-sm hover:bg-white hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full border-2 border-primary/20 text-primary hover:bg-primary/5 transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ArrowRight size={24} />
                 </button>
@@ -1232,28 +1169,43 @@ const StudySession = () => {
                     </div>
                   </motion.div>
                 </div>
-                <div className="flex justify-center mb-4">
-                  <span className="font-bold text-sm text-text-muted bg-primary/10 px-4 py-1 rounded-full">
+                <div className="flex items-center justify-between mb-8">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setCurrentIndex((p) => Math.max(0, p - 1));
+                      setIsFlipped(false);
+                    }}
+                    disabled={currentIndex === 0}
+                  >
+                    ← Trước
+                  </Button>
+                  <span className="font-bold">
                     {currentIndex + 1} / {selectedWords.length}
                   </span>
-                </div>
-                <SM2ReviewButtons
-                  options={reviewOptionsMap[selectedWords[currentIndex]?.id] ?? []}
-                  onSelect={(quality) =>
-                    handleReviewQuality(
-                      quality,
-                      selectedWords[currentIndex].id,
-                      selectedWords,
-                      currentIndex,
-                      () => {
+                  {currentIndex < selectedWords.length - 1 ? (
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setCurrentIndex((p) => p + 1);
+                        setIsFlipped(false);
+                      }}
+                    >
+                      Tiếp theo →
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="accent"
+                      onClick={() => {
                         setLearnStep(3);
                         setMatchType(null);
                         setIpaFallbackNotice(false);
-                      },
-                    )
-                  }
-                  isSubmitting={reviewSubmitting}
-                />
+                      }}
+                    >
+                      Vào luyện tập →
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
