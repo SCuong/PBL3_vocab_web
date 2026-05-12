@@ -22,6 +22,7 @@ namespace VocabLearning.Data
         public DbSet<LearningLog> LearningLogs { get; set; }
         public DbSet<Meaning> Meanings { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<StickyNote> StickyNotes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -317,6 +318,48 @@ namespace VocabLearning.Data
                 entity.HasIndex(item => item.TokenHash);
                 entity.HasIndex(item => new { item.UserId, item.CreatedAt });
                 entity.HasIndex(item => item.ExpiresAt);
+            });
+
+            modelBuilder.Entity<StickyNote>(entity =>
+            {
+                entity.ToTable("sticky_note");
+                entity.HasKey(note => note.StickyNoteId);
+
+                entity.Property(note => note.StickyNoteId)
+                    .HasColumnName("sticky_note_id")
+                    .UseIdentityColumn();
+
+                entity.Property(note => note.UserId)
+                    .HasColumnName("user_id");
+
+                entity.Property(note => note.Content)
+                    .HasColumnName("content")
+                    .HasMaxLength(1000)
+                    .HasDefaultValue(string.Empty);
+
+                entity.Property(note => note.Color)
+                    .HasColumnName("color")
+                    .HasMaxLength(32)
+                    .HasDefaultValue("yellow");
+
+                entity.Property(note => note.IsPinned)
+                    .HasColumnName("is_pinned")
+                    .HasDefaultValue(false);
+
+                entity.Property(note => note.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.Property(note => note.UpdatedAt)
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.HasOne<Users>()
+                    .WithMany()
+                    .HasForeignKey(note => note.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(note => new { note.UserId, note.IsPinned, note.UpdatedAt });
             });
         }
     }
