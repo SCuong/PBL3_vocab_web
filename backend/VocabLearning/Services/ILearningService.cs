@@ -10,7 +10,7 @@ namespace VocabLearning.Services
 
         LearningProgressStateViewModel MarkWordsReviewed(long userId, long topicId, IReadOnlyCollection<long> wordIds);
 
-        List<ReviewOptionsViewModel> GetBatchReviewOptions(long userId, IReadOnlyCollection<long> vocabIds);
+        List<ReviewOptionsViewModel> GetBatchReviewOptions(long userId, IReadOnlyCollection<long> vocabIds, IReadOnlyCollection<long> repeatedVocabIds);
 
         LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality);
     }

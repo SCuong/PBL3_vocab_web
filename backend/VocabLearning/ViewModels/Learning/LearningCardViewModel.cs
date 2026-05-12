@@ -19,6 +19,7 @@ namespace VocabLearning.ViewModels.Learning
     public class BatchReviewOptionsRequest
     {
         public List<long> VocabIds { get; set; } = new();
+        public List<long> RepeatedVocabIds { get; set; } = new();
     }
 
     public class SingleWordReviewRequest

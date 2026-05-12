@@ -17,19 +17,13 @@ const BUTTON_CONFIG = [
     {
         quality: 3,
         emoji: '🤔',
-        label: 'Hơi nhớ',
+        label: 'Chưa chắc',
         classes: 'border-orange-200 hover:bg-orange-50 hover:border-orange-300 focus:ring-orange-200',
-    },
-    {
-        quality: 4,
-        emoji: '😊',
-        label: 'Nhớ tốt',
-        classes: 'border-blue-200 hover:bg-blue-50 hover:border-blue-300 focus:ring-blue-200',
     },
     {
         quality: 5,
         emoji: '🔥',
-        label: 'Thuộc luôn',
+        label: 'Nhớ rõ',
         classes: 'border-green-200 hover:bg-green-50 hover:border-green-300 focus:ring-green-200',
     },
 ] as const;
@@ -48,7 +42,7 @@ const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({ options, onSelect, 
             <p className="text-center text-sm font-semibold text-text-muted mb-3 tracking-wide uppercase">
                 Bạn nhớ từ này ở mức nào?
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
                 {BUTTON_CONFIG.map(({ quality, emoji, label, classes }) => {
                     const option = getOption(quality);
                     const subLabel = option ? formatSubLabel(option.days) : '…';

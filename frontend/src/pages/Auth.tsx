@@ -4,6 +4,13 @@ import { Button } from '../components/ui';
 import { authApi } from '../services/authApi';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
+import {
+    checkPasswordPolicy,
+    isPasswordPolicyValid,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_POLICY_LABELS,
+    type PasswordPolicyResult,
+} from '../utils/passwordPolicy';
 
 const Auth = () => {
     const { syncUserGameData, addToast } = useAppContext();
@@ -86,16 +93,27 @@ const Auth = () => {
         setSearchParams({}, { replace: true });
     };
 
-    const passwordPolicy = {
-        minLength: password.length >= 8,
-        maxLength: password.length <= 15,
-        hasLowercase: /[a-z]/.test(password),
-        hasUppercase: /[A-Z]/.test(password),
-        hasNumber: /[0-9]/.test(password),
-        hasSpecial: /[^A-Za-z0-9]/.test(password),
-    };
+    const passwordPolicy = checkPasswordPolicy(password);
+    const resetPasswordPolicy = checkPasswordPolicy(newPassword);
+    const isPasswordValid = isPasswordPolicyValid(passwordPolicy);
+    const isResetPasswordValid = isPasswordPolicyValid(resetPasswordPolicy);
 
-    const isPasswordValid = Object.values(passwordPolicy).every(Boolean);
+    const renderPasswordPolicyChecklist = (policy: PasswordPolicyResult) => (
+        <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
+            <p className="font-semibold text-text-primary mb-0.5">Yêu cầu mật khẩu:</p>
+            {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                const ok = policy[key];
+                return (
+                    <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                            {ok ? '✓' : ''}
+                        </span>
+                        {label}
+                    </p>
+                );
+            })}
+        </div>
+    );
 
     const handleSubmit = async () => {
         if (isSubmitting) return;
@@ -175,6 +193,7 @@ const Auth = () => {
             setErrorMessage('Vui lòng nhập đầy đủ email, mã xác thực và mật khẩu mới.');
             return;
         }
+        if (!isResetPasswordValid) { setErrorMessage('Mật khẩu chưa đúng định dạng yêu cầu.'); return; }
         if (newPassword !== confirmNewPassword) { setErrorMessage('Xác nhận mật khẩu không khớp.'); return; }
         setErrorMessage(''); setSuccessMessage(''); setIsSubmitting(true);
         try {
@@ -235,7 +254,7 @@ const Auth = () => {
                                     <div className="relative">
                                         <input type={showNewPassword ? 'text' : 'password'} placeholder="Mật khẩu mới"
                                             className="auth-input pr-12"
-                                            value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                                            value={newPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setNewPassword(e.target.value)} />
                                         <button type="button" className="auth-eye-btn"
                                             onClick={() => setShowNewPassword((p) => !p)}
                                             aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>
@@ -245,13 +264,14 @@ const Auth = () => {
                                     <div className="relative">
                                         <input type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu mới"
                                             className="auth-input pr-12"
-                                            value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} />
+                                            value={confirmNewPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmNewPassword(e.target.value)} />
                                         <button type="button" className="auth-eye-btn"
                                             onClick={() => setShowConfirmNewPassword((p) => !p)}
                                             aria-label={showConfirmNewPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
                                             {showConfirmNewPassword ? '🙈' : '👁'}
                                         </button>
                                     </div>
+                                    {renderPasswordPolicyChecklist(resetPasswordPolicy)}
                                 </>
                             )}
                             {errorMessage && <div className="auth-error">{errorMessage}</div>}
@@ -393,7 +413,7 @@ const Auth = () => {
                             <div className="relative">
                                 <input type={showPassword ? 'text' : 'password'} placeholder="Mật khẩu"
                                     className="auth-input pr-12"
-                                    value={password} onChange={(e) => setPassword(e.target.value)} />
+                                    value={password} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setPassword(e.target.value)} />
                                 <button type="button" className="auth-eye-btn"
                                     onClick={() => setShowPassword((p) => !p)}
                                     aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
@@ -403,7 +423,7 @@ const Auth = () => {
                             <div className="relative">
                                 <input type={showConfirmPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu"
                                     className="auth-input pr-12"
-                                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                                    value={confirmPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmPassword(e.target.value)} />
                                 <button type="button" className="auth-eye-btn"
                                     onClick={() => setShowConfirmPassword((p) => !p)}
                                     aria-label={showConfirmPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
@@ -411,25 +431,7 @@ const Auth = () => {
                                 </button>
                             </div>
 
-                            {/* Password policy checklist */}
-                            <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
-                                <p className="font-semibold text-text-primary mb-0.5">Yêu cầu mật khẩu:</p>
-                                {[
-                                    [passwordPolicy.minLength, 'Tối thiểu 8 ký tự'],
-                                    [passwordPolicy.maxLength, 'Tối đa 15 ký tự'],
-                                    [passwordPolicy.hasLowercase, 'Có ít nhất 1 chữ thường'],
-                                    [passwordPolicy.hasUppercase, 'Có ít nhất 1 chữ in hoa'],
-                                    [passwordPolicy.hasNumber, 'Có ít nhất 1 chữ số'],
-                                    [passwordPolicy.hasSpecial, 'Có ít nhất 1 ký tự đặc biệt'],
-                                ].map(([ok, label]) => (
-                                    <p key={label as string} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
-                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
-                                            {ok ? '✓' : ''}
-                                        </span>
-                                        {label as string}
-                                    </p>
-                                ))}
-                            </div>
+                            {renderPasswordPolicyChecklist(passwordPolicy)}
 
                             {errorMessage && !isLogin && <div className="auth-error">{errorMessage}</div>}
                             {successMessage && !isLogin && <div className="auth-success">{successMessage}</div>}
