@@ -40,7 +40,7 @@ export const UserWidget = ({ user, gameData, onStreakClick }: UserWidgetProps) =
     }, [dropdownOpen]);
 
     return (
-        <div className="flex items-center gap-4 bg-white/40 backdrop-blur-md border border-primary/20 rounded-pill px-4 py-1.5 shadow-sm">
+        <div className="flex items-center gap-4 bg-surface/40 backdrop-blur-md border border-primary/20 rounded-pill px-4 py-1.5 shadow-sm">
             <div
                 className="flex items-center gap-1.5 text-orange-500 font-bold cursor-pointer hover:scale-105 transition-transform"
                 title="Streak"
@@ -71,7 +71,7 @@ export const UserWidget = ({ user, gameData, onStreakClick }: UserWidgetProps) =
                 </div>
 
                 {dropdownOpen && (
-                    <div className="absolute right-0 top-[calc(100%+8px)] w-48 glass-card py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.15)] z-[60] border border-border rounded-2xl overflow-hidden">
+                    <div className="absolute right-0 top-[calc(100%+8px)] w-48 glass-card py-1.5 shadow-[0_8px_32px_var(--shadow-color)] z-[60] border border-border rounded-2xl overflow-hidden">
                         <div className="px-4 py-2 border-b border-border/60 mb-1">
                             <p className="text-xs font-display font-bold text-text-primary truncate">{user.username}</p>
                             <p className="text-[10px] text-text-muted truncate">{user.email}</p>
@@ -90,10 +90,7 @@ export const UserWidget = ({ user, gameData, onStreakClick }: UserWidgetProps) =
                                 <div className="mx-3 my-1 h-px bg-border" />
                                 <button
                                     onClick={() => { navigate(PATHS.admin); setDropdownOpen(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 font-display font-bold transition-colors"
-                                    style={{ color: 'var(--color-primary)' }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(147,51,234,0.06)')}
-                                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                                    className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 font-display font-bold text-primary hover:bg-primary/[0.06] transition-colors"
                                 >
                                     <Shield size={14} />
                                     Admin Dashboard

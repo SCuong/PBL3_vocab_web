@@ -435,7 +435,7 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
-        public void GetBatchReviewOptions_RepeatedThisSession_ShouldReturnImmediateOneDayOneDay()
+        public void GetBatchReviewOptions_RepeatedThisSession_ShouldReturnOneDayOneDayOneDay()
         {
             // Act
             var result = _service.GetBatchReviewOptions(2, new[] { 10L }, new[] { 10L });
@@ -444,9 +444,24 @@ namespace VocabLearning.Tests.Services
             result.Should().ContainSingle();
             result[0].VocabId.Should().Be(10);
             result[0].Options.Should().HaveCount(3);
-            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 0);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 1);
             result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 1);
             result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 1);
+        }
+
+        [Fact]
+        public void SubmitSingleWordReview_RepeatedThisSessionForgot_ShouldScheduleTomorrow()
+        {
+            // Arrange
+            _service.SubmitSingleWordReview(2, 13, 10, 0);
+
+            // Act
+            _service.SubmitSingleWordReview(2, 13, 10, 0, isRepeatedThisSession: true);
+
+            // Assert
+            var progress = _context.Progresses.First(p => p.UserId == 2 && p.VocabId == 13);
+            progress.NextReviewDate.Should().NotBeNull();
+            progress.NextReviewDate!.Value.Date.Should().Be(DateTime.Now.Date.AddDays(1));
         }
 
         [Fact]

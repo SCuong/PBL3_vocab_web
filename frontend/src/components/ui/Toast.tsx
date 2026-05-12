@@ -1,4 +1,4 @@
-import { Check, Sparkles, X } from 'lucide-react';
+﻿import { Check, Sparkles, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 type ToastProps = {
@@ -12,7 +12,7 @@ export const Toast = ({ message, type = 'info', onClose }: ToastProps) => (
         initial={{ x: 100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 100, opacity: 0 }}
-        className="bg-white border-2 border-primary/30 rounded-card p-4 shadow-xl flex items-center gap-3 w-80 mb-4 pointer-events-auto"
+        className="bg-surface border-2 border-primary/30 rounded-card p-4 shadow-xl flex items-center gap-3 w-80 mb-4 pointer-events-auto"
     >
         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${type === 'success' ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'}`}>
             {type === 'success' ? <Check size={20} /> : <Sparkles size={20} />}

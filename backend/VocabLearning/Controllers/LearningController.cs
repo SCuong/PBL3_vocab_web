@@ -137,7 +137,7 @@ namespace VocabLearning.Controllers
             try
             {
                 return Ok(_learningService.SubmitSingleWordReview(
-                    currentUser.UserId, request.VocabId, request.TopicId, request.Quality));
+                    currentUser.UserId, request.VocabId, request.TopicId, request.Quality, request.IsRepeatedThisSession));
             }
             catch (Exception exception)
             {

@@ -27,5 +27,6 @@ namespace VocabLearning.ViewModels.Learning
         public long VocabId { get; set; }
         public long TopicId { get; set; }
         public int Quality { get; set; }
+        public bool IsRepeatedThisSession { get; set; }
     }
 }

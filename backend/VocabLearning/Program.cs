@@ -46,6 +46,7 @@ builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<CustomAuthenticationService>();
 builder.Services.AddScoped<AdminDataService>();
 builder.Services.AddScoped<LearningService>();
+builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
 builder.Services.AddHttpClient<IAIService, GeminiService>(client =>
 {

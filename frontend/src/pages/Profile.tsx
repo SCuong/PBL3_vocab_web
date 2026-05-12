@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui';
+import { Button, typography } from '../components/ui';
 import { StreakHeatmap } from '../components/learning/streak';
 import { DeleteAccountModal } from '../components/account';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
@@ -291,11 +291,11 @@ const Profile = () => {
                 <div className="space-y-8">
                     <div className="glass-card p-10 text-center">
                         {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover mx-auto mb-6 shadow-xl border-2 border-white/60" />
+                            <img src={avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover mx-auto mb-6 shadow-xl border-2 border-surface/60" />
                         ) : (
-                            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary to-secondary mx-auto mb-6 flex items-center justify-center text-5xl font-display text-white shadow-xl">{initials}</div>
+                            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary to-secondary mx-auto mb-6 flex items-center justify-center text-[2.75rem] font-display text-text-on-accent shadow-xl">{initials}</div>
                         )}
-                        <h2 className="text-3xl mb-1">{user.username}</h2>
+                        <h2 className={`${typography.sectionTitle} mb-1`}>{user.username}</h2>
                         <p className="text-text-muted mb-8">{user.email}</p>
                         <div className="space-y-3">
                             <Button variant="ghost" className="w-full" onClick={() => setIsEditing(true)}>Chỉnh sửa hồ sơ</Button>
@@ -319,7 +319,7 @@ const Profile = () => {
                             <div key={i} className="glass-card p-6 text-center">
                                 <div className="flex justify-center mb-2">{s.icon}</div>
                                 <div className="text-3xl font-bold">{s.value}</div>
-                                <div className="text-xs uppercase tracking-widest text-text-muted">{s.label}</div>
+                                <div className="text-xs uppercase tracking-wide text-text-muted">{s.label}</div>
                             </div>
                         ))}
                     </div>
@@ -331,7 +331,7 @@ const Profile = () => {
                             selectedDate={selectedStudyDate}
                             onSelectDate={setSelectedStudyDate}
                         />
-                        <div className="mt-5 p-4 rounded-2xl border border-primary/20 bg-white/40">
+                        <div className="mt-5 p-4 rounded-2xl border border-primary/20 bg-surface/40">
                             <p className="text-sm font-bold capitalize">{selectedStudyDateLabel}</p>
                             {selectedStudyDate ? (
                                 <>
@@ -344,11 +344,11 @@ const Profile = () => {
                                     {hasStudiedOnSelectedDate && (
                                         <div className="mt-3 space-y-3">
                                             <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                <div className="rounded-xl border border-primary/20 bg-surface/70 p-2 text-center">
                                                     <div className="text-text-muted uppercase">Từ đã học</div>
                                                     <div className="text-base font-bold">{selectedStudySummary.totalWords}</div>
                                                 </div>
-                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                <div className="rounded-xl border border-primary/20 bg-surface/70 p-2 text-center">
                                                     <div className="text-text-muted uppercase">XP</div>
                                                     <div className="text-base font-bold">+{selectedStudySummary.totalXp}</div>
                                                 </div>
@@ -407,17 +407,17 @@ const Profile = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[700] bg-white/35 backdrop-blur-sm p-6 flex items-center justify-center"
+                        className="fixed inset-0 z-[700] bg-surface/35 backdrop-blur-sm p-6 flex items-center justify-center"
                     >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.96, y: 16 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 16 }}
                             transition={{ duration: 0.24, ease: 'easeOut' }}
-                            className="glass-card bg-white/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
+                            className="glass-card bg-surface/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
                         >
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-2xl font-bold">Chỉnh sửa hồ sơ</h3>
+                                <h3 className={typography.modalTitle}>Chỉnh sửa hồ sơ</h3>
                                 <button
                                     className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
                                     onClick={() => setIsEditing(false)}
@@ -433,7 +433,7 @@ const Profile = () => {
                                     {avatarUrl ? (
                                         <img src={avatarUrl} alt="Avatar preview" className="w-20 h-20 rounded-full object-cover border border-primary/20" />
                                     ) : (
-                                        <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl font-display text-white">{initials}</div>
+                                        <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl font-display text-text-on-accent">{initials}</div>
                                     )}
                                     <Button
                                         type="button"
@@ -513,13 +513,13 @@ const Profile = () => {
                                         );
                                     }}
                                 />
-                                <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                                <div className="rounded-xl border border-primary/15 bg-surface/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
                                     <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
                                     {PASSWORD_POLICY_LABELS.map(([key, label]) => {
                                         const ok = newPasswordPolicy[key];
                                         return (
                                             <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
-                                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
                                                     {ok ? '✓' : ''}
                                                 </span>
                                                 {label}

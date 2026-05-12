@@ -1,4 +1,5 @@
 export { default as Home } from './Home';
+export { default as LearnerDashboard } from './LearnerDashboard';
 export { default as Vocabulary } from './Vocabulary';
 export { default as VocabDetail } from './VocabDetail';
 export { default as Auth } from './Auth';

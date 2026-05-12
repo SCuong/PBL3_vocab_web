@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '../components/ui';
+import { Button, typography } from '../components/ui';
 import { authApi } from '../services/authApi';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
@@ -99,13 +99,13 @@ const Auth = () => {
     const isResetPasswordValid = isPasswordPolicyValid(resetPasswordPolicy);
 
     const renderPasswordPolicyChecklist = (policy: PasswordPolicyResult) => (
-        <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
+        <div className="rounded-xl border border-primary/15 bg-surface/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
             <p className="font-semibold text-text-primary mb-0.5">Yêu cầu mật khẩu:</p>
             {PASSWORD_POLICY_LABELS.map(([key, label]) => {
                 const ok = policy[key];
                 return (
                     <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
                             {ok ? '✓' : ''}
                         </span>
                         {label}
@@ -223,7 +223,7 @@ const Auth = () => {
                             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-4">
                                 <span className="text-2xl">{isForgotPasswordMode ? '🔐' : '🔑'}</span>
                             </div>
-                            <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">{title}</h2>
+                            <h2 className={`${typography.pageTitle} mb-2`}>{title}</h2>
                             <p className="text-text-secondary text-sm">
                                 {isForgotPasswordMode ? 'Nhập email của bạn để nhận liên kết đặt lại mật khẩu' : 'Nhập thông tin để đặt lại mật khẩu mới'}
                             </p>
@@ -235,7 +235,7 @@ const Auth = () => {
                                         className="auth-input"
                                         value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} />
                                 ) : (
-                                    <div className="space-y-3 rounded-xl border-2 border-accent/30 bg-white/70 px-4 py-4 text-sm text-center">
+                                    <div className="space-y-3 rounded-xl border-2 border-accent/30 bg-surface/70 px-4 py-4 text-sm text-center">
                                         <p className="text-accent font-semibold flex items-center justify-center gap-2"><span>✓</span>Email đã được gửi!</p>
                                         <p className="text-text-secondary text-xs">
                                             {forgotPasswordUsedFallback
@@ -455,7 +455,7 @@ const Auth = () => {
                 {/* Flips OUT (rotateY -180°) when .active, flips back IN when .close   */}
                 <div className="auth-page auth-page-front">
                     <div className="auth-page-content">
-                        <h3 className="text-4xl font-bold mb-3">Xin chào!</h3>
+                        <h3 className="text-4xl font-bold text-white mb-3">Xin chào!</h3>
                         <p className="text-white/90 text-sm leading-relaxed text-center">
                             Tạo tài khoản để bắt đầu hành trình học từ vựng tiếng Anh của bạn.
                         </p>
@@ -469,7 +469,7 @@ const Auth = () => {
                 {/* Flips IN (rotateY -180°) when .active, flips back OUT when .close   */}
                 <div className="auth-page auth-page-back">
                     <div className="auth-page-content auth-page-back-content">
-                        <h3 className="text-4xl font-bold mb-3">Chào mừng trở lại!</h3>
+                        <h3 className="text-4xl font-bold text-white mb-3">Chào mừng trở lại!</h3>
                         <p className="text-white/90 text-sm leading-relaxed text-center">
                             Đăng nhập để tiếp tục bài học và nâng cao kỹ năng của bạn.
                         </p>

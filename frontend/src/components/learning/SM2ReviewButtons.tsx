@@ -53,7 +53,7 @@ const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({ options, onSelect, 
                             type="button"
                             disabled={isSubmitting}
                             onClick={() => onSelect(quality)}
-                            className={`flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border-2 bg-white/80 backdrop-blur-sm
+                            className={`flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border-2 bg-surface/80 backdrop-blur-sm
                                 transition-all duration-150 cursor-pointer
                                 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1
                                 disabled:opacity-40 disabled:cursor-not-allowed

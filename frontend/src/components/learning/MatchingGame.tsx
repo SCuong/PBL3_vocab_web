@@ -205,7 +205,7 @@ export const MatchingGame = ({ words, type, onFinish }: MatchingGameProps) => {
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-bold text-text-muted uppercase tracking-widest">
+        <span className="text-sm font-bold text-text-muted uppercase tracking-wide">
           {totalRounds > 1
             ? `Vòng ${gameState.round + 1} / ${totalRounds}`
             : "Nối từ"}
@@ -246,7 +246,7 @@ export const MatchingGame = ({ words, type, onFinish }: MatchingGameProps) => {
                       ? "border-primary bg-primary/5 shadow-lg scale-105"
                       : state === "wrong"
                         ? "border-red-400 bg-red-50 text-red-700"
-                        : "bg-white border-primary/10 hover:border-primary/40 hover:scale-[1.02] cursor-pointer"
+                        : "bg-surface border-primary/10 hover:border-primary/40 hover:scale-[1.02] cursor-pointer"
                 }
               `}
             >
