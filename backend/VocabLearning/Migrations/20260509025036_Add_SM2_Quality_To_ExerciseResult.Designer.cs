@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VocabLearning.Data;
 
@@ -11,9 +12,11 @@ using VocabLearning.Data;
 namespace VocabLearning.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260509025036_Add_SM2_Quality_To_ExerciseResult")]
+    partial class Add_SM2_Quality_To_ExerciseResult
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -102,7 +105,7 @@ namespace VocabLearning.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("ResultId"));
 
-                    b.Property<DateTime?>("AnsweredAt")
+                    b.Property<DateTime>("AnsweredAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("answered_at");
 
@@ -324,10 +327,10 @@ namespace VocabLearning.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("vocab_id");
 
-                    b.Property<float>("EaseFactor")
+                    b.Property<double>("EaseFactor")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("real")
-                        .HasDefaultValue(2.5f)
+                        .HasColumnType("float")
+                        .HasDefaultValue(2.5)
                         .HasColumnName("ease_factor");
 
                     b.Property<int>("IntervalDays")
@@ -385,7 +388,36 @@ namespace VocabLearning.Migrations
                     b.ToTable("topic", (string)null);
                 });
 
-            modelBuilder.Entity("VocabLearning.Models.User", b =>
+            modelBuilder.Entity("VocabLearning.Models.UserVocabulary", b =>
+                {
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("VocabId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("vocab_id");
+
+                    b.Property<DateTime?>("FirstLearnedDate")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("first_learned_date");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("status");
+
+                    b.HasKey("UserId", "VocabId");
+
+                    b.ToTable("user_vocabulary", (string)null);
+                });
+
+            modelBuilder.Entity("VocabLearning.Models.Users", b =>
                 {
                     b.Property<long>("UserId")
                         .ValueGeneratedOnAdd()
@@ -439,10 +471,6 @@ namespace VocabLearning.Migrations
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("status");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -461,45 +489,7 @@ namespace VocabLearning.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("users", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_users_role", "[role] IN ('ADMIN', 'LEARNER')");
-
-                            t.HasCheckConstraint("CK_users_status", "[status] IN ('ACTIVE', 'INACTIVE')");
-                        });
-                });
-
-            modelBuilder.Entity("VocabLearning.Models.UserVocabulary", b =>
-                {
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.Property<long>("VocabId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("vocab_id");
-
-                    b.Property<DateTime?>("FirstLearnedDate")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("first_learned_date");
-
-                    b.Property<string>("Note")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("note");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("UserId", "VocabId");
-
-                    b.ToTable("user_vocabulary", (string)null);
+                    b.ToTable("users", (string)null);
                 });
 
             modelBuilder.Entity("VocabLearning.Models.Vocabulary", b =>
@@ -531,10 +521,6 @@ namespace VocabLearning.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("topic_id");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
                     b.Property<string>("Word")
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("word");
@@ -565,7 +551,7 @@ namespace VocabLearning.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("VocabLearning.Models.User", null)
+                    b.HasOne("VocabLearning.Models.Users", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -580,7 +566,7 @@ namespace VocabLearning.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("VocabLearning.Models.User", null)
+                    b.HasOne("VocabLearning.Models.Users", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -609,7 +595,7 @@ namespace VocabLearning.Migrations
 
             modelBuilder.Entity("VocabLearning.Models.PasswordResetToken", b =>
                 {
-                    b.HasOne("VocabLearning.Models.User", "User")
+                    b.HasOne("VocabLearning.Models.Users", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -620,7 +606,7 @@ namespace VocabLearning.Migrations
 
             modelBuilder.Entity("VocabLearning.Models.Progress", b =>
                 {
-                    b.HasOne("VocabLearning.Models.User", null)
+                    b.HasOne("VocabLearning.Models.Users", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -635,7 +621,7 @@ namespace VocabLearning.Migrations
 
             modelBuilder.Entity("VocabLearning.Models.UserVocabulary", b =>
                 {
-                    b.HasOne("VocabLearning.Models.User", null)
+                    b.HasOne("VocabLearning.Models.Users", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
