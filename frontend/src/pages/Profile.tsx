@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
+import { Award, BookOpen, Flame, StickyNote, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { StreakHeatmap } from '../components/learning/streak';
 import { DeleteAccountModal } from '../components/account';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
+import { stickyNotesApi, type StickyNoteItem } from '../services/stickyNotesApi';
 import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
@@ -55,6 +56,8 @@ const Profile = () => {
     const [learnedWordsList, setLearnedWordsList] = useState<VocabularyListItem[]>([]);
     const [isLoadingLearnedWords, setIsLoadingLearnedWords] = useState(false);
     const [selectedStudyDate, setSelectedStudyDate] = useState<string | null>(null);
+    const [stickyNotes, setStickyNotes] = useState<StickyNoteItem[]>([]);
+    const [isLoadingStickyNotes, setIsLoadingStickyNotes] = useState(false);
 
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -139,6 +142,40 @@ const Profile = () => {
         };
     }, [showLearnedWords, learnedWordIds, onAddToast]);
 
+    useEffect(() => {
+        if (!currentUser?.userId) {
+            setStickyNotes([]);
+            return;
+        }
+
+        let isDisposed = false;
+
+        const loadStickyNotes = async () => {
+            setIsLoadingStickyNotes(true);
+            try {
+                const items = await stickyNotesApi.getAll();
+                if (!isDisposed) {
+                    setStickyNotes(items);
+                }
+            } catch (error: any) {
+                if (!isDisposed) {
+                    setStickyNotes([]);
+                    onAddToast?.(error?.message || 'Không thể tải danh sách ghi chú.', 'info');
+                }
+            } finally {
+                if (!isDisposed) {
+                    setIsLoadingStickyNotes(false);
+                }
+            }
+        };
+
+        void loadStickyNotes();
+
+        return () => {
+            isDisposed = true;
+        };
+    }, [currentUser?.userId, onAddToast]);
+
     const studyHistory = useMemo(
         () => (Array.isArray(user.studyHistory) ? user.studyHistory : [])
             .filter((day: unknown): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)),
@@ -208,6 +245,26 @@ const Profile = () => {
         ),
         [selectedStudyDate, studyHistoryDates, selectedStudyDetail, user.learnedWords, learnedWords.length, user.xp]
     );
+
+    const sortedStickyNotes = useMemo(
+        () => [...stickyNotes].sort((a, b) => Number(b.isPinned) - Number(a.isPinned)),
+        [stickyNotes],
+    );
+
+    const getNoteColorClass = (color: StickyNoteItem['color']) => {
+        switch (color) {
+            case 'blue':
+                return 'bg-sky-100 border-sky-200 text-slate-700';
+            case 'green':
+                return 'bg-emerald-100 border-emerald-200 text-slate-700';
+            case 'pink':
+                return 'bg-rose-100 border-rose-200 text-slate-700';
+            case 'purple':
+                return 'bg-violet-100 border-violet-200 text-slate-700';
+            default:
+                return 'bg-amber-100 border-amber-200 text-slate-700';
+        }
+    };
 
     const accountCreatedDate = useMemo(() => {
         if (!user?.createdAt || typeof user.createdAt !== 'string') {
@@ -393,6 +450,56 @@ const Profile = () => {
                                             <div className="text-sm text-text-muted">{item.meaning}</div>
                                         </div>
                                         <div className="text-xs text-text-muted">{item.topicName || 'Chủ đề khác'}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="glass-card p-8">
+                        <div className="flex items-center justify-between gap-4 mb-4">
+                            <h3 className="text-xl flex items-center gap-2">
+                                <StickyNote size={18} className="text-primary" /> Danh sách ghi chú
+                            </h3>
+                            <Button
+                                variant="ghost"
+                                className="px-4 py-2"
+                                onClick={async () => {
+                                    if (!currentUser?.userId) {
+                                        setStickyNotes([]);
+                                        return;
+                                    }
+                                    setIsLoadingStickyNotes(true);
+                                    try {
+                                        const items = await stickyNotesApi.getAll();
+                                        setStickyNotes(items);
+                                    } catch (error: any) {
+                                        onAddToast?.(error?.message || 'Không thể tải danh sách ghi chú.', 'info');
+                                    } finally {
+                                        setIsLoadingStickyNotes(false);
+                                    }
+                                }}
+                                disabled={isLoadingStickyNotes}
+                            >
+                                Làm mới
+                            </Button>
+                        </div>
+
+                        {isLoadingStickyNotes ? (
+                            <p className="text-sm text-text-muted">Đang tải ghi chú...</p>
+                        ) : sortedStickyNotes.length === 0 ? (
+                            <p className="text-sm text-text-muted">Bạn chưa có ghi chú nào.</p>
+                        ) : (
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                {sortedStickyNotes.map((note) => (
+                                    <div
+                                        key={note.stickyNoteId}
+                                        className={`rounded-2xl border p-4 ${getNoteColorClass(note.color)}`}
+                                    >
+                                        <div className="text-xs uppercase tracking-widest text-slate-500 mb-2 flex items-center justify-between">
+                                            <span>{note.isPinned ? 'Đã ghim' : 'Ghi chú'}</span>
+                                            <span>{new Date(note.updatedAt).toLocaleDateString('vi-VN')}</span>
+                                        </div>
+                                        <p className="text-sm whitespace-pre-line">{note.content || 'Ghi chú trống'}</p>
                                     </div>
                                 ))}
                             </div>
