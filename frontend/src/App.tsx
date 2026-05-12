@@ -7,7 +7,7 @@ import { PATHS } from './routes/paths';
 import { AdminRoute } from './routes/guards/AdminRoute';
 import { ProtectedRoute } from './routes/guards/ProtectedRoute';
 import { PublicOnlyRoute } from './routes/guards/PublicOnlyRoute';
-import { AuthNavbar, Footer, Navbar } from './components/layout';
+import { AuthNavbar, Footer, Navbar, StickyNotesWidget } from './components/layout';
 import { LearningTopics } from './components/learning/LearningTopics';
 import { StudySession } from './components/learning/StudySession';
 import { StreakModal } from './components/learning/streak';
@@ -24,6 +24,7 @@ const AppShell = () => {
         currentUser,
         gameData,
         fullGameData,
+        addToast,
         removeToast,
         toasts,
         xpFloats,
@@ -186,6 +187,11 @@ const AppShell = () => {
                     </motion.div>
                 ))}
             </AnimatePresence>
+
+            <StickyNotesWidget
+                isVisible={Boolean(currentUser) && !isAuthPage}
+                onNotify={addToast}
+            />
         </div>
     );
 };
