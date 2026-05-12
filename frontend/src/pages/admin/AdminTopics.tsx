@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    AlertTriangle, ChevronLeft, ChevronRight,
-    Loader2, Pencil, Plus, RefreshCw, Search, Trash2, X,
+    AlertTriangle,
+    Loader2, Pencil, Plus, RefreshCw, Search, Trash2,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
+import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, TextArea, adminInputClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
 import {
     adminApi,
@@ -80,33 +81,15 @@ const TopicFormModal = ({
     const currentId = isEdit ? modalState.topic.topicId : null;
     const parentOptions = allTopics.filter(t => t.topicId !== currentId);
 
-    const inputClass =
-        'w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-text-primary focus:outline-none focus:border-primary transition-colors disabled:opacity-60';
-    const labelClass = 'block text-xs font-display font-bold text-text-muted mb-1.5';
+    const inputClass = adminInputClass;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="glass-card w-full max-w-md p-8 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-display font-bold text-text-primary">
-                        {isEdit ? 'Edit Topic' : 'Create New Topic'}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/10 text-text-muted hover:text-primary transition-colors disabled:opacity-40"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
+        <Modal title={isEdit ? 'Edit Topic' : 'Create New Topic'} onClose={onClose}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className={labelClass}>Topic Name</label>
-                        <input
+                        <Input
+                            label="Topic Name"
                             type="text"
-                            className={inputClass}
                             value={form.name}
                             onChange={setField('name')}
                             required
@@ -117,9 +100,8 @@ const TopicFormModal = ({
                     </div>
 
                     <div>
-                        <label className={labelClass}>Description</label>
-                        <textarea
-                            className={`${inputClass} resize-none`}
+                        <TextArea
+                            label="Description"
                             rows={3}
                             value={form.description}
                             onChange={setField('description')}
@@ -131,12 +113,8 @@ const TopicFormModal = ({
                     </div>
 
                     <div>
-                        <label className={labelClass}>
-                            Parent Topic{' '}
-                            <span className="text-text-muted font-normal">(optional)</span>
-                        </label>
-                        <select
-                            className={inputClass}
+                        <Select
+                            label={<>Parent Topic <span className="text-text-muted font-normal">(optional)</span></>}
                             value={form.parentTopicId}
                             onChange={setField('parentTopicId')}
                             disabled={saving}
@@ -147,14 +125,14 @@ const TopicFormModal = ({
                                     {t.name}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
 
                     {error && (
-                        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                        <ErrorNotice>
                             <AlertTriangle size={14} className="shrink-0" />
                             {error}
-                        </div>
+                        </ErrorNotice>
                     )}
 
                     <div className="flex gap-3 pt-2">
@@ -185,8 +163,7 @@ const TopicFormModal = ({
                         </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };
 
@@ -201,8 +178,7 @@ interface DeleteConfirmProps {
 }
 
 const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: DeleteConfirmProps) => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="glass-card w-full max-w-sm p-8 shadow-2xl">
+    <Modal title="Delete Topic" onClose={onClose} size="sm">
             <div className="flex flex-col items-center text-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
                     <AlertTriangle size={28} className="text-red-500" />
@@ -219,10 +195,10 @@ const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: Dele
                 </div>
 
                 {error && (
-                    <div className="w-full flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                    <ErrorNotice>
                         <AlertTriangle size={14} className="shrink-0" />
                         {error}
-                    </div>
+                    </ErrorNotice>
                 )}
 
                 <div className="flex gap-3 w-full">
@@ -250,8 +226,7 @@ const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: Dele
                     </Button>
                 </div>
             </div>
-        </div>
-    </div>
+    </Modal>
 );
 
 // ── AdminTopics ───────────────────────────────────────────────────────────────
@@ -380,27 +355,31 @@ const AdminTopics = () => {
     return (
         <div>
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <div className="relative flex-1">
+            <FilterBar
+                actions={
+                    <Button variant="primary" onClick={openCreate}>
+                        <Plus size={16} /> Add Topic
+                    </Button>
+                }
+            >
+                <div className="relative">
                     <Search
                         size={15}
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
                     />
-                    <input
+                    <Input
+                        aria-label="Search topics"
                         type="text"
                         placeholder="Search name, description or parent…"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-pill border border-border bg-surface text-sm focus:outline-none focus:border-primary transition-colors"
+                        className="pl-10 rounded-pill"
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1); }}
                     />
                 </div>
-                <Button variant="primary" onClick={openCreate}>
-                    <Plus size={16} /> Add Topic
-                </Button>
-            </div>
+            </FilterBar>
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
+            <DataTable headers={[]}>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -408,7 +387,7 @@ const AdminTopics = () => {
                                 {['ID', 'Name', 'Description', 'Parent', ''].map(h => (
                                     <th
                                         key={h}
-                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}
+                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
                                     >
                                         {h}
                                     </th>
@@ -457,20 +436,20 @@ const AdminTopics = () => {
                                         </td>
                                         <td className="px-4 py-3.5">
                                             <div className="flex gap-1 justify-end">
-                                                <button
+                                                <IconButton
                                                     onClick={() => openEdit(topic)}
+                                                    aria-label={`Edit ${topic.name}`}
                                                     title="Edit topic"
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
+                                                    tone="primary"
+                                                    icon={<Pencil size={14} />}
+                                                />
+                                                <IconButton
                                                     onClick={() => openDelete(topic)}
+                                                    aria-label={`Delete ${topic.name}`}
                                                     title="Delete topic"
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                    tone="danger"
+                                                    icon={<Trash2 size={14} />}
+                                                />
                                             </div>
                                         </td>
                                     </tr>
@@ -480,36 +459,13 @@ const AdminTopics = () => {
                     </table>
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-primary/10">
-                        <span className="text-xs text-text-muted">
-                            {(page - 1) * PAGE_SIZE + 1}–
-                            {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}{' '}
-                            topics
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <span className="px-3 text-sm font-display font-bold text-text-primary">
-                                {page} / {totalPages}
-                            </span>
-                            <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                disabled={page === totalPages}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
+                <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} topics`}
+                />
+            </DataTable>
 
             {/* Modals */}
             {modalState && (

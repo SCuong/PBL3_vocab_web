@@ -614,10 +614,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 👤 Author
 
-**Vu Manh Cuong (SCuong)**
-
-- GitHub: [@SCuong](https://github.com/SCuong)
-- Email: vumanhcuongppt@gmail.com
+Vũ Mạnh Cường, Lê Thị Thanh Thái, Đậu Thùy Ngân, Đinh Văn Thành 
 - Project: PBL3 — Da Nang University of Science and Technology
 
 ---

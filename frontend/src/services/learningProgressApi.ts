@@ -47,12 +47,12 @@ export const learningProgressApi = {
         return Object.fromEntries(data.map(item => [item.vocabId, item.options]));
     },
 
-    submitSingleReview: async (vocabId: number, topicId: number, quality: number): Promise<LearningProgressState> => {
+    submitSingleReview: async (vocabId: number, topicId: number, quality: number, isRepeatedThisSession = false): Promise<LearningProgressState> => {
         const response = await fetch('/api/learning/words/review', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vocabId, topicId, quality }),
+            body: JSON.stringify({ vocabId, topicId, quality, isRepeatedThisSession }),
         });
         if (!response.ok) throw new Error('Failed to submit review.');
         return (await response.json()) as LearningProgressState;

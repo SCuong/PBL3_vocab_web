@@ -13,7 +13,7 @@ import { StudySession } from './components/learning/StudySession';
 import { StreakModal } from './components/learning/streak';
 import { Button, Toast } from './components/ui';
 import { Logo } from './assets/Logo';
-import { AdminDashboard, Auth, Home, Leaderboard, MinitestResult, MinitestReview, Profile, Vocabulary } from './pages';
+import { AdminDashboard, Auth, Home, LearnerDashboard, Leaderboard, MinitestResult, MinitestReview, Profile, Vocabulary } from './pages';
 
 const AUTH_PATHS: string[] = [PATHS.login, PATHS.register];
 
@@ -42,7 +42,7 @@ const AppShell = () => {
                 {isLoading && (
                     <motion.div
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[1000] bg-[#1A0A2E] flex flex-col items-center justify-center p-6 text-center"
+                        className="fixed inset-0 z-[1000] bg-bg-primary flex flex-col items-center justify-center p-6 text-center"
                     >
                         <motion.div
                             initial={{ scale: 0.8 }}
@@ -51,7 +51,7 @@ const AppShell = () => {
                         >
                             <Logo size={100} />
                         </motion.div>
-                        <div className="font-display font-bold text-2xl text-cyan tracking-wider">
+                        <div className="font-display font-bold text-2xl text-cyan tracking-wide">
                             VocabLearning
                         </div>
                     </motion.div>
@@ -90,6 +90,10 @@ const AppShell = () => {
                                 path={PATHS.register}
                                 element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>}
                             />
+                            <Route
+                                path={PATHS.dashboard}
+                                element={<ProtectedRoute><LearnerDashboard /></ProtectedRoute>}
+                            />
                             <Route path={PATHS.vocabulary} element={<Vocabulary />} />
                             <Route path={PATHS.learning} element={<LearningTopics />} />
                             <Route
@@ -122,10 +126,10 @@ const AppShell = () => {
                     <motion.div
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-2xl bg-white/80 backdrop-blur-xl border-2 border-primary/30 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6"
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-2xl bg-surface/80 backdrop-blur-xl border-2 border-primary/30 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6"
                     >
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-white text-3xl shadow-lg">
+                            <div className="w-14 h-14 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-text-on-accent text-3xl shadow-lg">
                                 🎁
                             </div>
                             <div>

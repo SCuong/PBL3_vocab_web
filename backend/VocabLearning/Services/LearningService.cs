@@ -324,15 +324,15 @@ namespace VocabLearning.Services
                 return new ReviewOptionItem
                 {
                     Quality = quality,
-                    Days = quality == 0 ? 0 : 1,
-                    NextReviewDate = now.AddDays(quality == 0 ? 0 : 1)
+                    Days = 1,
+                    NextReviewDate = now.AddDays(1)
                 };
             }
 
             return SimulateReviewOption(progress, quality, now, false);
         }
 
-        public LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality)
+        public LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality, bool isRepeatedThisSession = false)
         {
             quality = Math.Clamp(quality, 0, 5);
             var now = DateTime.Now;
@@ -342,7 +342,8 @@ namespace VocabLearning.Services
             var isFirstExposureReview = progress == null || progress.Repetitions == 0;
 
             // Idempotency: ignore duplicate submissions within 5-second window (handles network retries / multi-tab)
-            if (progress?.LastReviewDate.HasValue == true
+            if (!isRepeatedThisSession
+                && progress?.LastReviewDate.HasValue == true
                 && (now - progress.LastReviewDate.Value).TotalSeconds < 5)
             {
                 return GetLearningProgressState(userId);
@@ -358,7 +359,7 @@ namespace VocabLearning.Services
             }
 
             var (nextReviewDate, status) = isFirstExposureReview
-                ? BuildFirstExposureReviewPlan(progress, quality, now)
+                ? BuildFirstExposureReviewPlan(progress, quality, now, isRepeatedThisSession)
                 : BuildReviewPlan(progress, quality, now);
 
             progress.LastReviewDate = now;
@@ -386,9 +387,9 @@ namespace VocabLearning.Services
             return GetLearningProgressState(userId);
         }
 
-        private static (DateTime NextReviewDate, string Status) BuildFirstExposureReviewPlan(Progress progress, int quality, DateTime now)
+        private static (DateTime NextReviewDate, string Status) BuildFirstExposureReviewPlan(Progress progress, int quality, DateTime now, bool isRepeatedThisSession = false)
         {
-            var resultDays = quality >= 5 ? 1 : 0;
+            var resultDays = isRepeatedThisSession || quality >= 5 ? 1 : 0;
 
             progress.EaseFactor = Math.Max(1.3d, progress.EaseFactor);
             progress.IntervalDays = Math.Max(0, resultDays);
@@ -406,7 +407,7 @@ namespace VocabLearning.Services
             if (isRepeatedThisSession)
             {
                 // Phase B: word reinserted and seen again in the same session
-                resultDays = quality == 0 ? 0 : 1;
+                resultDays = 1;
             }
             else if (progress == null || progress.Repetitions == 0)
             {

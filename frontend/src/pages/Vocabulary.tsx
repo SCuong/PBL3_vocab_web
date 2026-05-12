@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Volume2, X, Sparkles, Loader2 } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
-import { Badge, Button } from '../components/ui';
+import { Badge, Button, PageTitle, typography } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { playPronunciationAudio } from '../utils/audio';
 import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
@@ -156,7 +156,7 @@ const Vocabulary = () => {
         <div className="max-w-6xl mx-auto px-6 py-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                 <div>
-                    <h1 className="text-4xl">Từ vựng</h1>
+                    <PageTitle>Từ vựng</PageTitle>
                     <p className="text-sm text-text-muted mt-2">
                         Trang {page} / {Math.max(totalPages, 1)} · Tổng {totalCount} từ vựng
                     </p>
@@ -167,7 +167,7 @@ const Vocabulary = () => {
                         <input
                             type="text"
                             placeholder="Tìm kiếm từ vựng..."
-                            className="w-full pl-12 pr-4 py-3 bg-white/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                            className="w-full pl-12 pr-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -175,7 +175,7 @@ const Vocabulary = () => {
                     <select
                         value={selectedCefr}
                         onChange={(e) => setSelectedCefr(e.target.value)}
-                        className="px-4 py-3 bg-white/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                        className="px-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
                     >
                         <option value="ALL">Tất cả cấp độ</option>
                         {CEFR_LEVELS.map(level => (
@@ -185,7 +185,7 @@ const Vocabulary = () => {
                     <select
                         value={selectedTopic}
                         onChange={(e) => setSelectedTopic(e.target.value)}
-                        className="px-4 py-3 bg-white/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm md:col-span-3"
+                        className="px-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm md:col-span-3"
                     >
                         <option value="ALL">Tất cả chủ đề</option>
                         {topicOptions.map(topic => (
@@ -286,7 +286,7 @@ const Vocabulary = () => {
                                     handleGoToPage();
                                 }
                             }}
-                            className="w-24 px-3 py-2 bg-white/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                            className="w-24 px-3 py-2 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
                         />
                         <Button variant="ghost" onClick={handleGoToPage}>
                             Đi
@@ -309,19 +309,20 @@ const Vocabulary = () => {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 20 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                            className="glass-card bg-white/90 w-full max-w-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto"
+                            className="glass-card bg-surface/90 w-full max-w-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex items-start justify-between gap-4 mb-6">
                                 <div>
                                     <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
-                                    <h2 className="text-4xl mb-1">{selectedWord.word}</h2>
+                                    <h2 className={`${typography.sectionTitle} mb-1`}>{selectedWord.word}</h2>
                                     <p className="text-text-muted font-mono">{selectedWord.transcription}</p>
                                 </div>
                                 <button
                                     type="button"
                                     className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
                                     onClick={onCloseWordDetail}
+                                    aria-label="Đóng chi tiết từ vựng"
                                 >
                                     <X size={18} />
                                 </button>
@@ -355,7 +356,7 @@ const Vocabulary = () => {
                                 </Button>
                             </div>
 
-                            <div className="bg-white/60 p-5 rounded-card border border-primary/10">
+                            <div className="bg-surface/60 p-5 rounded-card border border-primary/10">
                                 <h3 className="text-lg font-bold text-primary mb-2">Ý nghĩa</h3>
                                 <p className="text-lg mb-4">{selectedWord.meaning}</p>
                                 {selectedWord.example && (

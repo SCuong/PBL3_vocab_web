@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    AlertTriangle, ChevronDown, ChevronLeft, ChevronRight,
-    Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Volume2, X,
+    AlertTriangle, ChevronDown, ChevronRight,
+    Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Volume2,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
+import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, TextArea, adminFocusRingClass, adminInputClass, adminLabelClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
 import {
     adminApi,
@@ -77,7 +78,7 @@ const CEFR_COLORS: Record<string, string> = {
 const CefrBadge = ({ level }: { level?: string }) => {
     if (!level) return <span className="text-text-muted text-xs">—</span>;
     return (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-display font-bold ${CEFR_COLORS[level] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-display font-bold ${CEFR_COLORS[level] ?? 'bg-bg-secondary text-text-muted'}`}>
             {level}
         </span>
     );
@@ -85,8 +86,8 @@ const CefrBadge = ({ level }: { level?: string }) => {
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 
-const inputCls = 'w-full px-3 py-2 rounded-xl border border-border bg-surface text-sm text-text-primary focus:outline-none focus:border-primary transition-colors';
-const labelCls = 'block text-xs font-display font-bold text-text-muted mb-1.5';
+const inputCls = adminInputClass;
+const labelCls = `${adminLabelClass} mb-1.5`;
 
 // ── VocabFormModal ─────────────────────────────────────────────────────────────
 
@@ -134,51 +135,35 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="glass-card w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-display font-bold text-text-primary">
-                        {isEdit ? 'Edit Vocabulary' : 'Add Vocabulary'}
-                    </h2>
-                    <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-
+        <Modal title={isEdit ? 'Edit Vocabulary' : 'Add Vocabulary'} onClose={onClose} size="lg">
                 <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <label className={labelCls}>Word *</label>
-                            <input className={inputCls} value={form.word} onChange={set('word')} placeholder="e.g. eloquent" autoFocus />
+                            <Input label="Word" value={form.word} onChange={set('word')} placeholder="e.g. eloquent" required autoFocus />
                         </div>
                         <div>
-                            <label className={labelCls}>IPA</label>
-                            <input className={`${inputCls} font-mono`} value={form.ipa} onChange={set('ipa')} placeholder="/ˈɛl.ə.kwənt/" />
+                            <Input label="IPA" className="font-mono" value={form.ipa} onChange={set('ipa')} placeholder="/el.o.kwent/" />
                         </div>
                         <div>
-                            <label className={labelCls}>CEFR Level *</label>
-                            <select className={inputCls} value={form.level} onChange={set('level')}>
+                            <Select label="CEFR Level" value={form.level} onChange={set('level')} required>
                                 {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
+                            </Select>
                         </div>
                         <div className="col-span-2">
-                            <label className={labelCls}>Vietnamese Meaning</label>
-                            <input className={inputCls} value={form.meaningVi} onChange={set('meaningVi')} placeholder="e.g. hùng hồn, lưu loát" />
+                            <Input label="Vietnamese Meaning" value={form.meaningVi} onChange={set('meaningVi')} placeholder="e.g. hung hon, luu loat" />
                         </div>
                         <div className="col-span-2">
-                            <label className={labelCls}>Topic</label>
-                            <select className={inputCls} value={form.topicId} onChange={set('topicId')}>
+                            <Select label="Topic" value={form.topicId} onChange={set('topicId')}>
                                 <option value="">— No topic —</option>
                                 {topics.map(t => (
                                     <option key={t.topicId} value={String(t.topicId)}>
                                         {t.parentTopicName ? `${t.parentTopicName} › ` : ''}{t.name}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
                         </div>
                         <div className="col-span-2">
-                            <label className={labelCls}>Audio URL</label>
-                            <input className={inputCls} value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
+                            <Input label="Audio URL" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
                         </div>
                     </div>
 
@@ -197,8 +182,7 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
                         </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };
 
@@ -240,42 +224,33 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="glass-card w-full max-w-md p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-display font-bold text-text-primary">
-                        {isEdit ? 'Edit Example' : 'Add Example'}
-                    </h2>
-                    <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-
+        <Modal title={isEdit ? 'Edit Example' : 'Add Example'} onClose={onClose}>
                 <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                     <div>
-                        <label className={labelCls}>English Sentence *</label>
-                        <textarea
-                            className={`${inputCls} resize-none`}
+                        <TextArea
+                            label="English Sentence"
                             rows={3}
                             value={form.exampleEn}
                             onChange={set('exampleEn')}
                             placeholder="She was eloquent in her speech..."
+                            required
                             autoFocus
                         />
                     </div>
                     <div>
-                        <label className={labelCls}>Vietnamese Translation *</label>
+                        <label htmlFor="example-vi" className={labelCls}>Vietnamese Translation *</label>
                         <textarea
+                            id="example-vi"
                             className={`${inputCls} resize-none`}
                             rows={3}
                             value={form.exampleVi}
                             onChange={set('exampleVi')}
+                            required
                             placeholder="Cô ấy rất hùng hồn trong bài phát biểu..."
                         />
                     </div>
                     <div>
-                        <label className={labelCls}>Audio URL</label>
-                        <input className={inputCls} value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
+                        <Input label="Audio URL" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
                     </div>
 
                     {error && (
@@ -293,8 +268,7 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
                         </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };
 
@@ -332,8 +306,7 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
             : 'Permanently removes this example sentence.';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="glass-card w-full max-w-sm p-6">
+        <Modal title="Confirm Delete" onClose={onClose} size="sm">
                 <div className="flex items-start gap-4 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
                         <Trash2 size={18} className="text-red-500" />
@@ -355,16 +328,16 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
                 <div className="flex gap-3 justify-end">
                     <Button variant="ghost" onClick={onClose} disabled={deleting}>Cancel</Button>
                     <button
+                        type="button"
                         onClick={() => void handleConfirm()}
                         disabled={deleting}
-                        className="px-4 py-2 rounded-pill bg-red-500 hover:bg-red-600 text-white text-sm font-display font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className={`px-4 py-2 rounded-pill bg-danger-color hover:bg-danger-color/90 text-text-on-accent text-sm font-display font-bold transition-colors disabled:opacity-50 flex items-center gap-2 ${adminFocusRingClass}`}
                     >
                         {deleting && <Loader2 size={14} className="animate-spin" />}
                         Delete
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 
@@ -372,22 +345,24 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
 
 interface ExamplesPanelProps {
     vocab: AdminVocabularyItem;
+    panelId: string;
     onAdd: (vocabId: number) => void;
     onEdit: (example: AdminExampleItem) => void;
     onDelete: (example: AdminExampleItem) => void;
 }
 
-const ExamplesPanel = ({ vocab, onAdd, onEdit, onDelete }: ExamplesPanelProps) => (
-    <tr>
+const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPanelProps) => (
+    <tr id={panelId}>
         <td colSpan={7} className="px-4 pb-3 pt-0">
             <div className="p-4 rounded-2xl bg-primary/[0.04] border border-primary/10">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-display font-bold text-text-muted uppercase tracking-wider">
+                    <span className="text-xs font-display font-bold text-text-muted uppercase tracking-wide">
                         Examples — <span className="text-primary">{vocab.word}</span>
                     </span>
                     <button
+                        type="button"
                         onClick={() => onAdd(vocab.vocabId)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-bold text-primary hover:bg-primary/10 transition-colors"
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-bold text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
                     >
                         <Plus size={12} /> Add Example
                     </button>
@@ -406,32 +381,32 @@ const ExamplesPanel = ({ vocab, onAdd, onEdit, onDelete }: ExamplesPanelProps) =
                                     <p className="text-sm text-text-primary">{ex.exampleEn}</p>
                                     <p className="text-xs text-text-muted mt-0.5">{ex.exampleVi}</p>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                     {ex.audioUrl && (
                                         <a
                                             href={ex.audioUrl}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
-                                            title="Play audio"
+                                            aria-label={`Play audio for example: ${ex.exampleEn}`}
+                                            className={`p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
                                         >
                                             <Volume2 size={13} />
                                         </a>
                                     )}
-                                    <button
+                                    <IconButton
                                         onClick={() => onEdit(ex)}
-                                        className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                                        aria-label="Edit example"
                                         title="Edit example"
-                                    >
-                                        <Pencil size={13} />
-                                    </button>
-                                    <button
+                                        tone="primary"
+                                        icon={<Pencil size={13} />}
+                                    />
+                                    <IconButton
                                         onClick={() => onDelete(ex)}
-                                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                        aria-label="Delete example"
                                         title="Delete example"
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
+                                        tone="danger"
+                                        icon={<Trash2 size={13} />}
+                                    />
                                 </div>
                             </div>
                         ))}
@@ -608,18 +583,25 @@ const AdminVocabulary = () => {
 
     // ── Filter bar ─────────────────────────────────────────────────────────────
 
-    const filterInputCls = 'px-3 py-2 rounded-xl border border-border bg-surface text-sm text-text-primary focus:outline-none focus:border-primary transition-colors';
+    const filterInputCls = adminInputClass;
     const filterLabelCls = 'text-xs font-display font-bold text-text-muted';
 
     return (
         <div>
             {/* Toolbar */}
-            <div className="flex flex-wrap items-end gap-3 mb-6">
+            <FilterBar
+                actions={
+                    <Button variant="primary" onClick={() => setVocabModal({ type: 'create' })}>
+                        <Plus size={15} /> Add Vocabulary
+                    </Button>
+                }
+            >
                 <div className="flex-1 min-w-52">
-                    <p className={`${filterLabelCls} mb-1.5`}>Search</p>
+                    <label htmlFor="vocab-search" className={`${filterLabelCls} mb-1.5 block`}>Search</label>
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                         <input
+                            id="vocab-search"
                             className={`${filterInputCls} pl-8 w-full`}
                             placeholder="Word or meaning..."
                             value={search}
@@ -628,8 +610,9 @@ const AdminVocabulary = () => {
                     </div>
                 </div>
                 <div>
-                    <p className={`${filterLabelCls} mb-1.5`}>CEFR Level</p>
+                    <label htmlFor="vocab-cefr-filter" className={`${filterLabelCls} mb-1.5 block`}>CEFR Level</label>
                     <select
+                        id="vocab-cefr-filter"
                         className={filterInputCls}
                         value={cefrFilter}
                         onChange={e => { setCefrFilter(e.target.value); }}
@@ -639,8 +622,9 @@ const AdminVocabulary = () => {
                     </select>
                 </div>
                 <div>
-                    <p className={`${filterLabelCls} mb-1.5`}>Topic</p>
+                    <label htmlFor="vocab-topic-filter" className={`${filterLabelCls} mb-1.5 block`}>Topic</label>
                     <select
+                        id="vocab-topic-filter"
                         className={filterInputCls}
                         value={topicFilter}
                         onChange={e => { setTopicFilter(e.target.value); }}
@@ -653,13 +637,10 @@ const AdminVocabulary = () => {
                         ))}
                     </select>
                 </div>
-                <Button variant="primary" onClick={() => setVocabModal({ type: 'create' })}>
-                    <Plus size={15} /> Add Vocabulary
-                </Button>
-            </div>
+            </FilterBar>
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
+            <DataTable headers={[]}>
                 {loading ? (
                     <div className="flex items-center justify-center py-24 gap-3 text-text-muted">
                         <Loader2 size={22} className="animate-spin text-primary" />
@@ -683,12 +664,12 @@ const AdminVocabulary = () => {
                                 <thead>
                                     <tr className="border-b border-primary/10">
                                         <th className="w-10 px-4 py-3.5" />
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider">Word</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider">IPA</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider">Level</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider">Meaning</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider">Topic</th>
-                                        <th className="px-4 py-3.5 text-right text-xs font-display font-bold text-text-muted uppercase tracking-wider">Actions</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Word</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">IPA</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Level</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Meaning</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Topic</th>
+                                        <th className="px-4 py-3.5 text-right text-xs font-display font-bold text-text-muted uppercase tracking-wide">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -701,13 +682,18 @@ const AdminVocabulary = () => {
                                     ) : (
                                         items.map(vocab => {
                                             const isExpanded = expandedId === vocab.vocabId;
+                                            const examplesPanelId = `vocab-${vocab.vocabId}-examples`;
                                             return (
                                                 <React.Fragment key={vocab.vocabId}>
                                                     <tr className={`border-b border-primary/5 transition-colors ${isExpanded ? 'bg-primary/[0.04]' : 'hover:bg-primary/[0.03]'}`}>
                                                         <td className="px-4 py-3">
                                                             <button
+                                                                type="button"
                                                                 onClick={() => setExpandedId(isExpanded ? null : vocab.vocabId)}
-                                                                className="p-1 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                                                                aria-label={isExpanded ? `Collapse examples for ${vocab.word}` : `Expand ${vocab.examples.length} examples for ${vocab.word}`}
+                                                                aria-expanded={isExpanded}
+                                                                aria-controls={examplesPanelId}
+                                                                className={`p-1 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
                                                                 title={isExpanded ? 'Collapse' : `${vocab.examples.length} example(s) — click to manage`}
                                                             >
                                                                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -721,8 +707,8 @@ const AdminVocabulary = () => {
                                                                         href={vocab.audioUrl}
                                                                         target="_blank"
                                                                         rel="noreferrer"
-                                                                        className="text-text-muted hover:text-primary transition-colors"
-                                                                        title="Play audio"
+                                                                        aria-label={`Play audio for ${vocab.word}`}
+                                                                        className={`rounded text-text-muted hover:text-primary transition-colors ${adminFocusRingClass}`}
                                                                     >
                                                                         <Volume2 size={12} />
                                                                     </a>
@@ -748,26 +734,27 @@ const AdminVocabulary = () => {
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             <div className="flex items-center gap-1 justify-end">
-                                                                <button
+                                                                <IconButton
                                                                     onClick={() => setVocabModal({ type: 'edit', vocab })}
-                                                                    className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                                                                    aria-label={`Edit ${vocab.word}`}
                                                                     title="Edit"
-                                                                >
-                                                                    <Pencil size={14} />
-                                                                </button>
-                                                                <button
+                                                                    tone="primary"
+                                                                    icon={<Pencil size={14} />}
+                                                                />
+                                                                <IconButton
                                                                     onClick={() => setDeleteTarget({ type: 'vocab', id: vocab.vocabId, word: vocab.word })}
-                                                                    className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                                    aria-label={`Delete ${vocab.word}`}
                                                                     title="Delete"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
+                                                                    tone="danger"
+                                                                    icon={<Trash2 size={14} />}
+                                                                />
                                                             </div>
                                                         </td>
                                                     </tr>
                                                     {isExpanded && (
                                                         <ExamplesPanel
                                                             vocab={vocab}
+                                                            panelId={examplesPanelId}
                                                             onAdd={vocabId => setExampleModal({ type: 'create', vocabId })}
                                                             onEdit={example => setExampleModal({ type: 'edit', example })}
                                                             onDelete={ex => setDeleteTarget({
@@ -786,36 +773,15 @@ const AdminVocabulary = () => {
                             </table>
                         </div>
 
-                        {/* Pagination */}
-                        {pagination.totalPages > 1 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t border-primary/10">
-                                <span className="text-xs text-text-muted">
-                                    Page {pagination.page} of {pagination.totalPages} — {pagination.totalCount} words
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => handlePageChange(pagination.page - 1)}
-                                        disabled={pagination.page === 1}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronLeft size={16} />
-                                    </button>
-                                    <span className="px-3 text-sm font-display font-bold text-text-primary">
-                                        {pagination.page} / {pagination.totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => handlePageChange(pagination.page + 1)}
-                                        disabled={pagination.page === pagination.totalPages}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronRight size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        <Pagination
+                            page={pagination.page}
+                            totalPages={pagination.totalPages}
+                            onPageChange={handlePageChange}
+                            summary={`Page ${pagination.page} of ${pagination.totalPages} - ${pagination.totalCount} words`}
+                        />
                     </>
                 )}
-            </div>
+            </DataTable>
 
             {/* Modals */}
             {vocabModal && (

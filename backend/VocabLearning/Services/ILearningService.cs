@@ -12,6 +12,6 @@ namespace VocabLearning.Services
 
         List<ReviewOptionsViewModel> GetBatchReviewOptions(long userId, IReadOnlyCollection<long> vocabIds, IReadOnlyCollection<long> repeatedVocabIds);
 
-        LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality);
+        LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality, bool isRepeatedThisSession = false);
     }
 }

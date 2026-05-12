@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui';
+import { Button, typography } from '../components/ui';
 import { PATHS } from '../routes/paths';
 
 const ENCOURAGEMENT_MESSAGES = {
@@ -54,17 +54,17 @@ const MinitestResult = () => {
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="glass-card p-16 text-center shadow-2xl relative overflow-hidden"
+                className="glass-card p-6 sm:p-10 lg:p-12 text-center shadow-2xl relative overflow-hidden"
             >
                 <div className="mesh-orb w-64 h-64 bg-primary top-[-32px] right-[-32px] opacity-20" />
                 <div className="relative z-10">
-                    <div className="text-9xl font-display font-extrabold bg-linear-to-r from-cyan via-purple to-pink bg-clip-text text-transparent mb-8">
-                        {score}<span className="text-4xl text-text-muted">/{total}</span>
+                    <div className="text-[4rem] sm:text-[5rem] lg:text-[6rem] font-display font-extrabold bg-linear-to-r from-cyan via-purple to-pink bg-clip-text text-transparent mb-8 leading-none">
+                        {score}<span className="text-[1.75rem] text-text-muted">/{total}</span>
                     </div>
-                    <h2 className="text-4xl mb-6 font-bold">{message}</h2>
+                    <h2 className={`${typography.sectionTitle} mb-6`}>{message}</h2>
 
                     {detail?.bonus > 0 && (
-                        <div className="mb-12 inline-block px-6 py-3 bg-linear-to-r from-yellow-400 to-orange-500 rounded-pill text-white font-bold shadow-lg animate-bounce">
+                        <div className="mb-12 inline-block px-6 py-3 bg-linear-to-r from-yellow-400 to-orange-500 rounded-pill text-text-on-accent font-bold shadow-lg animate-bounce">
                             🔥 Perfect Translation Bonus: +50 XP
                         </div>
                     )}
