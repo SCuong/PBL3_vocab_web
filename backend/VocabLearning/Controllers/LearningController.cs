@@ -109,7 +109,8 @@ namespace VocabLearning.Controllers
             }
 
             var validIds = request.VocabIds.Where(id => id > 0).Distinct().ToList();
-            return Ok(_learningService.GetBatchReviewOptions(currentUser.UserId, validIds));
+            var repeatedIds = request.RepeatedVocabIds.Where(id => id > 0).Distinct().ToList();
+            return Ok(_learningService.GetBatchReviewOptions(currentUser.UserId, validIds, repeatedIds));
         }
 
         [HttpPost("/api/learning/words/review")]

@@ -100,6 +100,8 @@ const StudySession = () => {
   const [recentIndices, setRecentIndices] = useState<number[]>([]);
   const [reviewOptionsMap, setReviewOptionsMap] = useState<Record<number, ReviewOptionItem[]>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [sessionQueue, setSessionQueue] = useState<any[]>([]);
+  const [sessionSubmittedIds, setSessionSubmittedIds] = useState<Set<number>>(new Set());
 
   const words = useMemo(
     () =>
@@ -176,6 +178,10 @@ const StudySession = () => {
         .filter((w): w is any => Boolean(w)),
     [selectedWordIds, wordMapById],
   );
+
+  // In learnStep 2: session queue grows when words are reinserted (Phase A forgot/unsure).
+  // Falls back to selectedWords before queue is initialized (e.g. on F5 restore).
+  const activeSessionWords = sessionQueue.length > 0 ? sessionQueue : selectedWords;
 
   const ipaValidWords = useMemo(
     () => selectedWords.filter((w: any) => w.transcription && w.transcription.trim() !== ""),
@@ -274,31 +280,67 @@ const StudySession = () => {
     } catch {}
   }, [topicId, studyWords, sessionMode, tab, learnStep, selectedWordIds, currentIndex]);
 
+  // Initialize session queue when entering learnStep 2 (also handles F5 restore).
+  useEffect(() => {
+    if (learnStep === 2 && sessionQueue.length === 0 && selectedWords.length > 0) {
+      setSessionQueue([...selectedWords]);
+    }
+    if (learnStep !== 2) {
+      setSessionQueue([]);
+      setSessionSubmittedIds(new Set());
+    }
+    // selectedWords intentionally omitted — only re-run when learnStep changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnStep]);
+
   useEffect(() => {
     if (tab === 'learn' && learnStep === 2 && selectedWords.length > 0) {
-      learningProgressApi.getBatchReviewOptions(selectedWords.map((w: any) => w.id))
+      learningProgressApi.getBatchReviewOptions(
+        selectedWords.map((w: any) => w.id),
+        Array.from(sessionSubmittedIds),
+      )
         .then(map => setReviewOptionsMap(map))
         .catch(() => {});
     }
-  }, [tab, learnStep, selectedWords]);
+  }, [tab, learnStep, selectedWords, sessionSubmittedIds]);
 
   const handleReviewQuality = useCallback(async (
     quality: number,
     wordId: number,
-    wordList: any[],
+    queue: any[],
     index: number,
     onLast: () => void,
   ) => {
     if (reviewSubmitting || !topicId) return;
+
+    // Phase B = word already submitted once this session
+    const isPhaseB = sessionSubmittedIds.has(wordId);
+    // Phase C (review mode) uses backend scheduling only, never current queue reinsertion.
+    const shouldReinsert = !isReviewMode && (quality === 0 || (quality === 3 && !isPhaseB));
+
     setReviewSubmitting(true);
     try {
       await learningProgressApi.submitSingleReview(wordId, topicId, quality);
       onAddToast("Đã lưu tiến trình học tập", "success");
-      // Refresh options map so next words reflect updated SM-2 state
-      learningProgressApi.getBatchReviewOptions(wordList.map((w: any) => w.id))
+
+      const updatedSubmittedIds = new Set([...sessionSubmittedIds, wordId]);
+      setSessionSubmittedIds(updatedSubmittedIds);
+
+      let newQueue = queue;
+      if (shouldReinsert) {
+        newQueue = [...queue, queue[index]];
+        setSessionQueue(newQueue);
+      }
+
+      // Refresh options with updated repeated-IDs so Phase B previews display correctly
+      learningProgressApi.getBatchReviewOptions(
+        newQueue.map((w: any) => w.id),
+        Array.from(updatedSubmittedIds),
+      )
         .then(map => setReviewOptionsMap(map))
         .catch(() => {});
-      if (index < wordList.length - 1) {
+
+      if (index < newQueue.length - 1) {
         setCurrentIndex(index + 1);
         setIsFlipped(false);
       } else {
@@ -309,7 +351,7 @@ const StudySession = () => {
     } finally {
       setReviewSubmitting(false);
     }
-  }, [reviewSubmitting, topicId, onAddToast]);
+  }, [reviewSubmitting, topicId, onAddToast, sessionSubmittedIds, isReviewMode]);
 
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
@@ -813,6 +855,8 @@ const StudySession = () => {
                           onClick={() => {
                             setLearnStep(2);
                             setCurrentIndex(0);
+                            setSessionQueue([...selectedWords]);
+                            setSessionSubmittedIds(new Set());
                           }}
                         >
                           Bắt đầu học →
@@ -1086,6 +1130,8 @@ const StudySession = () => {
                         onClick={() => {
                           setLearnStep(2);
                           setCurrentIndex(0);
+                          setSessionQueue([...selectedWords]);
+                          setSessionSubmittedIds(new Set());
                         }}
                       >
                         {isReviewMode ? "Bắt đầu ôn tập" : "Bắt đầu học"}
@@ -1176,10 +1222,10 @@ const StudySession = () => {
                         Thẻ từ vựng
                       </Badge>
                       <div className="text-7xl font-display font-extrabold mb-4 text-primary">
-                        {selectedWords[currentIndex].word}
+                        {activeSessionWords[currentIndex].word}
                       </div>
                       <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
-                        {selectedWords[currentIndex].transcription}
+                        {activeSessionWords[currentIndex].transcription}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -1188,8 +1234,8 @@ const StudySession = () => {
                           onClick={(e: any) => {
                             e.stopPropagation();
                             playPronunciationAudio(
-                              selectedWords[currentIndex].audioUrl,
-                              selectedWords[currentIndex].word,
+                              activeSessionWords[currentIndex].audioUrl,
+                              activeSessionWords[currentIndex].word,
                             );
                           }}
                         >
@@ -1208,7 +1254,7 @@ const StudySession = () => {
                         Nghĩa
                       </Badge>
                       <div className="text-5xl font-bold mb-10 text-text-primary">
-                        {selectedWords[currentIndex].meaning}
+                        {activeSessionWords[currentIndex].meaning}
                       </div>
                       <Button
                         variant="ghost"
@@ -1216,17 +1262,17 @@ const StudySession = () => {
                         onClick={(e: any) => {
                           e.stopPropagation();
                           playPronunciationAudio(
-                            selectedWords[currentIndex].exampleAudioUrl,
-                            selectedWords[currentIndex].example,
+                            activeSessionWords[currentIndex].exampleAudioUrl,
+                            activeSessionWords[currentIndex].example,
                           );
                         }}
                       >
                         <Volume2 size={18} />
                       </Button>
                       <div className="bg-white/70 p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
-                        <p className="italic font-serif text-xl leading-loose">"{selectedWords[currentIndex].example}"</p>
-                        {selectedWords[currentIndex].translation && (
-                          <p className="text-sm text-text-muted mt-3">"{selectedWords[currentIndex].translation}"</p>
+                        <p className="italic font-serif text-xl leading-loose">"{activeSessionWords[currentIndex].example}"</p>
+                        {activeSessionWords[currentIndex].translation && (
+                          <p className="text-sm text-text-muted mt-3">"{activeSessionWords[currentIndex].translation}"</p>
                         )}
                       </div>
                     </div>
@@ -1234,16 +1280,16 @@ const StudySession = () => {
                 </div>
                 <div className="flex justify-center mb-4">
                   <span className="font-bold text-sm text-text-muted bg-primary/10 px-4 py-1 rounded-full">
-                    {currentIndex + 1} / {selectedWords.length}
+                    {currentIndex + 1} / {activeSessionWords.length}
                   </span>
                 </div>
                 <SM2ReviewButtons
-                  options={reviewOptionsMap[selectedWords[currentIndex]?.id] ?? []}
+                  options={reviewOptionsMap[activeSessionWords[currentIndex]?.id] ?? []}
                   onSelect={(quality) =>
                     handleReviewQuality(
                       quality,
-                      selectedWords[currentIndex].id,
-                      selectedWords,
+                      activeSessionWords[currentIndex].id,
+                      activeSessionWords,
                       currentIndex,
                       () => {
                         setLearnStep(3);

@@ -12,6 +12,12 @@ import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
 import { buildStudyDaySummary } from '../utils/studyHistory';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
+import {
+    checkPasswordPolicy,
+    isPasswordPolicyValid,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_POLICY_LABELS,
+} from '../utils/passwordPolicy';
 
 const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(value));
 
@@ -145,6 +151,8 @@ const Profile = () => {
             : {},
         [user?.studyHistoryDetails]
     );
+    const newPasswordPolicy = checkPasswordPolicy(newPassword);
+    const isNewPasswordValid = isPasswordPolicyValid(newPasswordPolicy);
 
     const studyHistoryDates = useMemo(() => {
         const detailDates = Object.keys(studyHistoryDetails)
@@ -247,6 +255,11 @@ const Profile = () => {
 
     const handleChangePassword = async () => {
         if (isSavingPassword) {
+            return;
+        }
+
+        if (!isNewPasswordValid) {
+            setConfirmPasswordError('Mật khẩu chưa đúng định dạng yêu cầu.');
             return;
         }
 
@@ -483,6 +496,7 @@ const Profile = () => {
                                     className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
                                     placeholder="Mật khẩu mới"
                                     value={newPassword}
+                                    maxLength={PASSWORD_MAX_LENGTH}
                                     onChange={(e) => {
                                         const nextValue = e.target.value;
                                         setNewPassword(nextValue);
@@ -499,11 +513,26 @@ const Profile = () => {
                                         );
                                     }}
                                 />
+                                <div className="rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                                    <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                                    {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                                        const ok = newPasswordPolicy[key];
+                                        return (
+                                            <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                                                    {ok ? '✓' : ''}
+                                                </span>
+                                                {label}
+                                            </p>
+                                        );
+                                    })}
+                                </div>
                                 <input
                                     type="password"
                                     className={`w-full px-4 py-3 rounded-xl border-2 ${confirmPasswordError ? 'border-red-400' : 'border-primary/10'}`}
                                     placeholder="Xác nhận mật khẩu mới"
                                     value={confirmNewPassword}
+                                    maxLength={PASSWORD_MAX_LENGTH}
                                     onChange={(e) => {
                                         const nextValue = e.target.value;
                                         setConfirmNewPassword(nextValue);

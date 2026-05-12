@@ -23,6 +23,7 @@ namespace VocabLearning.Services
         public LearningProgressStateViewModel GetLearningProgressState(long userId)
         {
             var now = DateTime.Now;
+            var today = now.Date;
 
             var learnedPairs = _context.UserVocabularies
                 .Where(item => item.UserId == userId)
@@ -42,7 +43,7 @@ namespace VocabLearning.Services
                 .Where(progress =>
                     progress.UserId == userId
                     && progress.NextReviewDate.HasValue
-                    && progress.NextReviewDate.Value <= now)
+                    && progress.NextReviewDate.Value.Date <= today)
                 .Join(
                     _context.Vocabularies.Where(vocabulary => vocabulary.TopicId.HasValue),
                     progress => progress.VocabId,
@@ -277,24 +278,58 @@ namespace VocabLearning.Services
             return GetLearningProgressState(userId);
         }
 
-        public List<ReviewOptionsViewModel> GetBatchReviewOptions(long userId, IReadOnlyCollection<long> vocabIds)
+        public List<ReviewOptionsViewModel> GetBatchReviewOptions(long userId, IReadOnlyCollection<long> vocabIds, IReadOnlyCollection<long> repeatedVocabIds)
         {
             var now = DateTime.Now;
             var progressByVocabId = _context.Progresses
                 .Where(p => p.UserId == userId && vocabIds.Contains(p.VocabId))
                 .ToDictionary(p => p.VocabId);
 
+            var repeatedSet = new HashSet<long>(repeatedVocabIds);
+
             return vocabIds.Select(vocabId =>
             {
                 progressByVocabId.TryGetValue(vocabId, out var progress);
+                var isRepeatedThisSession = repeatedSet.Contains(vocabId);
                 return new ReviewOptionsViewModel
                 {
                     VocabId = vocabId,
-                    Options = new[] { 0, 3, 4, 5 }
-                        .Select(q => SimulateReviewOption(progress, q, now))
+                    Options = new[] { 0, 3, 5 }
+                        .Select(q => SimulateReviewOptionWithPriority(progress, q, now, isRepeatedThisSession))
                         .ToList()
                 };
             }).ToList();
+        }
+
+        private static ReviewOptionItem SimulateReviewOptionWithPriority(Progress? progress, int quality, DateTime now, bool isRepeatedThisSession)
+        {
+            var today = now.Date;
+            var isDueRealReview = progress?.Repetitions > 0
+                && progress.NextReviewDate.HasValue
+                && progress.NextReviewDate.Value.Date <= today;
+
+            if (isDueRealReview)
+            {
+                var resultDays = CalculateRealReviewIntervalDays(progress!, quality, false);
+                return new ReviewOptionItem
+                {
+                    Quality = quality,
+                    Days = resultDays,
+                    NextReviewDate = now.AddDays(resultDays)
+                };
+            }
+
+            if (isRepeatedThisSession)
+            {
+                return new ReviewOptionItem
+                {
+                    Quality = quality,
+                    Days = quality == 0 ? 0 : 1,
+                    NextReviewDate = now.AddDays(quality == 0 ? 0 : 1)
+                };
+            }
+
+            return SimulateReviewOption(progress, quality, now, false);
         }
 
         public LearningProgressStateViewModel SubmitSingleWordReview(long userId, long vocabId, long topicId, int quality)
@@ -304,6 +339,7 @@ namespace VocabLearning.Services
 
             var progress = _context.Progresses
                 .FirstOrDefault(p => p.UserId == userId && p.VocabId == vocabId);
+            var isFirstExposureReview = progress == null || progress.Repetitions == 0;
 
             // Idempotency: ignore duplicate submissions within 5-second window (handles network retries / multi-tab)
             if (progress?.LastReviewDate.HasValue == true
@@ -315,13 +351,15 @@ namespace VocabLearning.Services
             var userVocabulary = _context.UserVocabularies
                 .FirstOrDefault(uv => uv.UserId == userId && uv.VocabId == vocabId);
 
-            var (nextReviewDate, status) = BuildReviewPlan(progress, quality, now);
-
             if (progress == null)
             {
                 progress = new Progress { UserId = userId, VocabId = vocabId };
                 _context.Progresses.Add(progress);
             }
+
+            var (nextReviewDate, status) = isFirstExposureReview
+                ? BuildFirstExposureReviewPlan(progress, quality, now)
+                : BuildReviewPlan(progress, quality, now);
 
             progress.LastReviewDate = now;
             progress.NextReviewDate = nextReviewDate;
@@ -348,33 +386,43 @@ namespace VocabLearning.Services
             return GetLearningProgressState(userId);
         }
 
-        // INTENTIONAL DESIGN: This is a UX-first SM-2 variant, not pure academic SM-2.
-        // Pure SM-2 gives identical intervals for all quality >= 3 at repetitions 1 and 2
-        // (hardcoded 1-day and 6-day steps), which makes all review buttons look the same.
-        // Instead, this preview simulation uses quality-differentiated multipliers so learners
-        // see meaningful, distinct feedback (Hard < Good < Easy) at every stage.
-        // The actual stored progress (BuildReviewPlan) follows standard SM-2 for long-term
-        // retention correctness. This method is for UI preview only.
-        private static ReviewOptionItem SimulateReviewOption(Progress? progress, int quality, DateTime now)
+        private static (DateTime NextReviewDate, string Status) BuildFirstExposureReviewPlan(Progress progress, int quality, DateTime now)
         {
-            var easeFactor = Math.Max(1.3d, progress?.EaseFactor ?? 2.5d);
-            var intervalDays = Math.Max(1, progress?.IntervalDays ?? 1);
+            var resultDays = quality >= 5 ? 1 : 0;
 
+            progress.EaseFactor = Math.Max(1.3d, progress.EaseFactor);
+            progress.IntervalDays = Math.Max(0, resultDays);
+            progress.Repetitions = quality >= 5 ? 1 : 0;
+
+            return (now.AddDays(resultDays), UserVocabularyStatuses.Learning);
+        }
+
+        // UI preview only — separates first-exposure / same-session reinforcement / real review.
+        // BuildReviewPlan (below) is the SM-2 source of truth for stored progress.
+        private static ReviewOptionItem SimulateReviewOption(Progress? progress, int quality, DateTime now, bool isRepeatedThisSession = false)
+        {
             int resultDays;
-            if (quality == 0)
+
+            if (isRepeatedThisSession)
             {
-                resultDays = 0; // preview: "Ôn lại ngay" — stored interval remains 1 day (BuildReviewPlan)
+                // Phase B: word reinserted and seen again in the same session
+                resultDays = quality == 0 ? 0 : 1;
+            }
+            else if (progress == null || progress.Repetitions == 0)
+            {
+                // Phase A: first exposure — show conservative intervals
+                resultDays = quality switch
+                {
+                    0 => 0,
+                    3 => 0,
+                    5 => 1,
+                    _ => 0
+                };
             }
             else
             {
-                var updatedEF = Math.Max(1.3d, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
-                resultDays = quality switch
-                {
-                    3 => Math.Max(2, (int)Math.Round(intervalDays * updatedEF * 0.5, MidpointRounding.AwayFromZero)),
-                    4 => Math.Max(3, (int)Math.Round(intervalDays * updatedEF, MidpointRounding.AwayFromZero)),
-                    5 => Math.Max(4, (int)Math.Round(intervalDays * updatedEF * 1.3, MidpointRounding.AwayFromZero)),
-                    _ => Math.Max(1, (int)Math.Round(intervalDays * updatedEF, MidpointRounding.AwayFromZero))
-                };
+                // Phase C: real review session — use SM-2-inspired intervals
+                resultDays = CalculateRealReviewIntervalDays(progress, quality, true);
             }
 
             return new ReviewOptionItem
@@ -396,16 +444,10 @@ namespace VocabLearning.Services
 
             if (quality >= 3)
             {
+                var previousRepetitions = repetitions;
                 repetitions += 1;
-                var updatedEF = Math.Max(1.3d, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)));
-                intervalDays = quality switch
-                {
-                    3 => Math.Max(2, (int)Math.Round(intervalDays * updatedEF * 0.5, MidpointRounding.AwayFromZero)),
-                    4 => Math.Max(3, (int)Math.Round(intervalDays * updatedEF, MidpointRounding.AwayFromZero)),
-                    5 => Math.Max(4, (int)Math.Round(intervalDays * updatedEF * 1.3, MidpointRounding.AwayFromZero)),
-                    _ => Math.Max(1, (int)Math.Round(intervalDays * updatedEF, MidpointRounding.AwayFromZero))
-                };
-                easeFactor = updatedEF;
+                easeFactor = CalculateUpdatedEaseFactor(easeFactor, quality);
+                intervalDays = CalculateSuccessfulReviewIntervalDays(intervalDays, easeFactor, quality, previousRepetitions);
             }
             else
             {
@@ -427,6 +469,37 @@ namespace VocabLearning.Services
                 : UserVocabularyStatuses.Learning;
 
             return (now.AddDays(intervalDays), status);
+        }
+
+        private static int CalculateRealReviewIntervalDays(Progress progress, int quality, bool allowImmediateForgot)
+        {
+            if (quality < 3)
+            {
+                return allowImmediateForgot ? 0 : 1;
+            }
+
+            var easeFactor = CalculateUpdatedEaseFactor(Math.Max(1.3d, progress.EaseFactor), quality);
+            var intervalDays = Math.Max(1, progress.IntervalDays);
+            var repetitions = Math.Max(0, progress.Repetitions);
+            return CalculateSuccessfulReviewIntervalDays(intervalDays, easeFactor, quality, repetitions);
+        }
+
+        private static int CalculateSuccessfulReviewIntervalDays(int intervalDays, double easeFactor, int quality, int repetitions)
+        {
+            return quality switch
+            {
+                3 when repetitions <= 1 => Math.Max(2, (int)Math.Round(intervalDays * easeFactor * 0.5d, MidpointRounding.AwayFromZero)),
+                3 => Math.Max(intervalDays + 1, (int)Math.Round(intervalDays * easeFactor * 0.75d, MidpointRounding.AwayFromZero)),
+                4 when repetitions <= 1 => Math.Max(3, (int)Math.Round(intervalDays * easeFactor, MidpointRounding.AwayFromZero)),
+                4 => Math.Max(intervalDays + 2, (int)Math.Round(intervalDays * easeFactor, MidpointRounding.AwayFromZero)),
+                5 => Math.Max(6, (int)Math.Round(intervalDays * easeFactor * 1.3d, MidpointRounding.AwayFromZero)),
+                _ => Math.Max(1, (int)Math.Round(intervalDays * easeFactor, MidpointRounding.AwayFromZero))
+            };
+        }
+
+        private static double CalculateUpdatedEaseFactor(double easeFactor, int quality)
+        {
+            return Math.Max(1.3d, easeFactor + (0.1d - (5 - quality) * (0.08d + (5 - quality) * 0.02d)));
         }
     }
 }

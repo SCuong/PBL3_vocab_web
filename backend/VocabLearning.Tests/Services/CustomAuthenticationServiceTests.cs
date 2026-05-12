@@ -44,6 +44,30 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
+        public async Task RegisterAsync_WithMinimumPolicyPassword_ShouldCreateUser()
+        {
+            var (succeeded, errorMessage, user) = await _service.RegisterAsync(
+                "policyuser", "policy@example.com", "abc12");
+
+            succeeded.Should().BeTrue();
+            errorMessage.Should().BeNull();
+            user.Should().NotBeNull();
+        }
+
+        [Theory]
+        [InlineData("abc1")]
+        [InlineData("ABCDE1")]
+        [InlineData("abcdef")]
+        public async Task RegisterAsync_WithPasswordOutsidePolicy_ShouldFail(string password)
+        {
+            var (succeeded, errorMessage, _) = await _service.RegisterAsync(
+                "badpolicy", "badpolicy@example.com", password);
+
+            succeeded.Should().BeFalse();
+            errorMessage.Should().Be(PasswordPolicyValidator.ErrorMessage);
+        }
+
+        [Fact]
         public async Task RegisterAsync_WithDuplicateUsername_ShouldFail()
         {
             // Arrange
@@ -193,6 +217,21 @@ namespace VocabLearning.Tests.Services
 
             // Verify new password works
             var authenticated = await _service.AuthenticateAsync("testuser", "NewPassword1!");
+            authenticated.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task ChangePasswordAsync_WithMinimumPolicyPassword_ShouldSucceed()
+        {
+            var (_, _, user) = await _service.RegisterAsync("changepolicy", "changepolicy@example.com", "old12");
+
+            var (succeeded, errorMessage) = await _service.ChangePasswordAsync(
+                user!.UserId, "old12", "abc12");
+
+            succeeded.Should().BeTrue();
+            errorMessage.Should().BeNull();
+
+            var authenticated = await _service.AuthenticateAsync("changepolicy", "abc12");
             authenticated.Should().NotBeNull();
         }
 
@@ -436,6 +475,22 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
+        public async Task ResetPasswordWithTokenAsync_WithMinimumPolicyPassword_ShouldSucceed()
+        {
+            await _service.RegisterAsync("resetpolicy", "resetpolicy@example.com", "old12");
+            var (_, _, _, token) = await _service.CreatePasswordResetTokenAsync("resetpolicy@example.com");
+
+            var (succeeded, errorMessage) = await _service.ResetPasswordWithTokenAsync(
+                "resetpolicy@example.com", token, "abc12", "127.0.0.1");
+
+            succeeded.Should().BeTrue();
+            errorMessage.Should().BeNull();
+
+            var user = await _service.AuthenticateAsync("resetpolicy", "abc12");
+            user.Should().NotBeNull();
+        }
+
+        [Fact]
         public async Task ResetPasswordWithTokenAsync_WithInvalidToken_ShouldFail()
         {
             // Arrange
@@ -497,6 +552,37 @@ namespace VocabLearning.Tests.Services
             succeeded.Should().BeTrue();
             user!.Role.Should().Be(UserRoles.Admin);
             user.Status.Should().Be(UserStatuses.Active);
+        }
+
+        [Fact]
+        public async Task CreateUserAsync_WithMinimumPolicyPassword_ShouldCreateUser()
+        {
+            var (succeeded, errorMessage, user) = await _service.CreateUserAsync(
+                "adminpolicy", "adminpolicy@example.com", "abc12", UserRoles.Admin, UserStatuses.Active);
+
+            succeeded.Should().BeTrue();
+            errorMessage.Should().BeNull();
+            user.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task UpdateUserAsync_WithPasswordOutsidePolicy_ShouldFail()
+        {
+            var (_, _, admin) = await _service.CreateUserAsync(
+                "admin", "admin@example.com", "admin1", UserRoles.Admin, UserStatuses.Active);
+            var (_, _, user) = await _service.RegisterAsync("learner", "learner@example.com", "abc12");
+
+            var (succeeded, errorMessage) = await _service.UpdateUserAsync(
+                user!.UserId,
+                "learner",
+                "learner@example.com",
+                "ABC12",
+                UserRoles.Learner,
+                UserStatuses.Active,
+                admin!.UserId);
+
+            succeeded.Should().BeFalse();
+            errorMessage.Should().Be(PasswordPolicyValidator.ErrorMessage);
         }
 
         [Fact]

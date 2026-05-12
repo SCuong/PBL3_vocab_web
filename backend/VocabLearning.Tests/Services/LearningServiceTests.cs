@@ -192,6 +192,24 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
+        public void GetLearningProgressState_WithReviewDueLaterToday_ShouldReturnReviewWordIds()
+        {
+            // Arrange
+            var progress = _context.Progresses.First(p => p.UserId == 2 && p.VocabId == 10);
+            progress.Repetitions = 0;
+            progress.NextReviewDate = DateTime.Now.Date.AddDays(1).AddTicks(-1);
+            _context.SaveChanges();
+
+            // Act
+            var result = _service.GetLearningProgressState(2);
+
+            // Assert
+            var topic10 = result.Topics.FirstOrDefault(t => t.TopicId == 10);
+            topic10.Should().NotBeNull();
+            topic10!.ReviewWordIds.Should().Contain(10);
+        }
+
+        [Fact]
         public void GetLearningProgressState_ShouldHaveLearnedWordIdsSorted()
         {
             // Act
@@ -399,6 +417,143 @@ namespace VocabLearning.Tests.Services
             var topic10 = result.Topics.FirstOrDefault(t => t.TopicId == 10);
             topic10.Should().NotBeNull();
             topic10!.LearnedWordIds.Should().Contain(new long[] { 13, 14 });
+        }
+
+        [Fact]
+        public void GetBatchReviewOptions_FirstExposure_ShouldReturnImmediateImmediateOneDay()
+        {
+            // Act
+            var result = _service.GetBatchReviewOptions(2, new[] { 13L }, Array.Empty<long>());
+
+            // Assert
+            result.Should().ContainSingle();
+            result[0].VocabId.Should().Be(13);
+            result[0].Options.Should().HaveCount(3);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 0);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 0);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 1);
+        }
+
+        [Fact]
+        public void GetBatchReviewOptions_RepeatedThisSession_ShouldReturnImmediateOneDayOneDay()
+        {
+            // Act
+            var result = _service.GetBatchReviewOptions(2, new[] { 10L }, new[] { 10L });
+
+            // Assert
+            result.Should().ContainSingle();
+            result[0].VocabId.Should().Be(10);
+            result[0].Options.Should().HaveCount(3);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 0);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 1);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 1);
+        }
+
+        [Fact]
+        public void GetBatchReviewOptions_FutureDayReview_ShouldKeepDynamicSm2Preview()
+        {
+            // Act
+            var result = _service.GetBatchReviewOptions(2, new[] { 10L }, Array.Empty<long>());
+
+            // Assert
+            result.Should().ContainSingle();
+            result[0].VocabId.Should().Be(10);
+            result[0].Options.Should().HaveCount(3);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 0);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 2);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 6);
+        }
+
+        [Fact]
+        public void GetBatchReviewOptions_DueReview_ShouldUseRealReviewPreview()
+        {
+            // Arrange
+            var progress = _context.Progresses.First(p => p.UserId == 2 && p.VocabId == 10);
+            progress.Repetitions = 1;
+            progress.IntervalDays = 2;
+            progress.EaseFactor = 2.5d;
+            progress.NextReviewDate = DateTime.Now.AddMinutes(-5);
+            _context.SaveChanges();
+
+            // Act
+            var result = _service.GetBatchReviewOptions(2, new[] { 10L }, Array.Empty<long>());
+
+            // Assert
+            result.Should().ContainSingle();
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 1);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 2);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 7);
+        }
+
+        [Fact]
+        public void GetBatchReviewOptions_DueReview_ShouldBeatRepeatedSessionFlag()
+        {
+            // Arrange
+            var progress = _context.Progresses.First(p => p.UserId == 2 && p.VocabId == 10);
+            progress.Repetitions = 1;
+            progress.IntervalDays = 2;
+            progress.EaseFactor = 2.5d;
+            progress.NextReviewDate = DateTime.Now.AddMinutes(-5);
+            _context.SaveChanges();
+
+            // Act
+            var result = _service.GetBatchReviewOptions(2, new[] { 10L }, new[] { 10L });
+
+            // Assert
+            result.Should().ContainSingle();
+            result[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 1);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 2);
+            result[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 7);
+        }
+
+        [Fact]
+        public void SubmitSingleWordReview_DueReviewUnsure_ShouldAdvanceRepAndGrowNextPreview()
+        {
+            // Arrange
+            var progress = _context.Progresses.First(p => p.UserId == 2 && p.VocabId == 10);
+            progress.Repetitions = 1;
+            progress.IntervalDays = 1;
+            progress.EaseFactor = 2.5d;
+            progress.NextReviewDate = DateTime.Now.AddMinutes(-5);
+            _context.SaveChanges();
+
+            // Act
+            _service.SubmitSingleWordReview(2, 10, 10, 3);
+
+            // Assert saved state after rep1 + q3
+            progress.Repetitions.Should().Be(2);
+            progress.IntervalDays.Should().Be(2);
+            progress.EaseFactor.Should().BeApproximately(2.36d, 0.001d);
+            progress.NextReviewDate!.Value.Date.Should().Be(DateTime.Now.Date.AddDays(2));
+
+            // Simulate the word becoming due again two days later.
+            progress.NextReviewDate = DateTime.Now.AddMinutes(-5);
+            _context.SaveChanges();
+
+            var preview = _service.GetBatchReviewOptions(2, new[] { 10L }, Array.Empty<long>());
+
+            preview.Should().ContainSingle();
+            preview[0].Options.Should().ContainSingle(o => o.Quality == 0 && o.Days == 1);
+            preview[0].Options.Should().ContainSingle(o => o.Quality == 3 && o.Days == 3);
+            preview[0].Options.Should().ContainSingle(o => o.Quality == 5 && o.Days == 6);
+        }
+
+        [Fact]
+        public void SubmitSingleWordReview_FirstExposureRememberClearly_ShouldScheduleReviewForTomorrow()
+        {
+            // Act
+            var result = _service.SubmitSingleWordReview(2, 13, 10, 5);
+
+            // Assert
+            var progress = _context.Progresses.FirstOrDefault(p => p.UserId == 2 && p.VocabId == 13);
+            progress.Should().NotBeNull();
+            progress!.Repetitions.Should().Be(1);
+            progress.IntervalDays.Should().Be(1);
+            progress.NextReviewDate.Should().NotBeNull();
+            progress.NextReviewDate!.Value.Date.Should().Be(DateTime.Now.Date.AddDays(1));
+
+            var topic10 = result.Topics.FirstOrDefault(t => t.TopicId == 10);
+            topic10?.ReviewWordIds.Should().NotContain(13);
         }
 
         [Fact]

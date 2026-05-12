@@ -7,6 +7,13 @@ import {
 import { Button } from '../../components/ui';
 import { useAppContext } from '../../context/AppContext';
 import {
+    checkPasswordPolicy,
+    isPasswordPolicyValid,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    PASSWORD_POLICY_LABELS,
+} from '../../utils/passwordPolicy';
+import {
     adminApi,
     type AdminUser,
     type AdminCreateUserPayload,
@@ -86,6 +93,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
     const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
     const [showPassword, setShowPassword] = useState(false);
     const isEdit = modalState.mode === 'edit';
+    const passwordPolicy = checkPasswordPolicy(form.password);
 
     useEffect(() => {
         if (modalState.mode === 'edit') {
@@ -180,9 +188,9 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                                 value={form.password}
                                 onChange={setField('password')}
                                 required={!isEdit}
-                                minLength={6}
-                                maxLength={128}
-                                placeholder={isEdit ? '••••••••' : 'Min 6 characters'}
+                                minLength={PASSWORD_MIN_LENGTH}
+                                maxLength={PASSWORD_MAX_LENGTH}
+                                placeholder={isEdit ? '••••••••' : `Min ${PASSWORD_MIN_LENGTH} characters`}
                                 disabled={saving}
                             />
                             <button
@@ -194,6 +202,22 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
+                        {(!isEdit || form.password) && (
+                            <div className="mt-2 rounded-xl border border-primary/15 bg-white/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                                <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                                {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                                    const ok = passwordPolicy[key];
+                                    return (
+                                        <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-gray-200'}`}>
+                                                {ok ? '✓' : ''}
+                                            </span>
+                                            {label}
+                                        </p>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -388,6 +412,12 @@ const AdminUsers = () => {
         setSaving(true);
         setFormError(null);
         try {
+            const shouldValidatePassword = modalState?.mode === 'create' || Boolean(form.password);
+            if (shouldValidatePassword && !isPasswordPolicyValid(checkPasswordPolicy(form.password))) {
+                setFormError('Password must be at least 5 characters and include one lowercase letter and one digit.');
+                return;
+            }
+
             if (modalState?.mode === 'create') {
                 const payload: AdminCreateUserPayload = {
                     username: form.username.trim(),
