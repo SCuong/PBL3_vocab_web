@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    AlertTriangle, ChevronDown, ChevronLeft,
-    ChevronRight, ChevronUp, Clock, Loader2, RefreshCw,
+    AlertTriangle, Activity, BarChart3, Clock, Loader2, RefreshCw,
     Users, BookOpen, BookMarked,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
+import { DataTable, FilterBar, Input, Pagination, SortableColumnHeader, StatCard } from '../../components/admin/ui';
+import { DashboardCard, EmptyState, MiniBarChart, ProgressBar } from '../../components/dashboard';
 import {
     adminApi,
     type LearningOverviewRow,
@@ -27,6 +28,22 @@ const formatDate = (iso: string): string =>
         month: 'short',
         day: 'numeric',
     });
+
+const toDayLabel = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+const buildDailyTrend = (rows: LearningOverviewRow[]) => {
+    const buckets = new Map<string, number>();
+    rows.forEach(row => {
+        const key = row.lastActivityAt?.slice(0, 10);
+        if (!key) return;
+        buckets.set(key, (buckets.get(key) ?? 0) + row.wordsStudied);
+    });
+    return Array.from(buckets.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-7)
+        .map(([date, value]) => ({ label: toDayLabel(date), value }));
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,27 +68,6 @@ interface Filters {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-interface StatCardProps {
-    icon: React.ReactNode;
-    label: string;
-    value: string | number;
-    color: string;
-}
-
-const StatCard = ({ icon, label, value, color }: StatCardProps) => (
-    <div className="glass-card p-6 flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
-            {icon}
-        </div>
-        <div>
-            <p className="text-xs font-display font-bold text-text-muted uppercase tracking-wider mb-0.5">
-                {label}
-            </p>
-            <p className="text-2xl font-display font-bold text-text-primary">{value}</p>
-        </div>
-    </div>
-);
-
 interface SortHeaderProps {
     label: string;
     sortKey: SortKey;
@@ -82,20 +78,13 @@ interface SortHeaderProps {
 const SortHeader = ({ label, sortKey, sort, onSort }: SortHeaderProps) => {
     const isActive = sort.by === sortKey;
     return (
-        <th
-            onClick={() => onSort(sortKey)}
-            className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wider cursor-pointer select-none group whitespace-nowrap"
-        >
-            <div className="flex items-center gap-1">
-                {label}
-                <span className={`transition-opacity ${isActive ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-40'}`}>
-                    {isActive && sort.direction === 'asc'
-                        ? <ChevronUp size={12} />
-                        : <ChevronDown size={12} />
-                    }
-                </span>
-            </div>
-        </th>
+        <SortableColumnHeader
+            label={label}
+            active={isActive}
+            direction={sort.direction}
+            onSort={() => onSort(sortKey)}
+            className="whitespace-nowrap"
+        />
     );
 };
 
@@ -161,64 +150,107 @@ const AdminOverview = () => {
         void load(cleared, sort, 1);
     };
 
-    const inputClass =
-        'px-3 py-2 rounded-xl border border-border bg-surface text-sm text-text-primary focus:outline-none focus:border-primary transition-colors';
-    const labelClass = 'text-xs font-display font-bold text-text-muted';
-
     const rows: LearningOverviewRow[] = result?.rows ?? [];
+    const activeLearners = new Set(rows.map(row => row.userId)).size;
+    const returningLearners = rows.filter(row => row.sessionCount > 1).length;
+    const retentionRate = rows.length > 0 ? Math.round((returningLearners / rows.length) * 100) : 0;
+    const reviewCompletionRate = rows.length > 0
+        ? Math.min(100, Math.round((rows.reduce((sum, row) => sum + row.wordsStudied, 0) / Math.max(1, rows.reduce((sum, row) => sum + row.sessionCount, 0) * 8)) * 100))
+        : 0;
+    const dailyTrend = buildDailyTrend(rows);
 
     return (
         <div>
             {/* Stats Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <StatCard
-                    icon={<Users size={22} className="text-white" />}
+                    icon={<Users size={22} className="text-text-on-accent" />}
                     label="Active Users"
                     value={result?.activeUserCount ?? '—'}
-                    color="bg-primary"
+                    tone="primary"
                 />
                 <StatCard
-                    icon={<BookOpen size={22} className="text-white" />}
+                    icon={<BookOpen size={22} className="text-text-on-accent" />}
                     label="Topics Studied"
                     value={result?.learnedTopicCount ?? '—'}
-                    color="bg-cyan"
-                    // reuse cyan via inline style
+                    tone="cyan"
                 />
                 <StatCard
-                    icon={<BookMarked size={22} className="text-white" />}
+                    icon={<BookMarked size={22} className="text-text-on-accent" />}
                     label="Words Studied"
                     value={result?.totalWordsStudied?.toLocaleString() ?? '—'}
-                    color="bg-accent"
+                    tone="accent"
                 />
                 <StatCard
-                    icon={<Clock size={22} className="text-white" />}
+                    icon={<Clock size={22} className="text-text-on-accent" />}
                     label="Active Hours"
                     value={result ? result.totalActiveHours.toFixed(1) : '—'}
-                    color="bg-secondary"
+                    tone="secondary"
                 />
             </div>
 
+            <div className="mb-8 grid gap-4 lg:grid-cols-3">
+                <DashboardCard title="Retention overview" subtitle="Derived from repeat learner sessions in current filter window.">
+                    <div className="flex items-end justify-between gap-4">
+                        <div>
+                            <p className="text-3xl font-display font-bold text-text-primary">{retentionRate}%</p>
+                            <p className="mt-1 text-xs text-text-muted">{returningLearners} returning activity rows</p>
+                        </div>
+                        <Users size={30} className="text-primary" />
+                    </div>
+                    <div className="mt-5">
+                        <ProgressBar value={retentionRate} max={100} tone="primary" />
+                    </div>
+                </DashboardCard>
+
+                <DashboardCard title="Review completion rate" subtitle="Estimated from words studied per session until review-event API exists.">
+                    <div className="flex items-end justify-between gap-4">
+                        <div>
+                            <p className="text-3xl font-display font-bold text-text-primary">{reviewCompletionRate}%</p>
+                            <p className="mt-1 text-xs text-text-muted">Proxy metric, not persisted review outcome.</p>
+                        </div>
+                        <Activity size={30} className="text-success-color" />
+                    </div>
+                    <div className="mt-5">
+                        <ProgressBar value={reviewCompletionRate} max={100} tone="success" />
+                    </div>
+                </DashboardCard>
+
+                <DashboardCard title="Daily learning trends" subtitle="Words studied by last activity date.">
+                    {dailyTrend.length > 0 ? (
+                        <MiniBarChart data={dailyTrend} tone="accent" />
+                    ) : (
+                        <EmptyState
+                            icon={<BarChart3 size={20} />}
+                            title="No trend data"
+                            description="Learning activity appears here after learners complete sessions."
+                        />
+                    )}
+                </DashboardCard>
+            </div>
+
+            <div className="mb-8 grid gap-4 lg:grid-cols-2">
+                <DashboardCard title="Hardest vocabulary analytics" subtitle="Needs per-word review quality/failure endpoint.">
+                    <EmptyState
+                        icon={<AlertTriangle size={20} />}
+                        title="No word difficulty feed yet"
+                        description="Add backend aggregation over exercise_result quality/accuracy by vocab_id to rank hardest words."
+                    />
+                </DashboardCard>
+
+                <DashboardCard title="Most failed exercises" subtitle="Needs exercise failure aggregation endpoint.">
+                    <EmptyState
+                        icon={<BookMarked size={20} />}
+                        title="No exercise failure feed yet"
+                        description="Add backend aggregation over exercise_result by exercise_id and incorrect attempts."
+                    />
+                </DashboardCard>
+            </div>
+
             {/* Filters */}
-            <div className="glass-card p-4 mb-6 flex flex-wrap gap-4 items-end">
-                <div>
-                    <p className={`${labelClass} mb-1.5`}>From Date</p>
-                    <input
-                        type="date"
-                        className={inputClass}
-                        value={filters.fromDate}
-                        onChange={e => setFilters(f => ({ ...f, fromDate: e.target.value }))}
-                    />
-                </div>
-                <div>
-                    <p className={`${labelClass} mb-1.5`}>To Date</p>
-                    <input
-                        type="date"
-                        className={inputClass}
-                        value={filters.toDate}
-                        onChange={e => setFilters(f => ({ ...f, toDate: e.target.value }))}
-                    />
-                </div>
-                <div className="flex gap-2">
+            <FilterBar
+                actions={
+                    <>
                     <Button variant="primary" onClick={applyFilters} disabled={loading}>
                         Apply
                     </Button>
@@ -227,11 +259,25 @@ const AdminOverview = () => {
                             Clear
                         </Button>
                     )}
-                </div>
-            </div>
+                    </>
+                }
+            >
+                <Input
+                    label="From Date"
+                    type="date"
+                    value={filters.fromDate}
+                    onChange={e => setFilters(f => ({ ...f, fromDate: e.target.value }))}
+                />
+                <Input
+                    label="To Date"
+                    type="date"
+                    value={filters.toDate}
+                    onChange={e => setFilters(f => ({ ...f, toDate: e.target.value }))}
+                />
+            </FilterBar>
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
+            <DataTable headers={[]}>
                 {loading ? (
                     <div className="flex items-center justify-center py-24 gap-3 text-text-muted">
                         <Loader2 size={22} className="animate-spin text-primary" />
@@ -307,36 +353,15 @@ const AdminOverview = () => {
                             </table>
                         </div>
 
-                        {/* Pagination */}
-                        {(result?.totalPages ?? 0) > 1 && (
-                            <div className="flex items-center justify-between px-4 py-3 border-t border-primary/10">
-                                <span className="text-xs text-text-muted">
-                                    Page {result!.page} of {result!.totalPages} — {result!.totalRows} rows total
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        disabled={page === 1}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronLeft size={16} />
-                                    </button>
-                                    <span className="px-3 text-sm font-display font-bold text-text-primary">
-                                        {page} / {result!.totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => setPage(p => Math.min(result!.totalPages, p + 1))}
-                                        disabled={page === result!.totalPages}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronRight size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        <Pagination
+                            page={page}
+                            totalPages={result?.totalPages ?? 0}
+                            onPageChange={setPage}
+                            summary={`Page ${result!.page} of ${result!.totalPages} - ${result!.totalRows} rows total`}
+                        />
                     </>
                 )}
-            </div>
+            </DataTable>
         </div>
     );
 };

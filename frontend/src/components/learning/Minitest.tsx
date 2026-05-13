@@ -102,7 +102,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
 
   return (
     <div className="max-w-5xl mx-auto pb-24 relative">
-      <div className="sticky top-[80px] z-40 bg-white/90 backdrop-blur-md p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
+      <div className="sticky top-[80px] z-40 bg-surface/90 backdrop-blur-md p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
         <div className="flex-1">
           <div className="flex justify-between text-xs font-bold text-text-muted mb-2 uppercase tracking-[0.2em]">
             <span>Tiến độ bài làm</span>
@@ -144,7 +144,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
               return (
                 <div
                   key={q.id}
-                  className={`glass-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50") : "bg-white"}`}
+                  className={`glass-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50") : "bg-surface"}`}
                 >
                   <div className="flex justify-between items-start mb-6">
                     <span className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center font-bold text-primary">
@@ -172,10 +172,10 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
                                   ? "border-green-500 bg-green-100 text-green-900"
                                   : isWrongSelected
                                   ? "border-red-500 bg-red-100 text-red-900"
-                                  : "border-primary/10 bg-white"
+                                  : "border-primary/10 bg-surface"
                                 : isSelected
                                 ? "border-primary bg-primary/5"
-                                : "border-primary/10 hover:border-primary/30 bg-white"
+                                : "border-primary/10 hover:border-primary/30 bg-surface"
                             }`}
                           >
                             <input
@@ -258,14 +258,14 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
                         ? isCorrect
                           ? "border-green-500 bg-green-50"
                           : "border-red-500 bg-red-50"
-                        : "border-transparent bg-white shadow-xl"
+                        : "border-transparent bg-surface shadow-xl"
                     }`}
                   >
                     <div className="flex items-center gap-4 mb-6">
                       <span className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center font-bold text-accent">
                         {qi + 1}
                       </span>
-                      <span className="text-sm font-bold text-accent uppercase tracking-wider">
+                      <span className="text-sm font-bold text-accent uppercase tracking-wide">
                         {q.questionType === "multiple-choice" ? "Trắc nghiệm" : "Điền từ"}
                       </span>
                     </div>
@@ -289,10 +289,10 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
                                     ? "border-green-500 bg-green-100 text-green-900 font-bold scale-[1.02]"
                                     : isWrongSelected
                                     ? "border-red-500 bg-red-100 text-red-900"
-                                    : "border-primary/5 bg-white"
+                                    : "border-primary/5 bg-surface"
                                   : isSelected
                                   ? "border-primary bg-primary/5 shadow-inner"
-                                  : "border-primary/5 hover:border-primary/20 bg-white"
+                                  : "border-primary/5 hover:border-primary/20 bg-surface"
                               }`}
                             >
                               <input
@@ -324,7 +324,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
                             setTranslationAnswers(next);
                           }}
                           placeholder="Nhập bản dịch tiếng Việt..."
-                          className="w-full p-4 text-xl border-2 border-primary/20 rounded-2xl focus:border-primary focus:outline-none transition-all disabled:bg-gray-50"
+                          className="w-full p-4 text-xl border-2 border-primary/20 rounded-2xl focus:border-primary focus:outline-none transition-all disabled:bg-bg-secondary"
                         />
                       </div>
                     )}

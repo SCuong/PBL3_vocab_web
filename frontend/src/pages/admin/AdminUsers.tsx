@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
-    AlertTriangle, ChevronLeft, ChevronRight,
+    AlertTriangle,
     Eye, EyeOff, Loader2, Pencil, Plus,
-    RefreshCw, Search, Trash2, X,
+    RefreshCw, Search, Trash2,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
+import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, adminInputClass, adminLabelClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
+import {
+    checkPasswordPolicy,
+    isPasswordPolicyValid,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    PASSWORD_POLICY_LABELS,
+} from '../../utils/passwordPolicy';
 import {
     adminApi,
     type AdminUser,
@@ -85,7 +93,9 @@ interface UserFormModalProps {
 const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFormModalProps) => {
     const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
     const [showPassword, setShowPassword] = useState(false);
+    const passwordId = useId();
     const isEdit = modalState.mode === 'edit';
+    const passwordPolicy = checkPasswordPolicy(form.password);
 
     useEffect(() => {
         if (modalState.mode === 'edit') {
@@ -112,34 +122,16 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
         e.preventDefault();
         void onSubmit(form);
     };
-
-    const inputClass =
-        'w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-sm text-text-primary focus:outline-none focus:border-primary transition-colors disabled:opacity-60';
-    const labelClass = 'block text-xs font-display font-bold text-text-muted mb-1.5';
+    const inputClass = adminInputClass;
+    const labelClass = adminLabelClass;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="glass-card w-full max-w-md p-8 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-display font-bold text-text-primary">
-                        {isEdit ? 'Edit User' : 'Create New User'}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={saving}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/10 text-text-muted hover:text-primary transition-colors disabled:opacity-40"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
+        <Modal title={isEdit ? 'Edit User' : 'Create New User'} onClose={onClose}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className={labelClass}>Username</label>
-                        <input
+                        <Input
+                            label="Username"
                             type="text"
-                            className={inputClass}
                             value={form.username}
                             onChange={setField('username')}
                             required
@@ -151,10 +143,9 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                     </div>
 
                     <div>
-                        <label className={labelClass}>Email</label>
-                        <input
+                        <Input
+                            label="Email"
                             type="email"
-                            className={inputClass}
                             value={form.email}
                             onChange={setField('email')}
                             required
@@ -165,7 +156,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                     </div>
 
                     <div>
-                        <label className={labelClass}>
+                        <label htmlFor={passwordId} className={labelClass}>
                             Password{' '}
                             {isEdit && (
                                 <span className="text-text-muted font-normal">
@@ -175,59 +166,76 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                         </label>
                         <div className="relative">
                             <input
+                                id={passwordId}
                                 type={showPassword ? 'text' : 'password'}
                                 className={`${inputClass} pr-10`}
                                 value={form.password}
                                 onChange={setField('password')}
                                 required={!isEdit}
-                                minLength={6}
-                                maxLength={128}
-                                placeholder={isEdit ? '••••••••' : 'Min 6 characters'}
+                                minLength={PASSWORD_MIN_LENGTH}
+                                maxLength={PASSWORD_MAX_LENGTH}
+                                placeholder={isEdit ? '••••••••' : `Min ${PASSWORD_MIN_LENGTH} characters`}
                                 disabled={saving}
                             />
                             <button
                                 type="button"
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                aria-pressed={showPassword}
+                                aria-controls={passwordId}
                                 onClick={() => setShowPassword(v => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-primary transition-colors"
-                                tabIndex={-1}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg text-text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary transition-colors"
                             >
                                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
+                        {(!isEdit || form.password) && (
+                            <div className="mt-2 rounded-xl border border-primary/15 bg-surface/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                                <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                                {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                                    const ok = passwordPolicy[key];
+                                    return (
+                                        <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
+                                                {ok ? '✓' : ''}
+                                            </span>
+                                            {label}
+                                        </p>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className={labelClass}>Role</label>
-                            <select
-                                className={inputClass}
+                            <Select
+                                label="Role"
                                 value={form.role}
                                 onChange={setField('role')}
                                 disabled={saving}
                             >
                                 <option value="LEARNER">LEARNER</option>
                                 <option value="ADMIN">ADMIN</option>
-                            </select>
+                            </Select>
                         </div>
                         <div>
-                            <label className={labelClass}>Status</label>
-                            <select
-                                className={inputClass}
+                            <Select
+                                label="Status"
                                 value={form.status}
                                 onChange={setField('status')}
                                 disabled={saving}
                             >
                                 <option value="ACTIVE">ACTIVE</option>
                                 <option value="INACTIVE">INACTIVE</option>
-                            </select>
+                            </Select>
                         </div>
                     </div>
 
                     {error && (
-                        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                        <ErrorNotice>
                             <AlertTriangle size={14} className="shrink-0" />
                             {error}
-                        </div>
+                        </ErrorNotice>
                     )}
 
                     <div className="flex gap-3 pt-2">
@@ -258,8 +266,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                         </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+        </Modal>
     );
 };
 
@@ -274,8 +281,7 @@ interface DeleteConfirmProps {
 }
 
 const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: DeleteConfirmProps) => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="glass-card w-full max-w-sm p-8 shadow-2xl">
+    <Modal title="Delete User" onClose={onClose} size="sm">
             <div className="flex flex-col items-center text-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
                     <AlertTriangle size={28} className="text-red-500" />
@@ -292,10 +298,10 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
                 </div>
 
                 {error && (
-                    <div className="w-full flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                    <ErrorNotice>
                         <AlertTriangle size={14} className="shrink-0" />
                         {error}
-                    </div>
+                    </ErrorNotice>
                 )}
 
                 <div className="flex gap-3 w-full">
@@ -323,8 +329,7 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
                     </Button>
                 </div>
             </div>
-        </div>
-    </div>
+    </Modal>
 );
 
 // ── AdminUsers ────────────────────────────────────────────────────────────────
@@ -388,6 +393,12 @@ const AdminUsers = () => {
         setSaving(true);
         setFormError(null);
         try {
+            const shouldValidatePassword = modalState?.mode === 'create' || Boolean(form.password);
+            if (shouldValidatePassword && !isPasswordPolicyValid(checkPasswordPolicy(form.password))) {
+                setFormError('Password must be at least 5 characters and include one lowercase letter and one digit.');
+                return;
+            }
+
             if (modalState?.mode === 'create') {
                 const payload: AdminCreateUserPayload = {
                     username: form.username.trim(),
@@ -460,34 +471,42 @@ const AdminUsers = () => {
     return (
         <div>
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <div className="relative flex-1">
+            <FilterBar
+                actions={
+                    <Button variant="primary" onClick={openCreate}>
+                        <Plus size={16} /> Add User
+                    </Button>
+                }
+            >
+                <div className="relative">
                     <Search
                         size={15}
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
                     />
-                    <input
+                    <Input
+                        aria-label="Search users"
                         type="text"
                         placeholder="Search username or email…"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-pill border border-border bg-surface text-sm focus:outline-none focus:border-primary transition-colors"
+                        className="pl-10 rounded-pill"
                         value={search}
                         onChange={e => { setSearch(e.target.value); resetPage(); }}
                     />
                 </div>
 
-                <div className="flex gap-2 flex-wrap">
-                    <select
-                        className="px-3 py-2.5 rounded-pill border border-border bg-surface text-sm text-text-muted focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    <Select
+                        aria-label="Filter users by role"
+                        className="rounded-pill"
                         value={roleFilter}
                         onChange={e => { setRoleFilter(e.target.value); resetPage(); }}
                     >
                         <option value="">All Roles</option>
                         <option value="ADMIN">ADMIN</option>
                         <option value="LEARNER">LEARNER</option>
-                    </select>
+                    </Select>
 
-                    <select
-                        className="px-3 py-2.5 rounded-pill border border-border bg-surface text-sm text-text-muted focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                    <Select
+                        aria-label="Filter users by status"
+                        className="rounded-pill"
                         value={statusFilter}
                         onChange={e => { setStatusFilter(e.target.value); resetPage(); }}
                     >
@@ -495,16 +514,11 @@ const AdminUsers = () => {
                         <option value="ACTIVE">ACTIVE</option>
                         <option value="INACTIVE">INACTIVE</option>
                         <option value="DELETED">DELETED</option>
-                    </select>
-
-                    <Button variant="primary" onClick={openCreate}>
-                        <Plus size={16} /> Add User
-                    </Button>
-                </div>
-            </div>
+                    </Select>
+            </FilterBar>
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
+            <DataTable headers={[]}>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -512,7 +526,7 @@ const AdminUsers = () => {
                                 {['ID', 'Username', 'Email', 'Role', 'Status', 'Login', 'Created', ''].map(h => (
                                     <th
                                         key={h}
-                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}
+                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
                                     >
                                         {h}
                                     </th>
@@ -569,7 +583,7 @@ const AdminUsers = () => {
                                             <div className="flex gap-1">
                                                 {user.hasLocalPassword && (
                                                     <span
-                                                        title="Password login"
+                                                        aria-label="Password login enabled"
                                                         className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
                                                     >
                                                         PW
@@ -577,7 +591,7 @@ const AdminUsers = () => {
                                                 )}
                                                 {user.hasGoogleLogin && (
                                                     <span
-                                                        title="Google login"
+                                                        aria-label="Google login enabled"
                                                         className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
                                                     >
                                                         G
@@ -591,20 +605,20 @@ const AdminUsers = () => {
                                         <td className="px-4 py-3.5">
                                             {!user.isDeleted && (
                                                 <div className="flex gap-1 justify-end">
-                                                    <button
+                                                    <IconButton
                                                         onClick={() => openEdit(user)}
+                                                        aria-label={`Edit ${user.username}`}
                                                         title="Edit user"
-                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
-                                                    >
-                                                        <Pencil size={14} />
-                                                    </button>
-                                                    <button
+                                                        tone="primary"
+                                                        icon={<Pencil size={14} />}
+                                                    />
+                                                    <IconButton
                                                         onClick={() => openDelete(user)}
+                                                        aria-label={`Delete ${user.username}`}
                                                         title="Delete user"
-                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                        tone="danger"
+                                                        icon={<Trash2 size={14} />}
+                                                    />
                                                 </div>
                                             )}
                                         </td>
@@ -615,36 +629,13 @@ const AdminUsers = () => {
                     </table>
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-primary/10">
-                        <span className="text-xs text-text-muted">
-                            {(page - 1) * PAGE_SIZE + 1}–
-                            {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}{' '}
-                            users
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <span className="px-3 text-sm font-display font-bold text-text-primary">
-                                {page} / {totalPages}
-                            </span>
-                            <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                disabled={page === totalPages}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
+                <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} users`}
+                />
+            </DataTable>
 
             {/* Modals */}
             {modalState && (

@@ -70,19 +70,19 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
                         initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.95, opacity: 0 }}
-                        className="bg-white rounded-3xl shadow-2xl w-full max-w-md"
+                        className="bg-surface rounded-3xl shadow-2xl w-full max-w-md"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-3xl flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <AlertTriangle className="text-white" size={24} />
-                                <h2 className="text-xl font-bold text-white">Xoá Tài Khoản</h2>
+                                <AlertTriangle className="text-text-on-accent" size={24} />
+                                <h2 className="text-xl font-bold text-text-on-accent">Xoá Tài Khoản</h2>
                             </div>
                             <button
                                 onClick={handleClose}
                                 disabled={isDeleting}
-                                className="text-white hover:bg-red-700 rounded-full p-1 transition-colors"
+                                className="text-text-on-accent hover:bg-danger-color/80 rounded-full p-1 transition-colors"
                             >
                                 <X size={20} />
                             </button>
@@ -98,7 +98,7 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2">
                                     Nhập mật khẩu để xác nhận
                                 </label>
                                 <input
@@ -110,12 +110,12 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
                                     }}
                                     placeholder="Mật khẩu của bạn"
                                     disabled={isDeleting}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-100"
+                                    className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-bg-secondary"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <label className="block text-sm font-semibold text-text-secondary mb-2">
                                     Nhập "DELETE" để xác nhận
                                 </label>
                                 <input
@@ -127,7 +127,7 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
                                     }}
                                     placeholder="Nhập DELETE"
                                     disabled={isDeleting}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-100"
+                                    className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-bg-secondary"
                                 />
                             </div>
 
@@ -143,7 +143,7 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
                         </div>
 
                         {/* Footer */}
-                        <div className="border-t border-gray-200 p-6 flex gap-3 justify-end">
+                        <div className="border-t border-border p-6 flex gap-3 justify-end">
                             <Button
                                 variant="ghost"
                                 onClick={handleClose}

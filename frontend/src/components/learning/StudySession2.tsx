@@ -6,21 +6,18 @@ import React, {
   useRef,
 } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "../ui";
 import { playPronunciationAudio } from "../../utils/audio";
 import { mockData } from "../../mocks/mockData";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
-import { SM2ReviewButtons } from "./SM2ReviewButtons";
 import { useAppContext } from "../../context/AppContext";
-import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
 import { PATHS } from "../../routes/paths";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const REVIEW_PAGE_SIZE = 10;
-
 
 const getCefrRank = (cefr?: string) => {
   const normalized = (cefr || "").toUpperCase();
@@ -37,31 +34,6 @@ const sortByCefrThenWord = (a: any, b: any) => {
   return (a.word || "").localeCompare(b.word || "");
 };
 
-const normalizeWordId = (id: unknown) => {
-  const value = Number(id);
-  return Number.isFinite(value) && value > 0 ? value : undefined;
-};
-
-const hasEarlierQueueOccurrence = (queue: any[], wordId: number | undefined, index: number) =>
-  Boolean(wordId && queue.slice(0, index).some((word: any) => normalizeWordId(word.id) === wordId));
-
-const getWordIds = (words: any[]) =>
-  words.map((word: any) => normalizeWordId(word.id)).filter((id): id is number => Boolean(id));
-
-const isEditableKeyboardTarget = (target: EventTarget | null) => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return (
-    target.isContentEditable ||
-    target.closest('[contenteditable="true"]') !== null ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
-  );
-};
-
 const StudySession = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -76,25 +48,9 @@ const StudySession = () => {
   } = useAppContext();
 
   const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
-
-  // Restore from sessionStorage when page is refreshed (F5) and locationState is lost
-  const [savedSession] = useState<{
-    topicId: number; words: any[]; mode: string | null;
-    tab: string; learnStep: number; selectedWordIds: number[]; currentIndex: number; ts: number;
-  } | null>(() => {
-    if (locationState?.topicId) return null;
-    try {
-      const raw = sessionStorage.getItem('ss_study_v1');
-      if (!raw) return null;
-      const s = JSON.parse(raw);
-      if (Date.now() - s.ts > 7_200_000) { sessionStorage.removeItem('ss_study_v1'); return null; }
-      return s;
-    } catch { return null; }
-  });
-
-  const topicId = locationState?.topicId ?? savedSession?.topicId;
-  const studyWords = locationState?.words ?? savedSession?.words;
-  const isReviewMode = (locationState?.mode ?? savedSession?.mode ?? null) === 'review';
+  const topicId = locationState?.topicId;
+  const studyWords = locationState?.words;
+  const isReviewMode = locationState?.mode === 'review';
 
   const onFinish = useCallback((score?: number, total?: number, detail?: any) => {
     if (score !== undefined && total !== undefined) {
@@ -105,27 +61,24 @@ const StudySession = () => {
   }, [navigate]);
 
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
-    (savedSession?.tab as "flashcard" | "learn" | "minitest" | undefined) ?? (isReviewMode ? "learn" : "flashcard"),
+    isReviewMode ? "learn" : "flashcard",
   );
-  const [learnStep, setLearnStep] = useState<1 | 2 | 3>((savedSession?.learnStep as 1 | 2 | 3 | undefined) ?? 1);
+  const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
   const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
-  const [selectedWordIds, setSelectedWordIds] = useState<number[]>(savedSession?.selectedWordIds ?? []);
+  const [customTab, setCustomTab] = useState<"new" | "review">("new");
+  const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
   const [reviewPage, setReviewPage] = useState(0);
   const [smartPage, setSmartPage] = useState(0);
   const [customNewPage, setCustomNewPage] = useState(0);
-  const hasAutoSelectedReview = useRef(Boolean(savedSession?.selectedWordIds?.length));
+  const [customReviewPage, setCustomReviewPage] = useState(0);
+  const hasAutoSelectedReview = useRef(false);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
   const [ipaFallbackNotice, setIpaFallbackNotice] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(savedSession?.currentIndex ?? 0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flashcardSearch, setFlashcardSearch] = useState('');
   const [showWordList, setShowWordList] = useState(false);
   const [recentIndices, setRecentIndices] = useState<number[]>([]);
-  const [reviewOptionsMap, setReviewOptionsMap] = useState<Record<number, ReviewOptionItem[]>>({});
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [sessionQueue, setSessionQueue] = useState<any[]>([]);
-  const [sessionSubmittedIds, setSessionSubmittedIds] = useState<Set<number>>(new Set());
-  const reviewOptionsRequestIdRef = useRef(0);
 
   const words = useMemo(
     () =>
@@ -203,37 +156,15 @@ const StudySession = () => {
     [selectedWordIds, wordMapById],
   );
 
-  // In learnStep 2: session queue grows when words are reinserted (Phase A forgot/unsure).
-  // Falls back to selectedWords before queue is initialized (e.g. on F5 restore).
-  const activeSessionWords = sessionQueue.length > 0 ? sessionQueue : selectedWords;
-  const activeWordId = normalizeWordId(activeSessionWords[currentIndex]?.id);
-  const isActiveWordPhaseB = !isReviewMode
-    && Boolean(activeWordId)
-    && (
-      sessionSubmittedIds.has(activeWordId)
-      || hasEarlierQueueOccurrence(activeSessionWords, activeWordId, currentIndex)
-    );
-  const activeReviewOptions = useMemo<ReviewOptionItem[]>(() => {
-    const options = activeWordId ? (reviewOptionsMap[activeWordId] ?? []) : [];
-    if (!isActiveWordPhaseB) {
-      return options;
-    }
-
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    return [0, 3, 5].map((quality) => {
-      const existing = options.find(option => option.quality === quality);
-      return {
-        quality,
-        days: 1,
-        nextReviewDate: existing?.nextReviewDate ?? tomorrow,
-      };
-    });
-  }, [activeWordId, isActiveWordPhaseB, reviewOptionsMap]);
-
   const ipaValidWords = useMemo(
     () => selectedWords.filter((w: any) => w.transcription && w.transcription.trim() !== ""),
     [selectedWords],
   );
+  const selectedReviewCount = useMemo(
+    () => selectedWords.filter((w: any) => learnedWordIdSet.has(w.id)).length,
+    [selectedWords, learnedWordIdSet],
+  );
+  const selectedNewCount = selectedWords.length - selectedReviewCount;
 
   const segment2Fill =
     learnStep >= 3
@@ -246,6 +177,16 @@ const StudySession = () => {
       words
         .filter((w: any) => !learnedWordIdSet.has(w.id)),
     [words, learnedWordIdSet],
+  );
+  const customReviewWords = useMemo(
+    () =>
+      words
+        .filter((w: any) => learnedWordIdSet.has(w.id)),
+    [words, learnedWordIdSet],
+  );
+  const customSelectableWords = useMemo(
+    () => (customTab === "new" ? customNewWords : customReviewWords),
+    [customTab, customNewWords, customReviewWords],
   );
   const learnedWordsForMinitest = useMemo(() => {
     if (!topicId || !learningProgressState?.topics) {
@@ -273,139 +214,34 @@ const StudySession = () => {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.isComposing || isEditableKeyboardTarget(e.target)) {
-        return;
-      }
-
-      if (tab === "flashcard") {
+      if (tab === "flashcard" || (tab === "learn" && learnStep === 2)) {
         if (e.code === "Space") {
           e.preventDefault();
           setIsFlipped((f) => !f);
-        } else if (e.code === "ArrowLeft") {
-          setCurrentIndex((i) => Math.max(0, i - 1));
-          setIsFlipped(false);
-        } else if (e.code === "ArrowRight") {
-          setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
+        }
+        if (e.code === "ArrowRight") {
+          setCurrentIndex((prev) => {
+            const max =
+              (tab === "flashcard" ? words : selectedWords).length - 1;
+            return prev < max ? prev + 1 : prev;
+          });
           setIsFlipped(false);
         }
-      } else if (tab === "learn" && learnStep === 2) {
-        if (e.code === "Space") {
-          e.preventDefault();
-          setIsFlipped((f) => !f);
+        if (e.code === "ArrowLeft") {
+          setCurrentIndex((prev) => Math.max(0, prev - 1));
+          setIsFlipped(false);
         }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [tab, learnStep, words.length]);
+  }, [tab, learnStep, words.length, selectedWords.length]);
 
   useEffect(() => {
     if (tab !== 'flashcard') return;
     setRecentIndices(prev => [currentIndex, ...prev.filter(i => i !== currentIndex)].slice(0, 6));
   }, [currentIndex, tab]);
 
-  // Persist session state so F5 refresh can resume from current position
-  const sessionMode = locationState?.mode ?? savedSession?.mode ?? null;
-  useEffect(() => {
-    if (!topicId || !studyWords || studyWords.length === 0 || tab !== 'learn' || learnStep < 2) return;
-    try {
-      sessionStorage.setItem('ss_study_v1', JSON.stringify({
-        topicId, words: studyWords, mode: sessionMode,
-        tab, learnStep, selectedWordIds, currentIndex, ts: Date.now(),
-      }));
-    } catch {}
-  }, [topicId, studyWords, sessionMode, tab, learnStep, selectedWordIds, currentIndex]);
-
-  // Initialize session queue when entering learnStep 2 (also handles F5 restore).
-  useEffect(() => {
-    if (learnStep === 2 && sessionQueue.length === 0 && selectedWords.length > 0) {
-      setSessionQueue([...selectedWords]);
-    }
-    if (learnStep !== 2) {
-      setSessionQueue([]);
-      setSessionSubmittedIds(new Set());
-    }
-    // selectedWords intentionally omitted — only re-run when learnStep changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnStep]);
-
-  useEffect(() => {
-    if (tab === 'learn' && learnStep === 2 && selectedWords.length > 0) {
-      const requestId = ++reviewOptionsRequestIdRef.current;
-      learningProgressApi.getBatchReviewOptions(
-        getWordIds(selectedWords),
-        Array.from(sessionSubmittedIds),
-      )
-        .then(map => {
-          if (requestId === reviewOptionsRequestIdRef.current) {
-            setReviewOptionsMap(map);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [tab, learnStep, selectedWords, sessionSubmittedIds]);
-
-  const handleReviewQuality = useCallback(async (
-    quality: number,
-    wordId: number,
-    queue: any[],
-    index: number,
-    onLast: () => void,
-  ) => {
-    if (reviewSubmitting || !topicId) return;
-
-    // Phase B = word already submitted once this session
-    const normalizedWordId = normalizeWordId(wordId);
-    if (!normalizedWordId) return;
-
-    const isDueReviewWord = reviewWordIdSet.has(normalizedWordId);
-    const isPhaseB = !isReviewMode
-      && (
-        sessionSubmittedIds.has(normalizedWordId)
-        || hasEarlierQueueOccurrence(queue, normalizedWordId, index)
-      );
-    // Phase C (review mode) uses backend scheduling only, never current queue reinsertion.
-    const shouldReinsert = !isReviewMode && !isDueReviewWord && !isPhaseB && (quality === 0 || quality === 3);
-
-    setReviewSubmitting(true);
-    try {
-      await learningProgressApi.submitSingleReview(normalizedWordId, topicId, quality, isPhaseB);
-      onAddToast("Đã lưu tiến trình học tập", "success");
-
-      const updatedSubmittedIds = new Set([...sessionSubmittedIds, normalizedWordId]);
-      setSessionSubmittedIds(updatedSubmittedIds);
-
-      let newQueue = queue;
-      if (shouldReinsert) {
-        newQueue = [...queue, queue[index]];
-        setSessionQueue(newQueue);
-      }
-
-      // Refresh options with updated repeated-IDs so Phase B previews display correctly
-      const requestId = ++reviewOptionsRequestIdRef.current;
-      learningProgressApi.getBatchReviewOptions(
-        getWordIds(newQueue),
-        Array.from(updatedSubmittedIds),
-      )
-        .then(map => {
-          if (requestId === reviewOptionsRequestIdRef.current) {
-            setReviewOptionsMap(map);
-          }
-        })
-        .catch(() => {});
-
-      if (index < newQueue.length - 1) {
-        setCurrentIndex(index + 1);
-        setIsFlipped(false);
-      } else {
-        onLast();
-      }
-    } catch {
-      onAddToast("Không thể lưu tiến trình. Vui lòng thử lại.", "error");
-    } finally {
-      setReviewSubmitting(false);
-    }
-  }, [reviewSubmitting, topicId, onAddToast, sessionSubmittedIds, isReviewMode, reviewWordIdSet]);
 
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
@@ -426,13 +262,6 @@ const StudySession = () => {
     setSelectedWordIds(reviewWords.slice(0, count).map((w: any) => w.id));
     setReviewPage(0);
   }, [reviewWords]);
-
-  const startSelectedStudyQueue = useCallback(() => {
-    setLearnStep(2);
-    setCurrentIndex(0);
-    setSessionQueue([...selectedWords]);
-    setSessionSubmittedIds(new Set());
-  }, [selectedWords]);
 
   const pagedReviewWords = useMemo(
     () => reviewWords.slice(reviewPage * REVIEW_PAGE_SIZE, (reviewPage + 1) * REVIEW_PAGE_SIZE),
@@ -464,12 +293,21 @@ const StudySession = () => {
     [customNewWords.length],
   );
 
+  const pagedCustomReviewWords = useMemo(
+    () => customReviewWords.slice(customReviewPage * REVIEW_PAGE_SIZE, (customReviewPage + 1) * REVIEW_PAGE_SIZE),
+    [customReviewWords, customReviewPage],
+  );
+
+  const customReviewTotalPages = useMemo(
+    () => Math.ceil(customReviewWords.length / REVIEW_PAGE_SIZE),
+    [customReviewWords.length],
+  );
+
   const handleFinishMatching = async (
     correct: number,
     total: number,
     time: number,
   ) => {
-    sessionStorage.removeItem('ss_study_v1');
     const gainedXp = correct * 5;
 
     if (topicId && selectedWordIds.length > 0) {
@@ -491,7 +329,7 @@ const StudySession = () => {
     onAddXP(gainedXp);
     onStreakCheck();
     onAddToast(
-      `Hoàn thành! +${gainedXp} XP 🎉`,
+      `Hoàn thành Matching trong ${time}s! +${gainedXp} XP`,
       "success",
     );
     setMatchType(null);
@@ -592,14 +430,17 @@ const StudySession = () => {
           >
             <div className="w-full">
 
-              {/* ── Flashcard carousel ────────────────────────────── */}
+              {/* ── Flashcard carousel with side arrows ───────────── */}
               <div className="flex items-center justify-center gap-6 mb-8 max-w-4xl mx-auto">
-                {/* Left arrow */}
+                {/* LEFT ARROW */}
                 <button
                   type="button"
+                  onClick={() => {
+                    setCurrentIndex((p) => Math.max(0, p - 1));
+                    setIsFlipped(false);
+                  }}
                   disabled={currentIndex === 0}
-                  onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface/60 backdrop-blur-sm hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full border-2 border-primary/20 text-primary hover:bg-primary/5 transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ArrowLeft size={24} />
                 </button>
@@ -704,12 +545,15 @@ const StudySession = () => {
                 </div>
                 </div>
 
-                {/* Right arrow */}
+                {/* RIGHT ARROW */}
                 <button
                   type="button"
+                  onClick={() => {
+                    setCurrentIndex((p) => Math.min(words.length - 1, p + 1));
+                    setIsFlipped(false);
+                  }}
                   disabled={currentIndex === words.length - 1}
-                  onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface/60 backdrop-blur-sm hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full border-2 border-primary/20 text-primary hover:bg-primary/5 transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ArrowRight size={24} />
                 </button>
@@ -885,13 +729,17 @@ const StudySession = () => {
                 )}
 
                 {learnMode === "custom" ? (
-                  <div className="mb-16 max-w-3xl mx-auto">
-                    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+                  <div className="mb-16">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
                       <div>
                         <h3 className="text-2xl font-bold">
                           {selectedWordIds.length === 0
                             ? "Chọn từ vựng để học"
-                            : `${selectedWordIds.length} từ mới đã chọn`}
+                            : selectedNewCount > 0 && selectedReviewCount > 0
+                              ? `${selectedNewCount} từ mới + ${selectedReviewCount} từ ôn`
+                              : selectedNewCount > 0
+                                ? `${selectedNewCount} từ mới đã chọn`
+                                : `${selectedReviewCount} từ ôn đã chọn`}
                         </h3>
                         <p className="text-sm text-text-muted mt-1">Nhấp vào từ để chọn / bỏ chọn</p>
                       </div>
@@ -899,7 +747,10 @@ const StudySession = () => {
                         <Button
                           variant="primary"
                           disabled={selectedWordIds.length === 0}
-                          onClick={startSelectedStudyQueue}
+                          onClick={() => {
+                            setLearnStep(2);
+                            setCurrentIndex(0);
+                          }}
                         >
                           Bắt đầu học →
                         </Button>
@@ -909,60 +760,106 @@ const StudySession = () => {
                       </div>
                     </div>
 
-                    <div className="rounded-3xl border border-primary/10 bg-surface/60 p-5 sm:p-6 shadow-sm">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-                        <div>
-                          <h4 className="font-bold text-lg text-text-primary">🆕 Từ mới</h4>
-                          <p className="text-xs text-text-muted mt-1">Chọn thủ công các từ mới muốn học trong phiên này.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-text-muted">
-                            {selectedWordIds.length > 0
-                              ? `${selectedWordIds.length} / ${customNewWords.length} từ`
-                              : `${customNewWords.length} từ`}
-                          </span>
-                          {customNewWords.length > 0 && (
-                            <button
-                              className="text-xs font-bold text-primary hover:underline cursor-pointer active:opacity-70 transition-opacity"
-                              onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customNewWords.map((w: any) => w.id)])))}
-                            >
-                              Chọn tất cả
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {customNewWords.length === 0 ? (
-                        <div className="glass-card p-6 text-sm text-text-muted text-center">
-                          Không còn từ mới trong chủ đề này.
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {pagedCustomNewWords.map((w: any) => {
-                              const isSel = selectedWordIds.includes(w.id);
-                              return (
-                                <div
-                                  key={w.id}
-                                  onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
-                                  className={`glass-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
-                                >
-                                  <div className="text-lg font-bold mb-0.5">{w.word}</div>
-                                  <div className="text-xs text-text-muted font-mono">{w.transcription}</div>
-                                </div>
-                              );
-                            })}
+                    <div className="grid lg:grid-cols-2 gap-8">
+                      {/* New words section */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-lg">🆕 Từ mới</h4>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-text-muted">{customNewWords.length} từ</span>
+                            {customNewWords.length > 0 && (
+                              <button
+                                className="text-xs font-bold text-primary hover:underline cursor-pointer active:opacity-70 transition-opacity"
+                                onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customNewWords.map((w: any) => w.id)])))}
+                              >
+                                Chọn tất cả
+                              </button>
+                            )}
                           </div>
-                          {customNewTotalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-6">
-                              <button onClick={() => setCustomNewPage((p) => Math.max(0, p - 1))} disabled={customNewPage === 0} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">← Trước</button>
-                              {Array.from({ length: customNewTotalPages }, (_, i) => (
-                                <button key={i} onClick={() => setCustomNewPage(i)} className={`w-8 h-8 rounded-full text-sm font-bold transition-colors cursor-pointer active:scale-95 ${customNewPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}>{i + 1}</button>
-                              ))}
-                              <button onClick={() => setCustomNewPage((p) => Math.min(customNewTotalPages - 1, p + 1))} disabled={customNewPage === customNewTotalPages - 1} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">Tiếp →</button>
+                        </div>
+                        {customNewWords.length === 0 ? (
+                          <div className="glass-card p-6 text-sm text-text-muted text-center">
+                            Không còn từ mới trong chủ đề này.
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {pagedCustomNewWords.map((w: any) => {
+                                const isSel = selectedWordIds.includes(w.id);
+                                return (
+                                  <div
+                                    key={w.id}
+                                    onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
+                                    className={`glass-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
+                                  >
+                                    <div className="text-lg font-bold mb-0.5">{w.word}</div>
+                                    <div className="text-xs text-text-muted font-mono">{w.transcription}</div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          )}
-                        </>
-                      )}
+                            {customNewTotalPages > 1 && (
+                              <div className="flex items-center justify-center gap-2 mt-3">
+                                <button onClick={() => setCustomNewPage((p) => Math.max(0, p - 1))} disabled={customNewPage === 0} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">← Trước</button>
+                                {Array.from({ length: customNewTotalPages }, (_, i) => (
+                                  <button key={i} onClick={() => setCustomNewPage(i)} className={`w-8 h-8 rounded-full text-sm font-bold transition-colors cursor-pointer active:scale-95 ${customNewPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}>{i + 1}</button>
+                                ))}
+                                <button onClick={() => setCustomNewPage((p) => Math.min(customNewTotalPages - 1, p + 1))} disabled={customNewPage === customNewTotalPages - 1} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">Tiếp →</button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Review words section */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-bold text-lg">🔔 Ôn tập</h4>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-text-muted">{customReviewWords.length} từ</span>
+                            {customReviewWords.length > 0 && (
+                              <button
+                                className="text-xs font-bold text-primary hover:underline cursor-pointer active:opacity-70 transition-opacity"
+                                onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customReviewWords.map((w: any) => w.id)])))}
+                              >
+                                Chọn tất cả
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {customReviewWords.length === 0 ? (
+                          <div className="glass-card p-6 text-sm text-text-muted text-center">
+                            Chưa có từ đến hạn ôn tập.
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {pagedCustomReviewWords.map((w: any) => {
+                                const isSel = selectedWordIds.includes(w.id);
+                                return (
+                                  <div
+                                    key={w.id}
+                                    onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
+                                    className={`glass-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-primary bg-primary/10 scale-105" : "border-transparent hover:border-primary/20"}`}
+                                  >
+                                    <div className="text-lg font-bold mb-0.5">{w.word}</div>
+                                    <div className="text-xs text-text-muted font-mono">{w.transcription}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {customReviewTotalPages > 1 && (
+                              <div className="flex items-center justify-center gap-2 mt-3">
+                                <button onClick={() => setCustomReviewPage((p) => Math.max(0, p - 1))} disabled={customReviewPage === 0} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">← Trước</button>
+                                {Array.from({ length: customReviewTotalPages }, (_, i) => (
+                                  <button key={i} onClick={() => setCustomReviewPage(i)} className={`w-8 h-8 rounded-full text-sm font-bold transition-colors cursor-pointer active:scale-95 ${customReviewPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}>{i + 1}</button>
+                                ))}
+                                <button onClick={() => setCustomReviewPage((p) => Math.min(customReviewTotalPages - 1, p + 1))} disabled={customReviewPage === customReviewTotalPages - 1} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">Tiếp →</button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1114,14 +1011,19 @@ const StudySession = () => {
                           ? `${selectedWordIds.length} từ cần ôn`
                           : learnMode === "smart"
                             ? `${selectedWordIds.length} từ mới`
-                            : `${selectedWordIds.length} từ đã chọn`}
+                            : selectedNewCount > 0 && selectedReviewCount > 0
+                              ? `${selectedNewCount} từ mới + ${selectedReviewCount} từ ôn`
+                              : `${selectedWordIds.length} từ đã chọn`}
                       </div>
 
                       <Button
                         variant="primary"
                         className="w-full"
                         disabled={selectedWordIds.length === 0}
-                        onClick={startSelectedStudyQueue}
+                        onClick={() => {
+                          setLearnStep(2);
+                          setCurrentIndex(0);
+                        }}
                       >
                         {isReviewMode ? "Bắt đầu ôn tập" : "Bắt đầu học"}
                       </Button>
@@ -1211,10 +1113,10 @@ const StudySession = () => {
                         Thẻ từ vựng
                       </Badge>
                       <div className="text-[4.5rem] font-display font-extrabold mb-4 text-primary leading-none">
-                        {activeSessionWords[currentIndex].word}
+                        {selectedWords[currentIndex].word}
                       </div>
                       <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
-                        {activeSessionWords[currentIndex].transcription}
+                        {selectedWords[currentIndex].transcription}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button
@@ -1223,8 +1125,8 @@ const StudySession = () => {
                           onClick={(e: any) => {
                             e.stopPropagation();
                             playPronunciationAudio(
-                              activeSessionWords[currentIndex].audioUrl,
-                              activeSessionWords[currentIndex].word,
+                              selectedWords[currentIndex].audioUrl,
+                              selectedWords[currentIndex].word,
                             );
                           }}
                         >
@@ -1243,7 +1145,7 @@ const StudySession = () => {
                         Nghĩa
                       </Badge>
                       <div className="text-[2rem] sm:text-[2.5rem] font-bold mb-10 text-text-primary leading-tight">
-                        {activeSessionWords[currentIndex].meaning}
+                        {selectedWords[currentIndex].meaning}
                       </div>
                       <Button
                         variant="ghost"
@@ -1251,44 +1153,59 @@ const StudySession = () => {
                         onClick={(e: any) => {
                           e.stopPropagation();
                           playPronunciationAudio(
-                            activeSessionWords[currentIndex].exampleAudioUrl,
-                            activeSessionWords[currentIndex].example,
+                            selectedWords[currentIndex].exampleAudioUrl,
+                            selectedWords[currentIndex].example,
                           );
                         }}
                       >
                         <Volume2 size={18} />
                       </Button>
                       <div className="bg-surface/70 p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
-                        <p className="italic font-serif text-xl leading-loose">"{activeSessionWords[currentIndex].example}"</p>
-                        {activeSessionWords[currentIndex].translation && (
-                          <p className="text-sm text-text-muted mt-3">"{activeSessionWords[currentIndex].translation}"</p>
+                        <p className="italic font-serif text-xl leading-loose">"{selectedWords[currentIndex].example}"</p>
+                        {selectedWords[currentIndex].translation && (
+                          <p className="text-sm text-text-muted mt-3">"{selectedWords[currentIndex].translation}"</p>
                         )}
                       </div>
                     </div>
                   </motion.div>
                 </div>
-                <div className="flex justify-center mb-4">
-                  <span className="font-bold text-sm text-text-muted bg-primary/10 px-4 py-1 rounded-full">
-                    {currentIndex + 1} / {activeSessionWords.length}
+                <div className="flex items-center justify-between mb-8">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setCurrentIndex((p) => Math.max(0, p - 1));
+                      setIsFlipped(false);
+                    }}
+                    disabled={currentIndex === 0}
+                  >
+                    ← Trước
+                  </Button>
+                  <span className="font-bold">
+                    {currentIndex + 1} / {selectedWords.length}
                   </span>
-                </div>
-                <SM2ReviewButtons
-                  options={activeReviewOptions}
-                  onSelect={(quality) =>
-                    handleReviewQuality(
-                      quality,
-                      activeSessionWords[currentIndex].id,
-                      activeSessionWords,
-                      currentIndex,
-                      () => {
+                  {currentIndex < selectedWords.length - 1 ? (
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setCurrentIndex((p) => p + 1);
+                        setIsFlipped(false);
+                      }}
+                    >
+                      Tiếp theo →
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="accent"
+                      onClick={() => {
                         setLearnStep(3);
                         setMatchType(null);
                         setIpaFallbackNotice(false);
-                      },
-                    )
-                  }
-                  isSubmitting={reviewSubmitting}
-                />
+                      }}
+                    >
+                      Vào luyện tập →
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
