@@ -19,7 +19,7 @@ namespace VocabLearning.Services
             CancellationToken cancellationToken = default);
 
         Task<(bool Succeeded, string? ErrorMessage)> ChangePasswordAsync(
-            long userId, string currentPassword, string newPassword,
+            long userId, string? currentPassword, string newPassword,
             CancellationToken cancellationToken = default);
 
         bool ValidatePasswordAsync(string passwordHash, string password);
