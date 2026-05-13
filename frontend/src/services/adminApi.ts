@@ -1,4 +1,5 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
+import { apiFetch } from './apiClient';
 
 export interface AdminUser {
     userId: number;
@@ -160,9 +161,8 @@ async function adminFetch<T>(
     url: string,
     options?: RequestInit
 ): Promise<T & { succeeded: boolean; message?: string }> {
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
         ...options,
-        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             ...options?.headers,

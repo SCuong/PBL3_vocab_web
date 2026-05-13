@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient';
+
 export type StickyNoteItem = {
     stickyNoteId: number;
     content: string;
@@ -20,9 +22,7 @@ type UpdateStickyNotePayload = {
 
 export const stickyNotesApi = {
     getAll: async (): Promise<StickyNoteItem[]> => {
-        const response = await fetch('/api/sticky-notes', {
-            credentials: 'include',
-        });
+        const response = await apiFetch('/api/sticky-notes');
 
         if (!response.ok) {
             throw new Error('Không thể tải sticky notes.');
@@ -32,9 +32,8 @@ export const stickyNotesApi = {
     },
 
     create: async (payload: CreateStickyNotePayload): Promise<StickyNoteItem> => {
-        const response = await fetch('/api/sticky-notes', {
+        const response = await apiFetch('/api/sticky-notes', {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
@@ -47,9 +46,8 @@ export const stickyNotesApi = {
     },
 
     update: async (stickyNoteId: number, payload: UpdateStickyNotePayload): Promise<StickyNoteItem> => {
-        const response = await fetch(`/api/sticky-notes/${stickyNoteId}`, {
+        const response = await apiFetch(`/api/sticky-notes/${stickyNoteId}`, {
             method: 'PUT',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
@@ -62,9 +60,8 @@ export const stickyNotesApi = {
     },
 
     remove: async (stickyNoteId: number): Promise<void> => {
-        const response = await fetch(`/api/sticky-notes/${stickyNoteId}`, {
+        const response = await apiFetch(`/api/sticky-notes/${stickyNoteId}`, {
             method: 'DELETE',
-            credentials: 'include',
         });
 
         if (!response.ok) {
