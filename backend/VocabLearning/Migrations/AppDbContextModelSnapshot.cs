@@ -114,6 +114,10 @@ namespace VocabLearning.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("is_correct");
 
+                    b.Property<int>("Quality")
+                        .HasColumnType("int")
+                        .HasColumnName("quality");
+
                     b.Property<long>("SessionId")
                         .HasColumnType("bigint")
                         .HasColumnName("session_id");
@@ -261,6 +265,55 @@ namespace VocabLearning.Migrations
                     b.ToTable("meaning", (string)null);
                 });
 
+            modelBuilder.Entity("VocabLearning.Models.PasswordResetToken", b =>
+                {
+                    b.Property<long>("PasswordResetTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("password_reset_token_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("PasswordResetTokenId"));
+
+                    b.Property<string>("ConsumedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("consumed_by_ip");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("used_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("PasswordResetTokenId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("password_reset_token", (string)null);
+                });
+
             modelBuilder.Entity("VocabLearning.Models.Progress", b =>
                 {
                     b.Property<long>("UserId")
@@ -271,10 +324,10 @@ namespace VocabLearning.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("vocab_id");
 
-                    b.Property<float>("EaseFactor")
+                    b.Property<double>("EaseFactor")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("real")
-                        .HasDefaultValue(2.5f)
+                        .HasColumnType("float")
+                        .HasDefaultValue(2.5)
                         .HasColumnName("ease_factor");
 
                     b.Property<int>("IntervalDays")
@@ -302,6 +355,60 @@ namespace VocabLearning.Migrations
                     b.HasIndex("UserId", "NextReviewDate");
 
                     b.ToTable("progress", (string)null);
+                });
+
+            modelBuilder.Entity("VocabLearning.Models.StickyNote", b =>
+                {
+                    b.Property<long>("StickyNoteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("sticky_note_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("StickyNoteId"));
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)")
+                        .HasDefaultValue("yellow")
+                        .HasColumnName("color");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<bool>("IsPinned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_pinned");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("StickyNoteId");
+
+                    b.HasIndex("UserId", "IsPinned", "UpdatedAt");
+
+                    b.ToTable("sticky_note", (string)null);
                 });
 
             modelBuilder.Entity("VocabLearning.Models.Topic", b =>
@@ -376,6 +483,10 @@ namespace VocabLearning.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("GETDATE()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -386,6 +497,12 @@ namespace VocabLearning.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)")
                         .HasColumnName("google_subject");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -527,6 +644,17 @@ namespace VocabLearning.Migrations
                     b.Navigation("Vocabulary");
                 });
 
+            modelBuilder.Entity("VocabLearning.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("VocabLearning.Models.Users", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("VocabLearning.Models.Progress", b =>
                 {
                     b.HasOne("VocabLearning.Models.Users", null)
@@ -539,6 +667,15 @@ namespace VocabLearning.Migrations
                         .WithOne()
                         .HasForeignKey("VocabLearning.Models.Progress", "UserId", "VocabId")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VocabLearning.Models.StickyNote", b =>
+                {
+                    b.HasOne("VocabLearning.Models.Users", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
