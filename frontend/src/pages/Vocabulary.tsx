@@ -4,6 +4,7 @@ import { Search, Volume2, X, Sparkles, Loader2 } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { Badge, Button, PageTitle, typography } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
+import { apiFetch } from '../services/apiClient';
 import { playPronunciationAudio } from '../utils/audio';
 import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
 import { useAppContext } from '../context/AppContext';
@@ -52,7 +53,7 @@ const Vocabulary = () => {
             formData.append('word', selectedWord.word);
             formData.append('context', selectedWord.meaning);
 
-            const response = await fetch('/api/AI/Explain', {
+            const response = await apiFetch('/api/AI/Explain', {
                 method: 'POST',
                 body: formData
             });

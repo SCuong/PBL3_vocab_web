@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient';
+
 export type AuthenticatedUser = {
     userId: number;
     username: string;
@@ -32,9 +34,7 @@ export type ForgotPasswordResult = {
 export const authApi = {
     me: async (): Promise<AuthApiResponse | null> => {
         try {
-            const response = await fetch('/api/auth/me', {
-                credentials: 'include'
-            });
+            const response = await apiFetch('/api/auth/me');
 
             if (response.status === 401) {
                 return null;
@@ -48,10 +48,9 @@ export const authApi = {
     },
 
     login: async (payload: { usernameOrEmail: string; password: string; rememberMe: boolean }) => {
-        const response = await fetch('/api/auth/login', {
+        const response = await apiFetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -64,10 +63,9 @@ export const authApi = {
     },
 
     register: async (payload: { name: string; email: string; password: string; confirmPassword: string }) => {
-        const response = await fetch('/api/auth/register', {
+        const response = await apiFetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -80,10 +78,9 @@ export const authApi = {
     },
 
     verifyEmail: async (payload: { token: string }) => {
-        const response = await fetch('/api/auth/verify-email', {
+        const response = await apiFetch('/api/auth/verify-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -96,10 +93,9 @@ export const authApi = {
     },
 
     resendVerification: async (payload: { email: string }) => {
-        const response = await fetch('/api/auth/resend-verification', {
+        const response = await apiFetch('/api/auth/resend-verification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -112,10 +108,9 @@ export const authApi = {
     },
 
     googleLogin: async (payload: { idToken: string }) => {
-        const response = await fetch('/api/auth/google', {
+        const response = await apiFetch('/api/auth/google', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -128,10 +123,9 @@ export const authApi = {
     },
 
     forgotPassword: async (payload: { email: string }): Promise<ForgotPasswordResult> => {
-        const response = await fetch('/api/auth/forgot-password', {
+        const response = await apiFetch('/api/auth/forgot-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -155,10 +149,9 @@ export const authApi = {
         newPassword: string;
         confirmNewPassword: string;
     }) => {
-        const response = await fetch('/api/auth/reset-password', {
+        const response = await apiFetch('/api/auth/reset-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -171,10 +164,9 @@ export const authApi = {
     },
 
     updateProfile: async (payload: { username: string; email: string }) => {
-        const response = await fetch('/api/account/profile', {
+        const response = await apiFetch('/api/account/profile', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -187,10 +179,9 @@ export const authApi = {
     },
 
     changePassword: async (payload: { currentPassword: string; newPassword: string; confirmNewPassword: string }) => {
-        const response = await fetch('/api/account/change-password', {
+        const response = await apiFetch('/api/account/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 
@@ -201,17 +192,15 @@ export const authApi = {
     },
 
     logout: async () => {
-        await fetch('/api/auth/logout', {
-            method: 'POST',
-            credentials: 'include'
+        await apiFetch('/api/auth/logout', {
+            method: 'POST'
         });
     },
 
     deleteAccount: async (payload: { password: string }) => {
-        const response = await fetch('/api/account/delete', {
+        const response = await apiFetch('/api/account/delete', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(payload)
         });
 

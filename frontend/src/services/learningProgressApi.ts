@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient';
+
 export type LearningProgressTopicStateItem = {
     topicId: number;
     learnedWordIds: number[];
@@ -23,9 +25,7 @@ const normalizeWordIds = (wordIds: number[]) => wordIds.filter(id => Number.isFi
 
 export const learningProgressApi = {
     getState: async (): Promise<LearningProgressState> => {
-        const response = await fetch('/api/learning/progress', {
-            credentials: 'include'
-        });
+        const response = await apiFetch('/api/learning/progress');
 
         if (!response.ok) {
             throw new Error('Failed to load learning progress state.');
@@ -36,9 +36,8 @@ export const learningProgressApi = {
 
     getBatchReviewOptions: async (vocabIds: number[], repeatedVocabIds: number[] = []): Promise<Record<number, ReviewOptionItem[]>> => {
         if (vocabIds.length === 0) return {};
-        const response = await fetch('/api/learning/review-options/batch', {
+        const response = await apiFetch('/api/learning/review-options/batch', {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ vocabIds, repeatedVocabIds }),
         });
@@ -48,9 +47,8 @@ export const learningProgressApi = {
     },
 
     submitSingleReview: async (vocabId: number, topicId: number, quality: number, isRepeatedThisSession = false): Promise<LearningProgressState> => {
-        const response = await fetch('/api/learning/words/review', {
+        const response = await apiFetch('/api/learning/words/review', {
             method: 'POST',
-            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ vocabId, topicId, quality, isRepeatedThisSession }),
         });
@@ -59,9 +57,8 @@ export const learningProgressApi = {
     },
 
     markWordsLearned: async (topicId: number, wordIds: number[]): Promise<LearningProgressState> => {
-        const response = await fetch('/api/learning/progress/learn', {
+        const response = await apiFetch('/api/learning/progress/learn', {
             method: 'POST',
-            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },

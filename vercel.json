@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://pbl3-vocab-api.azurewebsites.net/api/:path*"
+    }
+  ]
+}

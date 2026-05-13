@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Volume2, Sparkles, Loader2 } from 'lucide-react';
 import { playPronunciationAudio } from '../utils/audio';
 import { Badge, Button, typography } from '../components/ui';
+import { apiFetch } from '../services/apiClient';
 
 const VocabDetail = ({ word, onBack }: any) => {
     const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -19,7 +20,7 @@ const VocabDetail = ({ word, onBack }: any) => {
             formData.append('word', word.word);
             formData.append('context', word.meaning);
 
-            const response = await fetch('/api/AI/Explain', {
+            const response = await apiFetch('/api/AI/Explain', {
                 method: 'POST',
                 body: formData,
                 signal: controller.signal,

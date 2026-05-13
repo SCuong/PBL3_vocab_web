@@ -1,3 +1,5 @@
+import { apiFetch } from './apiClient';
+
 export type VocabularyListItem = {
     id: number;
     word: string;
@@ -82,9 +84,7 @@ const buildVocabularyQuery = ({ page = 1, pageSize = 24, search = '', cefr = '',
 export const vocabularyApi = {
     getPage: async (params: GetVocabularyPageParams = {}): Promise<PagedVocabularyResult> => {
         const query = buildVocabularyQuery(params);
-        const response = await fetch(`/api/vocabulary?${query}`, {
-            credentials: 'include'
-        });
+        const response = await apiFetch(`/api/vocabulary?${query}`);
 
         if (!response.ok) {
             throw new Error('Không thể tải danh sách từ vựng.');
@@ -103,9 +103,7 @@ export const vocabularyApi = {
         }
 
         const query = normalizedIds.map((id) => `ids=${encodeURIComponent(String(id))}`).join('&');
-        const response = await fetch(`/api/vocabulary/by-ids?${query}`, {
-            credentials: 'include'
-        });
+        const response = await apiFetch(`/api/vocabulary/by-ids?${query}`);
 
         if (!response.ok) {
             throw new Error('Không thể tải danh sách từ đã học.');
@@ -115,9 +113,7 @@ export const vocabularyApi = {
     },
 
     getById: async (id: number): Promise<VocabularyDetailItem> => {
-        const response = await fetch(`/api/vocabulary/${id}`, {
-            credentials: 'include'
-        });
+        const response = await apiFetch(`/api/vocabulary/${id}`);
 
         if (!response.ok) {
             throw new Error('Không thể tải chi tiết từ vựng.');
@@ -127,9 +123,7 @@ export const vocabularyApi = {
     },
 
     getTopics: async (): Promise<VocabularyTopicItem[]> => {
-        const response = await fetch('/api/vocabulary/topics', {
-            credentials: 'include'
-        });
+        const response = await apiFetch('/api/vocabulary/topics');
 
         if (!response.ok) {
             throw new Error('Không thể tải danh sách chủ đề.');
@@ -139,9 +133,7 @@ export const vocabularyApi = {
     },
 
     getLearningByTopic: async (topicId: number): Promise<VocabularyLearningItem[]> => {
-        const response = await fetch(`/api/learning/topics/${topicId}/vocabulary`, {
-            credentials: 'include'
-        });
+        const response = await apiFetch(`/api/learning/topics/${topicId}/vocabulary`);
 
         if (!response.ok) {
             throw new Error('Không thể tải danh sách học theo chủ đề.');
