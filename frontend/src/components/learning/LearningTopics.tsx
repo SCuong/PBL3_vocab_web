@@ -47,9 +47,9 @@ const LearningTopics = () => {
     <div className="max-w-6xl mx-auto px-6 py-12 relative">
       {/* Guest Banner */}
       {isGuest && (
-        <div className="mb-12 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex items-center justify-between backdrop-blur-md border border-white/20 shadow-xl animate-fade-in">
-          <div className="flex items-center gap-4 text-white">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+        <div className="mb-12 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex items-center justify-between backdrop-blur-md border border-text-on-accent/20 shadow-xl animate-fade-in">
+          <div className="flex items-center gap-4 text-text-on-accent">
+            <div className="w-10 h-10 rounded-full bg-surface/20 flex items-center justify-center text-xl">
               ✨
             </div>
             <p className="font-bold">
@@ -58,7 +58,7 @@ const LearningTopics = () => {
           </div>
           <Button
             variant="ghost"
-            className="bg-white/20 border-white/40 text-white"
+            className="bg-surface/20 border-text-on-accent/40 text-text-on-accent"
             onClick={() => navigate("/register")}
           >
             Đăng ký miễn phí →
@@ -70,7 +70,7 @@ const LearningTopics = () => {
       {!isGuest && (
         <header className="flex items-center justify-between mb-16 animate-slide-down">
           <div>
-            <h1 className="text-5xl mb-2 font-display font-bold">
+            <h1 className="text-[1.875rem] sm:text-[2rem] mb-2 font-display font-bold leading-tight tracking-normal">
               Chào {currentUser.username}! 👋
             </h1>
             <p className="text-text-secondary text-lg">
@@ -91,7 +91,7 @@ const LearningTopics = () => {
       {/* Main Header for Guest */}
       {isGuest && (
         <header className="text-center mb-16">
-          <h1 className="text-5xl mb-4 font-display font-bold">
+          <h1 className="text-[1.875rem] sm:text-[2rem] mb-4 font-display font-bold leading-tight tracking-normal">
             Khám phá chủ đề học
           </h1>
           <p className="text-text-secondary text-lg max-w-2xl mx-auto">
@@ -105,7 +105,7 @@ const LearningTopics = () => {
         <div className={`mb-8 p-4 rounded-2xl flex items-center gap-4 border animate-fade-in ${
           totalReviewCount > 10
             ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-purple/10 border-purple/30 text-[#4B1F8A]'
+            : 'bg-purple/10 border-purple/30 text-primary'
         }`}>
           <div className="text-3xl flex-shrink-0">🔔</div>
           <div>
@@ -136,7 +136,7 @@ const LearningTopics = () => {
                 disabled={isCategoryLocked}
               >
                 <div className="flex items-center gap-6">
-                  <div className="text-4xl group-hover:scale-110 transition-transform">
+                  <div className="text-[2rem] group-hover:scale-110 transition-transform">
                     {cat.icon ?? "📚"}
                   </div>
                   <div className="text-left">
@@ -166,7 +166,7 @@ const LearningTopics = () => {
                     initial={{ height: 0 }}
                     animate={{ height: "auto" }}
                     exit={{ height: 0 }}
-                    className="overflow-hidden bg-white/30"
+                    className="overflow-hidden bg-surface/30"
                   >
                     <div className="p-8 grid md:grid-cols-2 gap-6">
                       {cat.topics.map((topic: any, idx: number) => {
@@ -189,15 +189,15 @@ const LearningTopics = () => {
                           >
                             {/* Locking Overlay */}
                             {isTopicLocked && (
-                              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/10 backdrop-blur-[1px] rounded-card">
-                                <div className="w-10 h-10 rounded-full bg-white/80 flex items-center justify-center shadow-lg border-2 border-primary/20 text-text-muted">
+                              <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/10 backdrop-blur-[1px] rounded-card">
+                                <div className="w-10 h-10 rounded-full bg-surface/80 flex items-center justify-center shadow-lg border-2 border-primary/20 text-text-muted">
                                   🔒
                                 </div>
                               </div>
                             )}
 
                             <div className="flex items-start justify-between mb-4">
-                              <div className="text-4xl">{topic.icon}</div>
+                              <div className="text-[2rem]">{topic.icon}</div>
                               {isGuest && idx < 3 && (
                                 <Badge
                                   variant="green"
@@ -302,10 +302,10 @@ const LearningTopics = () => {
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            className="pointer-events-auto bg-white/90 backdrop-blur-xl border-2 border-primary/40 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center gap-8 max-w-4xl w-full"
+            className="pointer-events-auto bg-surface/90 backdrop-blur-xl border-2 border-primary/40 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center gap-8 max-w-4xl w-full"
           >
             <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple flex items-center justify-center text-white text-3xl shadow-lg ring-4 ring-primary/10">
+              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple flex items-center justify-center text-text-on-accent text-3xl shadow-lg ring-4 ring-primary/10">
                 🎯
               </div>
               <div>

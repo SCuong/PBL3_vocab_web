@@ -1,6 +1,6 @@
 import { Check, Calendar, XCircle, Trophy, Users, PlusCircle, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Badge, Button } from '../../ui';
+import { Badge, Button, typography } from '../../ui';
 import { StreakHeatmap } from './StreakHeatmap';
 
 type StreakModalProps = {
@@ -37,7 +37,7 @@ export const StreakModal = ({ isOpen, onClose, gameData }: StreakModalProps) => 
                     <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-orange-100 mb-6 shadow-glow">
                         <Flame size={48} className="text-orange-500 animate-pulse" fill="currentColor" />
                     </div>
-                    <h2 className="text-4xl font-display font-bold mb-2">{gameData.currentUser.streak} Ngày Stream!</h2>
+                    <h2 className={`${typography.sectionTitle} mb-2`}>{gameData.currentUser.streak} Ngày Stream!</h2>
                     <p className="text-text-secondary">Bạn đang làm rất tốt, hãy duy trì phong độ nhé!</p>
                 </div>
 
@@ -74,10 +74,10 @@ export const StreakModal = ({ isOpen, onClose, gameData }: StreakModalProps) => 
                         {gameData.groupStreak.map((member: any) => (
                             <div key={member.id} className="flex-1 flex flex-col items-center gap-2">
                                 <div className="relative">
-                                    <div className="w-14 h-14 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-2xl shadow-md border-2 border-white">
+                                    <div className="w-14 h-14 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-2xl shadow-md border-2 border-surface">
                                         {member.avatar}
                                     </div>
-                                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] shadow-sm ${member.status === 'done' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-surface flex items-center justify-center text-[10px] shadow-sm ${member.status === 'done' ? 'bg-success-color text-text-on-accent' : 'bg-warning-color text-text-on-accent'}`}>
                                         {member.status === 'done' ? '✅' : '⏳'}
                                     </div>
                                 </div>
