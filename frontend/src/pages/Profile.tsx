@@ -254,15 +254,15 @@ const Profile = () => {
     const getNoteColorClass = (color: StickyNoteItem['color']) => {
         switch (color) {
             case 'blue':
-                return 'bg-sky-100 border-sky-200 text-slate-700';
+                return 'bg-[var(--sticky-note-blue-bg)] border-[var(--sticky-note-blue-border)]';
             case 'green':
-                return 'bg-emerald-100 border-emerald-200 text-slate-700';
+                return 'bg-[var(--sticky-note-green-bg)] border-[var(--sticky-note-green-border)]';
             case 'pink':
-                return 'bg-rose-100 border-rose-200 text-slate-700';
+                return 'bg-[var(--sticky-note-pink-bg)] border-[var(--sticky-note-pink-border)]';
             case 'purple':
-                return 'bg-violet-100 border-violet-200 text-slate-700';
+                return 'bg-[var(--sticky-note-purple-bg)] border-[var(--sticky-note-purple-border)]';
             default:
-                return 'bg-amber-100 border-amber-200 text-slate-700';
+                return 'bg-[var(--sticky-note-yellow-bg)] border-[var(--sticky-note-yellow-border)]';
         }
     };
 
@@ -380,7 +380,7 @@ const Profile = () => {
                             </div>
                         ))}
                     </div>
-                    <div className="glass-card p-8">
+                    <div className="glass-card p-6 sm:p-7">
                         <h3 className="text-xl mb-6">Lịch sử học</h3>
                         <StreakHeatmap
                             history={studyHistoryDates}
@@ -425,8 +425,8 @@ const Profile = () => {
                             )}
                         </div>
                     </div>
-                    <div className="glass-card p-8">
-                        <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="glass-card p-6 sm:p-7">
+                        <div className="flex items-start justify-between gap-4 mb-4">
                             <h3 className="text-xl">Từ đã học</h3>
                             <Button
                                 variant="ghost"
@@ -455,14 +455,19 @@ const Profile = () => {
                             </div>
                         )}
                     </div>
-                    <div className="glass-card p-8">
-                        <div className="flex items-center justify-between gap-4 mb-4">
-                            <h3 className="text-xl flex items-center gap-2">
-                                <StickyNote size={18} className="text-primary" /> Danh sách ghi chú
-                            </h3>
+                    <div className="glass-card p-6 sm:p-7">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <h3 className="text-lg sm:text-xl flex items-center gap-2">
+                                    <StickyNote size={18} className="text-primary" /> Danh sách ghi chú
+                                </h3>
+                                <p className="mt-1 text-xs text-text-muted">
+                                    {sortedStickyNotes.length} ghi chú, ghim hiển thị trước
+                                </p>
+                            </div>
                             <Button
                                 variant="ghost"
-                                className="px-4 py-2"
+                                className="px-4 py-2 shrink-0"
                                 onClick={async () => {
                                     if (!currentUser?.userId) {
                                         setStickyNotes([]);
@@ -489,19 +494,23 @@ const Profile = () => {
                         ) : sortedStickyNotes.length === 0 ? (
                             <p className="text-sm text-text-muted">Bạn chưa có ghi chú nào.</p>
                         ) : (
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                {sortedStickyNotes.map((note) => (
-                                    <div
-                                        key={note.stickyNoteId}
-                                        className={`rounded-2xl border p-4 ${getNoteColorClass(note.color)}`}
-                                    >
-                                        <div className="text-xs uppercase tracking-widest text-slate-500 mb-2 flex items-center justify-between">
-                                            <span>{note.isPinned ? 'Đã ghim' : 'Ghi chú'}</span>
-                                            <span>{new Date(note.updatedAt).toLocaleDateString('vi-VN')}</span>
+                            <div className="max-h-[28rem] overflow-y-auto pr-1 rounded-2xl">
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    {sortedStickyNotes.map((note) => (
+                                        <div
+                                            key={note.stickyNoteId}
+                                            className={`rounded-xl border p-3 text-text-primary ${getNoteColorClass(note.color)}`}
+                                        >
+                                            <div className="text-[11px] uppercase tracking-wide text-text-muted mb-1.5 flex items-center justify-between gap-3">
+                                                <span>{note.isPinned ? 'Đã ghim' : 'Ghi chú'}</span>
+                                                <span className="shrink-0">{new Date(note.updatedAt).toLocaleDateString('vi-VN')}</span>
+                                            </div>
+                                            <p className="max-h-24 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line">
+                                                {note.content || 'Ghi chú trống'}
+                                            </p>
                                         </div>
-                                        <p className="text-sm whitespace-pre-line">{note.content || 'Ghi chú trống'}</p>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

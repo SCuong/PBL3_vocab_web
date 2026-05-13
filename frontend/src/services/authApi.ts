@@ -7,6 +7,7 @@ export type AuthenticatedUser = {
     status: string;
     hasGoogleLogin: boolean;
     hasLocalPassword: boolean;
+    isEmailVerified: boolean;
 };
 
 export type AuthApiResponse = {
@@ -16,6 +17,7 @@ export type AuthApiResponse = {
     emailSent?: boolean;
     usedFallbackLink?: boolean;
     resetLink?: string;
+    verificationLink?: string;
     inboxUrl?: string;
 };
 
@@ -61,7 +63,7 @@ export const authApi = {
         return data.user;
     },
 
-    register: async (payload: { name: string; email: string; password: string }) => {
+    register: async (payload: { name: string; email: string; password: string; confirmPassword: string }) => {
         const response = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -70,8 +72,56 @@ export const authApi = {
         });
 
         const data = (await response.json()) as AuthApiResponse;
-        if (!response.ok || !data.succeeded || !data.user) {
+        if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Đăng ký thất bại.');
+        }
+
+        return data;
+    },
+
+    verifyEmail: async (payload: { token: string }) => {
+        const response = await fetch('/api/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Xác minh email thất bại.');
+        }
+
+        return data.message || 'Email verified successfully. You can now log in.';
+    },
+
+    resendVerification: async (payload: { email: string }) => {
+        const response = await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded) {
+            throw new Error(data.message || 'Không thể gửi lại email xác minh.');
+        }
+
+        return data;
+    },
+
+    googleLogin: async (payload: { idToken: string }) => {
+        const response = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        const data = (await response.json()) as AuthApiResponse;
+        if (!response.ok || !data.succeeded || !data.user) {
+            throw new Error(data.message || 'Đăng nhập Google thất bại.');
         }
 
         return data.user;

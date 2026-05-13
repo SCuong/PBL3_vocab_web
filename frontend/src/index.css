@@ -21,6 +21,17 @@
     --accent-cyan: #22d3ee;
     --accent-soft: #f3e8ff;
     --shadow-color: rgba(147, 51, 234, 0.14);
+    --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 16%, var(--surface));
+    --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 36%, var(--border-color));
+    --sticky-note-blue-bg: color-mix(in srgb, var(--accent-cyan) 14%, var(--surface));
+    --sticky-note-blue-border: color-mix(in srgb, var(--accent-cyan) 34%, var(--border-color));
+    --sticky-note-green-bg: color-mix(in srgb, var(--success-color) 14%, var(--surface));
+    --sticky-note-green-border: color-mix(in srgb, var(--success-color) 34%, var(--border-color));
+    --sticky-note-pink-bg: color-mix(in srgb, var(--accent-secondary) 14%, var(--surface));
+    --sticky-note-pink-border: color-mix(in srgb, var(--accent-secondary) 34%, var(--border-color));
+    --sticky-note-purple-bg: color-mix(in srgb, var(--accent-color) 14%, var(--surface));
+    --sticky-note-purple-border: color-mix(in srgb, var(--accent-color) 34%, var(--border-color));
+    --sticky-note-control-hover: color-mix(in srgb, var(--surface) 72%, var(--text-primary) 8%);
 }
 
 [data-theme="dark"] {
@@ -42,6 +53,17 @@
     --accent-cyan: #67e8f9;
     --accent-soft: #2a2142;
     --shadow-color: rgba(0, 0, 0, 0.32);
+    --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 20%, var(--surface));
+    --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 45%, var(--border-color));
+    --sticky-note-blue-bg: color-mix(in srgb, var(--accent-cyan) 18%, var(--surface));
+    --sticky-note-blue-border: color-mix(in srgb, var(--accent-cyan) 42%, var(--border-color));
+    --sticky-note-green-bg: color-mix(in srgb, var(--success-color) 18%, var(--surface));
+    --sticky-note-green-border: color-mix(in srgb, var(--success-color) 42%, var(--border-color));
+    --sticky-note-pink-bg: color-mix(in srgb, var(--accent-secondary) 18%, var(--surface));
+    --sticky-note-pink-border: color-mix(in srgb, var(--accent-secondary) 42%, var(--border-color));
+    --sticky-note-purple-bg: color-mix(in srgb, var(--accent-color) 20%, var(--surface));
+    --sticky-note-purple-border: color-mix(in srgb, var(--accent-color) 45%, var(--border-color));
+    --sticky-note-control-hover: color-mix(in srgb, var(--surface-hover) 80%, var(--text-primary) 8%);
 }
 
 @theme {

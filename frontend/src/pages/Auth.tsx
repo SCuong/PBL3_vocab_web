@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, typography } from '../components/ui';
 import { authApi } from '../services/authApi';
@@ -11,6 +11,80 @@ import {
     PASSWORD_POLICY_LABELS,
     type PasswordPolicyResult,
 } from '../utils/passwordPolicy';
+
+type GoogleCredentialResponse = {
+    credential?: string;
+};
+
+declare global {
+    interface Window {
+        google?: {
+            accounts: {
+                id: {
+                    initialize: (options: {
+                        client_id: string;
+                        callback: (response: GoogleCredentialResponse) => void;
+                        auto_select?: boolean;
+                        cancel_on_tap_outside?: boolean;
+                    }) => void;
+                    renderButton: (
+                        parent: HTMLElement,
+                        options: {
+                            theme?: 'outline' | 'filled_blue' | 'filled_black';
+                            size?: 'large' | 'medium' | 'small';
+                            type?: 'standard' | 'icon';
+                            text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+                            shape?: 'rectangular' | 'pill' | 'circle' | 'square';
+                            width?: number;
+                        }
+                    ) => void;
+                    disableAutoSelect?: () => void;
+                };
+            };
+        };
+    }
+}
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 30;
+const EMAIL_VERIFICATION_REQUIRED_MESSAGE = 'Please verify your email before logging in.';
+const ALLOWED_EMAIL_TLDS = new Set([
+    'com', 'net', 'org', 'edu', 'gov', 'vn', 'com.vn', 'edu.vn', 'gov.vn', 'net.vn',
+    'info', 'io', 'co', 'dev', 'app', 'me', 'biz'
+]);
+
+const normalizeSignupEmail = (value: string) => value.trim().toLowerCase();
+const normalizeDisplayName = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+const isValidSignupEmail = (value: string) => {
+    const email = normalizeSignupEmail(value);
+    if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,24}$/.test(email)) {
+        return false;
+    }
+
+    const domainParts = email.split('@')[1]?.split('.').filter(Boolean) ?? [];
+    if (domainParts.length < 2) {
+        return false;
+    }
+
+    const topLevelDomain = domainParts[domainParts.length - 1];
+    const twoPartTopLevelDomain = domainParts.length >= 2
+        ? `${domainParts[domainParts.length - 2]}.${topLevelDomain}`
+        : topLevelDomain;
+
+    return ALLOWED_EMAIL_TLDS.has(topLevelDomain) || ALLOWED_EMAIL_TLDS.has(twoPartTopLevelDomain);
+};
+
+const isValidDisplayName = (value: string) => {
+    const normalized = normalizeDisplayName(value);
+    const readableCharacters = normalized.replace(/[^\p{L}\p{N}]/gu, '');
+
+    return normalized.length >= USERNAME_MIN_LENGTH
+        && normalized.length <= USERNAME_MAX_LENGTH
+        && /\p{L}/u.test(normalized)
+        && readableCharacters.length >= USERNAME_MIN_LENGTH;
+};
 
 const Auth = () => {
     const { syncUserGameData, addToast } = useAppContext();
@@ -39,8 +113,13 @@ const Auth = () => {
     const [forgotPasswordResetLink, setForgotPasswordResetLink] = useState('');
     const [forgotPasswordUsedFallback, setForgotPasswordUsedFallback] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+    const [isResendingVerification, setIsResendingVerification] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [verificationLink, setVerificationLink] = useState('');
+    const googleLoginButtonRef = useRef<HTMLDivElement>(null);
+    const googleRegisterButtonRef = useRef<HTMLDivElement>(null);
     // 'idle' | 'active' | 'close' — mirrors the sample's container class
     const [flipState, setFlipState] = useState<'idle' | 'active' | 'close'>(
         initialMode === 'register' ? 'active' : 'idle'
@@ -53,6 +132,33 @@ const Auth = () => {
         setForgotPasswordUsedFallback(false);
     };
 
+    const handleGoogleCredential = useCallback(async (response: GoogleCredentialResponse) => {
+        if (isGoogleSubmitting) return;
+
+        const idToken = response.credential?.trim();
+        if (!idToken) {
+            setErrorMessage('Không nhận được mã xác thực Google.');
+            return;
+        }
+
+        setErrorMessage('');
+        setSuccessMessage('');
+        setIsGoogleSubmitting(true);
+
+        try {
+            const user = await authApi.googleLogin({ idToken });
+            syncUserGameData(user);
+            addToast('Đăng nhập Google thành công!', 'success');
+            navigate(PATHS.home);
+        } catch (error: any) {
+            const message = error?.message || 'Đăng nhập Google thất bại.';
+            setErrorMessage(message);
+            addToast(message, 'info');
+        } finally {
+            setIsGoogleSubmitting(false);
+        }
+    }, [addToast, isGoogleSubmitting, navigate, syncUserGameData]);
+
     useEffect(() => {
         const nextLogin = initialMode !== 'register';
         setIsLogin(nextLogin);
@@ -62,6 +168,7 @@ const Auth = () => {
         setIsResetPasswordMode(false);
         setErrorMessage('');
         setSuccessMessage('');
+        setVerificationLink('');
     }, [initialMode]);
 
     useEffect(() => {
@@ -78,6 +185,64 @@ const Auth = () => {
         }
     }, [searchParams]);
 
+    useEffect(() => {
+        if (!googleClientId || isForgotPasswordMode || isResetPasswordMode) {
+            return;
+        }
+
+        let isCancelled = false;
+        const renderGoogleButtons = () => {
+            if (isCancelled || !window.google?.accounts?.id) {
+                return;
+            }
+
+            window.google.accounts.id.initialize({
+                client_id: googleClientId,
+                callback: handleGoogleCredential,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+
+            [googleLoginButtonRef.current, googleRegisterButtonRef.current].forEach((target) => {
+                if (!target) return;
+                target.innerHTML = '';
+                window.google?.accounts.id.renderButton(target, {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    text: 'continue_with',
+                    shape: 'pill',
+                    width: Math.min(target.clientWidth || 320, 400)
+                });
+            });
+        };
+
+        const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+        if (existingScript) {
+            if (window.google?.accounts?.id) {
+                renderGoogleButtons();
+            } else {
+                existingScript.addEventListener('load', renderGoogleButtons, { once: true });
+            }
+
+            return () => {
+                isCancelled = true;
+                existingScript.removeEventListener('load', renderGoogleButtons);
+            };
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = renderGoogleButtons;
+        document.head.appendChild(script);
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [handleGoogleCredential, isForgotPasswordMode, isResetPasswordMode]);
+
     const goBackToLogin = () => {
         setIsForgotPasswordMode(false);
         setIsResetPasswordMode(false);
@@ -85,6 +250,7 @@ const Auth = () => {
         setFlipState('idle');
         setErrorMessage('');
         setSuccessMessage('');
+        setVerificationLink('');
         resetForgotPasswordState();
         setResetToken('');
         setConfirmPassword('');
@@ -115,10 +281,37 @@ const Auth = () => {
         </div>
     );
 
+    const renderGoogleLoginArea = (targetRef: RefObject<HTMLDivElement | null>) => (
+        <div className="mb-4 w-full space-y-3">
+            {googleClientId ? (
+                <div
+                    className="flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface px-2 py-1"
+                    aria-busy={isGoogleSubmitting}
+                >
+                    <div ref={targetRef} className="w-full max-w-[400px]" />
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    className="min-h-11 w-full rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    onClick={() => setErrorMessage('Google login chưa được cấu hình.')}
+                >
+                    Continue with Google
+                </button>
+            )}
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+                <span className="h-px flex-1 bg-border" />
+                <span>hoặc</span>
+                <span className="h-px flex-1 bg-border" />
+            </div>
+        </div>
+    );
+
     const handleSubmit = async () => {
         if (isSubmitting) return;
         setErrorMessage('');
         setSuccessMessage('');
+        setVerificationLink('');
         setIsSubmitting(true);
 
         try {
@@ -128,6 +321,17 @@ const Auth = () => {
                 addToast('Đăng nhập thành công!', 'success');
                 navigate(PATHS.home);
             } else {
+                const cleanName = normalizeDisplayName(name);
+                const cleanEmail = normalizeSignupEmail(email);
+
+                if (!isValidDisplayName(cleanName)) {
+                    setErrorMessage(`Tên hiển thị phải từ ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} ký tự.`);
+                    return;
+                }
+                if (!isValidSignupEmail(cleanEmail)) {
+                    setErrorMessage('Email không đúng định dạng.');
+                    return;
+                }
                 if (!isPasswordValid) {
                     setErrorMessage('Mật khẩu chưa đúng định dạng yêu cầu.');
                     return;
@@ -136,10 +340,16 @@ const Auth = () => {
                     setErrorMessage('Xác nhận mật khẩu không khớp.');
                     return;
                 }
-                const user = await authApi.register({ name, email, password });
-                syncUserGameData(user);
-                addToast('Đăng ký thành công!', 'success');
-                navigate(PATHS.home);
+                const result = await authApi.register({
+                    name: cleanName,
+                    email: cleanEmail,
+                    password,
+                    confirmPassword
+                });
+                const message = result.message || 'Account created. Please verify your email before logging in.';
+                setSuccessMessage(message);
+                setVerificationLink(result.verificationLink || '');
+                addToast(message, 'success');
             }
         } catch (error: any) {
             const message = error?.message || 'Không thể kết nối tới hệ thống xác thực.';
@@ -150,11 +360,37 @@ const Auth = () => {
         }
     };
 
+    const handleResendVerification = async () => {
+        if (isResendingVerification) return;
+
+        const emailToVerify = normalizeSignupEmail(usernameOrEmail);
+        if (!isValidSignupEmail(emailToVerify)) {
+            setErrorMessage('Vui lòng nhập email đã đăng ký để gửi lại xác minh.');
+            return;
+        }
+
+        setIsResendingVerification(true);
+        try {
+            const result = await authApi.resendVerification({ email: emailToVerify });
+            const message = result.message || 'If this learner account needs verification, a new email has been sent.';
+            setSuccessMessage(message);
+            setVerificationLink(result.verificationLink || '');
+            addToast(message, 'success');
+        } catch (error: any) {
+            const message = error?.message || 'Không thể gửi lại email xác minh.';
+            setErrorMessage(message);
+            addToast(message, 'info');
+        } finally {
+            setIsResendingVerification(false);
+        }
+    };
+
     const switchToRegister = () => {
         setIsLogin(false);
         setFlipState('active');
         setErrorMessage('');
         setSuccessMessage('');
+        setVerificationLink('');
     };
 
     const switchToLogin = () => {
@@ -162,6 +398,7 @@ const Auth = () => {
         setFlipState('close');
         setErrorMessage('');
         setSuccessMessage('');
+        setVerificationLink('');
         setConfirmPassword('');
         setShowConfirmPassword(false);
     };
@@ -338,6 +575,8 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
                         </div>
 
+                        {renderGoogleLoginArea(googleLoginButtonRef)}
+
                         <div className="space-y-3 w-full">
                             <input
                                 type="text"
@@ -363,8 +602,27 @@ const Auth = () => {
                                 </button>
                             </div>
 
-                            {errorMessage && isLogin && <div className="auth-error">{errorMessage}</div>}
+                            {errorMessage && isLogin && (
+                                <div className="space-y-2">
+                                    <div className="auth-error">{errorMessage}</div>
+                                    {errorMessage === EMAIL_VERIFICATION_REQUIRED_MESSAGE && (
+                                        <button
+                                            type="button"
+                                            className="w-full text-primary text-sm font-semibold py-2 px-4 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+                                            onClick={handleResendVerification}
+                                            disabled={isResendingVerification}
+                                        >
+                                            {isResendingVerification ? 'Đang gửi...' : 'Gửi lại email xác minh'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             {successMessage && isLogin && <div className="auth-success">{successMessage}</div>}
+                            {verificationLink && isLogin && (
+                                <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
+                                    Mở liên kết xác minh
+                                </a>
+                            )}
 
                             <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? 'Đang xử lý...' : 'Vào học ngay'}
@@ -403,6 +661,8 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
                         </div>
 
+                        {renderGoogleLoginArea(googleRegisterButtonRef)}
+
                         <div className="space-y-2 w-full">
                             <input type="text" placeholder="Tên hiển thị"
                                 className="auth-input"
@@ -435,6 +695,11 @@ const Auth = () => {
 
                             {errorMessage && !isLogin && <div className="auth-error">{errorMessage}</div>}
                             {successMessage && !isLogin && <div className="auth-success">{successMessage}</div>}
+                            {verificationLink && !isLogin && (
+                                <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
+                                    Mở liên kết xác minh
+                                </a>
+                            )}
 
                             <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
                                 {isSubmitting ? 'Đang xử lý...' : 'Tạo tài khoản'}

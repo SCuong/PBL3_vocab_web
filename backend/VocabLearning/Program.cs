@@ -48,6 +48,10 @@ builder.Services.AddScoped<AdminDataService>();
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
+builder.Services.AddHttpClient<GoogleIdTokenVerifier>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddHttpClient<IAIService, GeminiService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(35);

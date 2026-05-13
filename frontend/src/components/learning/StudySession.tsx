@@ -48,6 +48,20 @@ const hasEarlierQueueOccurrence = (queue: any[], wordId: number | undefined, ind
 const getWordIds = (words: any[]) =>
   words.map((word: any) => normalizeWordId(word.id)).filter((id): id is number => Boolean(id));
 
+const isEditableKeyboardTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target.isContentEditable ||
+    target.closest('[contenteditable="true"]') !== null ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+};
+
 const StudySession = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -259,6 +273,10 @@ const StudySession = () => {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || isEditableKeyboardTarget(e.target)) {
+        return;
+      }
+
       if (tab === "flashcard") {
         if (e.code === "Space") {
           e.preventDefault();
