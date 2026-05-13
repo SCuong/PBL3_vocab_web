@@ -22,6 +22,8 @@ namespace VocabLearning.Data
         public DbSet<LearningLog> LearningLogs { get; set; }
         public DbSet<Meaning> Meanings { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<EmailVerificationToken> EmailVerificationTokens { get; set; }
+        public DbSet<StickyNote> StickyNotes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -57,6 +59,10 @@ namespace VocabLearning.Data
                 entity.Property(user => user.Status)
                     .HasColumnName("status")
                     .HasMaxLength(20);
+
+                entity.Property(user => user.IsEmailVerified)
+                    .HasColumnName("is_email_verified")
+                    .HasDefaultValue(true);
 
                 entity.Property(user => user.CreatedAt)
                     .HasColumnName("created_at")
@@ -167,7 +173,7 @@ namespace VocabLearning.Data
                     .WithOne()
                     .HasForeignKey<Progress>(progress => new { progress.UserId, progress.VocabId })
                     .HasPrincipalKey<UserVocabulary>(item => new { item.UserId, item.VocabId })
-                    .OnDelete(DeleteBehavior.NoAction);
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(progress => new { progress.UserId, progress.NextReviewDate });
             });
@@ -227,6 +233,7 @@ namespace VocabLearning.Data
                 entity.Property(result => result.ExerciseId).HasColumnName("exercise_id");
                 entity.Property(result => result.UserId).HasColumnName("user_id");
                 entity.Property(result => result.IsCorrect).HasColumnName("is_correct");
+                entity.Property(result => result.Quality).HasColumnName("quality");
                 entity.Property(result => result.AnsweredAt).HasColumnName("answered_at");
 
                 entity.HasOne<Users>()
@@ -316,6 +323,85 @@ namespace VocabLearning.Data
                 entity.HasIndex(item => item.TokenHash);
                 entity.HasIndex(item => new { item.UserId, item.CreatedAt });
                 entity.HasIndex(item => item.ExpiresAt);
+            });
+
+            modelBuilder.Entity<EmailVerificationToken>(entity =>
+            {
+                entity.ToTable("email_verification_token");
+                entity.HasKey(item => item.EmailVerificationTokenId);
+
+                entity.Property(item => item.EmailVerificationTokenId)
+                    .HasColumnName("email_verification_token_id")
+                    .UseIdentityColumn();
+
+                entity.Property(item => item.UserId).HasColumnName("user_id");
+
+                entity.Property(item => item.TokenHash)
+                    .HasColumnName("token_hash")
+                    .HasMaxLength(255);
+
+                entity.Property(item => item.ExpiresAt).HasColumnName("expires_at");
+
+                entity.Property(item => item.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.Property(item => item.UsedAt).HasColumnName("used_at");
+
+                entity.Property(item => item.ConsumedByIp)
+                    .HasColumnName("consumed_by_ip")
+                    .HasMaxLength(64);
+
+                entity.HasOne(item => item.User)
+                    .WithMany()
+                    .HasForeignKey(item => item.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(item => item.TokenHash).IsUnique();
+                entity.HasIndex(item => new { item.UserId, item.CreatedAt });
+                entity.HasIndex(item => item.ExpiresAt);
+            });
+
+            modelBuilder.Entity<StickyNote>(entity =>
+            {
+                entity.ToTable("sticky_note");
+                entity.HasKey(note => note.StickyNoteId);
+
+                entity.Property(note => note.StickyNoteId)
+                    .HasColumnName("sticky_note_id")
+                    .UseIdentityColumn();
+
+                entity.Property(note => note.UserId)
+                    .HasColumnName("user_id");
+
+                entity.Property(note => note.Content)
+                    .HasColumnName("content")
+                    .HasMaxLength(1000)
+                    .HasDefaultValue(string.Empty);
+
+                entity.Property(note => note.Color)
+                    .HasColumnName("color")
+                    .HasMaxLength(32)
+                    .HasDefaultValue("yellow");
+
+                entity.Property(note => note.IsPinned)
+                    .HasColumnName("is_pinned")
+                    .HasDefaultValue(false);
+
+                entity.Property(note => note.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.Property(note => note.UpdatedAt)
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql("GETDATE()");
+
+                entity.HasOne<Users>()
+                    .WithMany()
+                    .HasForeignKey(note => note.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(note => new { note.UserId, note.IsPinned, note.UpdatedAt });
             });
         }
     }

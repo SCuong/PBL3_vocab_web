@@ -1,6 +1,6 @@
 namespace VocabLearning.Models
 {
-    public class Users
+    public class User
     {
         public long UserId { get; set; }
 
@@ -16,9 +16,9 @@ namespace VocabLearning.Models
 
         public string Status { get; set; } = string.Empty;
 
-        public bool IsEmailVerified { get; set; }
-
         public DateTime CreatedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
 
         public bool IsDeleted { get; set; }
 

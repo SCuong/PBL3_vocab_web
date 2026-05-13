@@ -27,6 +27,7 @@ BEGIN
         [google_subject] NVARCHAR(200) NULL,
         [role] NVARCHAR(20) NOT NULL CONSTRAINT [DF_users_role] DEFAULT N'{UserRoles.Learner}',
         [status] NVARCHAR(20) NOT NULL CONSTRAINT [DF_users_status] DEFAULT N'ACTIVE',
+        [is_email_verified] BIT NOT NULL CONSTRAINT [DF_users_is_email_verified] DEFAULT ((1)),
         [created_at] DATETIME NOT NULL CONSTRAINT [DF_users_created_at] DEFAULT GETDATE(),
         [is_deleted] BIT NOT NULL CONSTRAINT [DF_users_is_deleted] DEFAULT ((0)),
         [deleted_at] DATETIME NULL,
@@ -49,6 +50,11 @@ END;",
 IF COL_LENGTH('dbo.users', 'status') IS NULL
 BEGIN
     ALTER TABLE [dbo].[users] ADD [status] NVARCHAR(20) NOT NULL CONSTRAINT [DF_users_status_upgrade] DEFAULT N'ACTIVE';
+END;",
+                @"
+IF COL_LENGTH('dbo.users', 'is_email_verified') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[users] ADD [is_email_verified] BIT NOT NULL CONSTRAINT [DF_users_is_email_verified] DEFAULT ((1));
 END;",
                 @"
 IF COL_LENGTH('dbo.users', 'created_at') IS NULL
@@ -177,6 +183,94 @@ BEGIN
     END;
 END;",
                 @"
+IF OBJECT_ID(N'dbo.email_verification_token', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[email_verification_token]
+    (
+        [email_verification_token_id] BIGINT IDENTITY(1,1) NOT NULL,
+        [user_id] BIGINT NOT NULL,
+        [token_hash] NVARCHAR(255) NOT NULL,
+        [expires_at] DATETIME NOT NULL,
+        [created_at] DATETIME NOT NULL CONSTRAINT [DF_email_verification_token_created_at] DEFAULT GETDATE(),
+        [used_at] DATETIME NULL,
+        [consumed_by_ip] NVARCHAR(64) NULL,
+        CONSTRAINT [PK_email_verification_token] PRIMARY KEY ([email_verification_token_id]),
+        CONSTRAINT [FK_email_verification_token_users]
+            FOREIGN KEY ([user_id]) REFERENCES [dbo].[users]([user_id])
+            ON DELETE CASCADE
+    );
+END;",
+                @"
+IF OBJECT_ID(N'dbo.email_verification_token', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_email_verification_token_token_hash'
+          AND [object_id] = OBJECT_ID(N'dbo.email_verification_token')
+    )
+    BEGIN
+        CREATE UNIQUE INDEX [IX_email_verification_token_token_hash]
+            ON [dbo].[email_verification_token]([token_hash]);
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_email_verification_token_user_id_created_at'
+          AND [object_id] = OBJECT_ID(N'dbo.email_verification_token')
+    )
+    BEGIN
+        CREATE INDEX [IX_email_verification_token_user_id_created_at]
+            ON [dbo].[email_verification_token]([user_id], [created_at]);
+    END;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM [sys].[indexes]
+        WHERE [name] = N'IX_email_verification_token_expires_at'
+          AND [object_id] = OBJECT_ID(N'dbo.email_verification_token')
+    )
+    BEGIN
+        CREATE INDEX [IX_email_verification_token_expires_at]
+            ON [dbo].[email_verification_token]([expires_at]);
+    END;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.sticky_note', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[sticky_note]
+    (
+        [sticky_note_id] BIGINT IDENTITY(1,1) NOT NULL,
+        [user_id] BIGINT NOT NULL,
+        [content] NVARCHAR(1000) NOT NULL CONSTRAINT [DF_sticky_note_content] DEFAULT N'',
+        [color] NVARCHAR(32) NOT NULL CONSTRAINT [DF_sticky_note_color] DEFAULT N'yellow',
+        [is_pinned] BIT NOT NULL CONSTRAINT [DF_sticky_note_is_pinned] DEFAULT ((0)),
+        [created_at] DATETIME2 NOT NULL CONSTRAINT [DF_sticky_note_created_at] DEFAULT GETDATE(),
+        [updated_at] DATETIME2 NOT NULL CONSTRAINT [DF_sticky_note_updated_at] DEFAULT GETDATE(),
+        CONSTRAINT [PK_sticky_note] PRIMARY KEY ([sticky_note_id]),
+        CONSTRAINT [FK_sticky_note_users_user_id]
+            FOREIGN KEY ([user_id]) REFERENCES [dbo].[users]([user_id])
+            ON DELETE CASCADE
+    );
+END;",
+                @"
+IF OBJECT_ID(N'dbo.sticky_note', N'U') IS NOT NULL
+   AND NOT EXISTS
+   (
+       SELECT 1
+       FROM [sys].[indexes]
+       WHERE [name] = N'IX_sticky_note_user_id_is_pinned_updated_at'
+         AND [object_id] = OBJECT_ID(N'dbo.sticky_note')
+   )
+BEGIN
+    CREATE INDEX [IX_sticky_note_user_id_is_pinned_updated_at]
+        ON [dbo].[sticky_note]([user_id], [is_pinned], [updated_at]);
+END;",
+                @"
 IF OBJECT_ID(N'dbo.learning_log', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[learning_log]
@@ -235,6 +329,46 @@ BEGIN
     ALTER TABLE [dbo].[learning_log] WITH NOCHECK
     ADD CONSTRAINT [CK_learning_log_activity_type]
     CHECK ([activity_type] IN ({learningActivityTypeInListSql}));
+END;",
+                @"
+IF OBJECT_ID(N'dbo.exercise_result', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.exercise_result', 'quality') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[exercise_result]
+    ADD [quality] INT NOT NULL
+        CONSTRAINT [DF_exercise_result_quality] DEFAULT ((0));
+END;",
+                @"
+IF OBJECT_ID(N'dbo.progress', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.user_vocabulary', N'U') IS NOT NULL
+BEGIN
+    DECLARE @progressUserVocabularyFk SYSNAME;
+    DECLARE @progressUserVocabularyDeleteAction INT;
+
+    SELECT TOP (1)
+        @progressUserVocabularyFk = fk.[name],
+        @progressUserVocabularyDeleteAction = fk.[delete_referential_action]
+    FROM [sys].[foreign_keys] fk
+    WHERE fk.[parent_object_id] = OBJECT_ID(N'dbo.progress')
+      AND fk.[referenced_object_id] = OBJECT_ID(N'dbo.user_vocabulary');
+
+    IF @progressUserVocabularyFk IS NOT NULL
+       AND @progressUserVocabularyDeleteAction <> 1
+    BEGIN
+        DECLARE @dropProgressUserVocabularyFkSql NVARCHAR(MAX) =
+            N'ALTER TABLE [dbo].[progress] DROP CONSTRAINT ' + QUOTENAME(@progressUserVocabularyFk);
+        EXEC sp_executesql @dropProgressUserVocabularyFkSql;
+        SET @progressUserVocabularyFk = NULL;
+    END;
+
+    IF @progressUserVocabularyFk IS NULL
+    BEGIN
+        ALTER TABLE [dbo].[progress] WITH CHECK
+        ADD CONSTRAINT [FK_progress_user_vocabulary_user_id_vocab_id]
+        FOREIGN KEY ([user_id], [vocab_id])
+        REFERENCES [dbo].[user_vocabulary]([user_id], [vocab_id])
+        ON DELETE CASCADE;
+    END;
 END;",
                 $@"
 IF OBJECT_ID(N'dbo.exercise', N'U') IS NOT NULL
