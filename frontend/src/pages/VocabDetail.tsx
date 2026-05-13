@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Volume2, Sparkles, Loader2 } from 'lucide-react';
 import { playPronunciationAudio } from '../utils/audio';
-import { Badge, Button } from '../components/ui';
+import { Badge, Button, typography } from '../components/ui';
 
 const VocabDetail = ({ word, onBack }: any) => {
     const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -46,12 +46,12 @@ const VocabDetail = ({ word, onBack }: any) => {
     return (
         <div className="max-w-4xl mx-auto px-6 py-12">
             <Button variant="ghost" className="mb-8" onClick={onBack}><ArrowLeft size={18} /> Quay lại</Button>
-            <div className="glass-card p-12 relative overflow-hidden">
-                <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+            <div className="glass-card p-6 sm:p-8 relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-12 relative z-10">
                     <div className="text-center md:text-left flex-1">
                         <Badge variant="cyan" className="mb-4">{word.cefr}</Badge>
-                        <h1 className="text-6xl mb-2">{word.word}</h1>
-                        <p className="text-2xl text-text-muted font-mono mb-8">{word.transcription}</p>
+                        <h1 className={`${typography.pageTitle} mb-2`}>{word.word}</h1>
+                        <p className="text-lg sm:text-xl text-text-muted font-mono mb-8">{word.transcription}</p>
                         <div className="flex flex-col gap-3">
                             <Button variant="primary" className="text-lg px-8 w-full md:w-auto" onClick={() => playPronunciationAudio(word.audioUrl, word.word)}><Volume2 size={24} /> Nghe phát âm</Button>
                             <Button variant="accent" className="text-lg px-8 w-full md:w-auto" onClick={handleAskAi} disabled={isLoadingAi}>
@@ -60,7 +60,7 @@ const VocabDetail = ({ word, onBack }: any) => {
                             </Button>
                         </div>
                     </div>
-                    <div className="flex-1 bg-white/50 p-8 rounded-card border-2 border-primary/10 shadow-sm w-full">
+                    <div className="flex-1 bg-surface/50 p-8 rounded-card border-2 border-primary/10 shadow-sm w-full">
                         <h3 className="text-xl font-bold mb-4 text-primary">Ý nghĩa</h3>
                         <p className="text-xl mb-8 leading-relaxed">{word.meaning}</p>
                         <div className="flex items-center gap-3 mb-4">

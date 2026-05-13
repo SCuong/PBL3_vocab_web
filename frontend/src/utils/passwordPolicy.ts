@@ -25,9 +25,8 @@ export function isPasswordPolicyValid(policy: PasswordPolicyResult): boolean {
     return Object.values(policy).every(Boolean);
 }
 
-export const PASSWORD_POLICY_LABELS: [keyof PasswordPolicyResult, string][] = [
+export const PASSWORD_POLICY_LABELS: [keyof Omit<PasswordPolicyResult, 'maxLength'>, string][] = [
     ['minLength', `Tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`],
-    ['maxLength', `Tối đa ${PASSWORD_MAX_LENGTH} ký tự`],
     ['hasLowercase', 'Có ít nhất 1 chữ thường'],
     ['hasUppercase', 'Có ít nhất 1 chữ in hoa'],
     ['hasNumber', 'Có ít nhất 1 chữ số'],

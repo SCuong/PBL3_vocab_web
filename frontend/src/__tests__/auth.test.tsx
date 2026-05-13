@@ -94,15 +94,15 @@ describe('Auth — Register', () => {
     vi.clearAllMocks();
   });
 
-  it('shows error when password fails policy — no uppercase', async () => {
+  it('shows error when password fails policy — no lowercase', async () => {
     const user = userEvent.setup();
     render(<Auth onLogin={onLogin} initialMode="register" />);
 
     await user.type(screen.getByPlaceholderText('Tên hiển thị'), 'Test User');
     await user.type(screen.getByPlaceholderText('Email'), 'new@test.com');
-    // Password missing uppercase — fails policy
-    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'password1!');
-    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'password1!');
+    // Password missing lowercase — fails policy
+    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'ABC12');
+    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'ABC12');
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     await waitFor(() =>
@@ -117,8 +117,8 @@ describe('Auth — Register', () => {
 
     await user.type(screen.getByPlaceholderText('Tên hiển thị'), 'Test User');
     await user.type(screen.getByPlaceholderText('Email'), 'new@test.com');
-    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'Valid1!pw');
-    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'Different1!pw');
+    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'abc12');
+    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'different12');
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     await waitFor(() =>
@@ -134,15 +134,15 @@ describe('Auth — Register', () => {
 
     await user.type(screen.getByPlaceholderText('Tên hiển thị'), 'Test User');
     await user.type(screen.getByPlaceholderText('Email'), 'new@test.com');
-    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'Valid1!pw');
-    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'Valid1!pw');
+    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'abc12');
+    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'abc12');
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     await waitFor(() => expect(onLogin).toHaveBeenCalledWith(mockUser));
     expect(mockRegister).toHaveBeenCalledWith({
       name: 'Test User',
       email: 'new@test.com',
-      password: 'Valid1!pw',
+      password: 'abc12',
     });
   });
 
@@ -153,8 +153,8 @@ describe('Auth — Register', () => {
 
     await user.type(screen.getByPlaceholderText('Tên hiển thị'), 'Dup User');
     await user.type(screen.getByPlaceholderText('Email'), 'taken@test.com');
-    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'Valid1!pw');
-    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'Valid1!pw');
+    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'abc12');
+    await user.type(screen.getByPlaceholderText('Xác nhận mật khẩu'), 'abc12');
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     await waitFor(() =>
@@ -166,12 +166,13 @@ describe('Auth — Register', () => {
     const user = userEvent.setup();
     render(<Auth onLogin={onLogin} initialMode="register" />);
 
-    // Type a valid password meeting all criteria
-    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'Abc1!xyz');
+    // Type a valid password meeting all required criteria
+    await user.type(screen.getAllByPlaceholderText('Mật khẩu')[1], 'abc12');
 
-    expect(screen.getByText('Tối thiểu 8 ký tự').closest('p')).toHaveClass('text-green-700');
-    expect(screen.getByText('Có ít nhất 1 chữ in hoa').closest('p')).toHaveClass('text-green-700');
+    expect(screen.getByText('Tối thiểu 5 ký tự').closest('p')).toHaveClass('text-green-700');
+    expect(screen.getByText('Có ít nhất 1 chữ thường').closest('p')).toHaveClass('text-green-700');
     expect(screen.getByText('Có ít nhất 1 chữ số').closest('p')).toHaveClass('text-green-700');
-    expect(screen.getByText('Có ít nhất 1 ký tự đặc biệt').closest('p')).toHaveClass('text-green-700');
+    expect(screen.queryByText('Có ít nhất 1 chữ in hoa')).not.toBeInTheDocument();
+    expect(screen.queryByText('Có ít nhất 1 ký tự đặc biệt')).not.toBeInTheDocument();
   });
 });

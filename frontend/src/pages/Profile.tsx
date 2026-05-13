@@ -1,17 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Award, BookOpen, Flame, UserPlus, Users, X } from 'lucide-react';
+import { Award, BookOpen, Flame, StickyNote, UserPlus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui';
+import { Button, typography } from '../components/ui';
 import { StreakHeatmap } from '../components/learning/streak';
 import { DeleteAccountModal } from '../components/account';
 import { authApi, type AuthenticatedUser } from '../services/authApi';
+import { stickyNotesApi, type StickyNoteItem } from '../services/stickyNotesApi';
 import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
 import { loadProfilePreferences, saveProfilePreferences } from '../utils/profilePreferences';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../utils/avatarPresets';
 import { buildStudyDaySummary } from '../utils/studyHistory';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
+import {
+    checkPasswordPolicy,
+    isPasswordPolicyValid,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_POLICY_LABELS,
+} from '../utils/passwordPolicy';
 
 const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(value));
 
@@ -49,6 +56,8 @@ const Profile = () => {
     const [learnedWordsList, setLearnedWordsList] = useState<VocabularyListItem[]>([]);
     const [isLoadingLearnedWords, setIsLoadingLearnedWords] = useState(false);
     const [selectedStudyDate, setSelectedStudyDate] = useState<string | null>(null);
+    const [stickyNotes, setStickyNotes] = useState<StickyNoteItem[]>([]);
+    const [isLoadingStickyNotes, setIsLoadingStickyNotes] = useState(false);
 
     const [isSavingProfile, setIsSavingProfile] = useState(false);
     const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -133,6 +142,40 @@ const Profile = () => {
         };
     }, [showLearnedWords, learnedWordIds, onAddToast]);
 
+    useEffect(() => {
+        if (!currentUser?.userId) {
+            setStickyNotes([]);
+            return;
+        }
+
+        let isDisposed = false;
+
+        const loadStickyNotes = async () => {
+            setIsLoadingStickyNotes(true);
+            try {
+                const items = await stickyNotesApi.getAll();
+                if (!isDisposed) {
+                    setStickyNotes(items);
+                }
+            } catch (error: any) {
+                if (!isDisposed) {
+                    setStickyNotes([]);
+                    onAddToast?.(error?.message || 'Không thể tải danh sách ghi chú.', 'info');
+                }
+            } finally {
+                if (!isDisposed) {
+                    setIsLoadingStickyNotes(false);
+                }
+            }
+        };
+
+        void loadStickyNotes();
+
+        return () => {
+            isDisposed = true;
+        };
+    }, [currentUser?.userId, onAddToast]);
+
     const studyHistory = useMemo(
         () => (Array.isArray(user.studyHistory) ? user.studyHistory : [])
             .filter((day: unknown): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)),
@@ -145,6 +188,18 @@ const Profile = () => {
             : {},
         [user?.studyHistoryDetails]
     );
+    const hasLocalPassword = Boolean(user.hasLocalPassword);
+    const hasGoogleLogin = Boolean(user.hasGoogleLogin);
+    const isGoogleOnlyAccount = hasGoogleLogin && !hasLocalPassword;
+    const passwordSectionTitle = isGoogleOnlyAccount ? 'Thiết lập mật khẩu' : 'Đổi mật khẩu';
+    const passwordSuccessMessage = isGoogleOnlyAccount
+        ? 'Thiết lập mật khẩu thành công.'
+        : 'Đổi mật khẩu thành công.';
+    const accountAuthLabel = hasGoogleLogin
+        ? (hasLocalPassword ? 'Google + Password enabled' : 'Đăng nhập bằng Google')
+        : 'Đăng nhập bằng mật khẩu';
+    const newPasswordPolicy = checkPasswordPolicy(newPassword);
+    const isNewPasswordValid = isPasswordPolicyValid(newPasswordPolicy);
 
     const studyHistoryDates = useMemo(() => {
         const detailDates = Object.keys(studyHistoryDetails)
@@ -201,6 +256,26 @@ const Profile = () => {
         [selectedStudyDate, studyHistoryDates, selectedStudyDetail, user.learnedWords, learnedWords.length, user.xp]
     );
 
+    const sortedStickyNotes = useMemo(
+        () => [...stickyNotes].sort((a, b) => Number(b.isPinned) - Number(a.isPinned)),
+        [stickyNotes],
+    );
+
+    const getNoteColorClass = (color: StickyNoteItem['color']) => {
+        switch (color) {
+            case 'blue':
+                return 'bg-[var(--sticky-note-blue-bg)] border-[var(--sticky-note-blue-border)]';
+            case 'green':
+                return 'bg-[var(--sticky-note-green-bg)] border-[var(--sticky-note-green-border)]';
+            case 'pink':
+                return 'bg-[var(--sticky-note-pink-bg)] border-[var(--sticky-note-pink-border)]';
+            case 'purple':
+                return 'bg-[var(--sticky-note-purple-bg)] border-[var(--sticky-note-purple-border)]';
+            default:
+                return 'bg-[var(--sticky-note-yellow-bg)] border-[var(--sticky-note-yellow-border)]';
+        }
+    };
+
     const accountCreatedDate = useMemo(() => {
         if (!user?.createdAt || typeof user.createdAt !== 'string') {
             return null;
@@ -250,6 +325,16 @@ const Profile = () => {
             return;
         }
 
+        if (hasLocalPassword && !currentPassword.trim()) {
+            setConfirmPasswordError('Vui lòng nhập mật khẩu hiện tại.');
+            return;
+        }
+
+        if (!isNewPasswordValid) {
+            setConfirmPasswordError('Mật khẩu chưa đúng định dạng yêu cầu.');
+            return;
+        }
+
         if (newPassword !== confirmNewPassword) {
             setConfirmPasswordError('Mật khẩu xác nhận không khớp với mật khẩu mới.');
             return;
@@ -259,12 +344,19 @@ const Profile = () => {
 
         setIsSavingPassword(true);
         try {
-            await authApi.changePassword({ currentPassword, newPassword, confirmNewPassword });
+            const result = await authApi.changePassword({
+                ...(hasLocalPassword ? { currentPassword } : {}),
+                newPassword,
+                confirmNewPassword
+            });
             setCurrentPassword('');
             setNewPassword('');
             setConfirmNewPassword('');
             setConfirmPasswordError('');
-            onAddToast?.('Đổi mật khẩu thành công.', 'success');
+            if (result.user) {
+                onUserUpdated(result.user);
+            }
+            onAddToast?.(passwordSuccessMessage, 'success');
         } catch (error: any) {
             onAddToast?.(error?.message || 'Không thể đổi mật khẩu.', 'info');
         } finally {
@@ -278,11 +370,11 @@ const Profile = () => {
                 <div className="space-y-8">
                     <div className="glass-card p-10 text-center">
                         {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover mx-auto mb-6 shadow-xl border-2 border-white/60" />
+                            <img src={avatarUrl} alt="Avatar" className="w-32 h-32 rounded-full object-cover mx-auto mb-6 shadow-xl border-2 border-surface/60" />
                         ) : (
-                            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary to-secondary mx-auto mb-6 flex items-center justify-center text-5xl font-display text-white shadow-xl">{initials}</div>
+                            <div className="w-32 h-32 rounded-full bg-linear-to-br from-primary to-secondary mx-auto mb-6 flex items-center justify-center text-[2.75rem] font-display text-text-on-accent shadow-xl">{initials}</div>
                         )}
-                        <h2 className="text-3xl mb-1">{user.username}</h2>
+                        <h2 className={`${typography.sectionTitle} mb-1`}>{user.username}</h2>
                         <p className="text-text-muted mb-8">{user.email}</p>
                         <div className="space-y-3">
                             <Button variant="ghost" className="w-full" onClick={() => setIsEditing(true)}>Chỉnh sửa hồ sơ</Button>
@@ -306,11 +398,11 @@ const Profile = () => {
                             <div key={i} className="glass-card p-6 text-center">
                                 <div className="flex justify-center mb-2">{s.icon}</div>
                                 <div className="text-3xl font-bold">{s.value}</div>
-                                <div className="text-xs uppercase tracking-widest text-text-muted">{s.label}</div>
+                                <div className="text-xs uppercase tracking-wide text-text-muted">{s.label}</div>
                             </div>
                         ))}
                     </div>
-                    <div className="glass-card p-8">
+                    <div className="glass-card p-6 sm:p-7">
                         <h3 className="text-xl mb-6">Lịch sử học</h3>
                         <StreakHeatmap
                             history={studyHistoryDates}
@@ -318,7 +410,7 @@ const Profile = () => {
                             selectedDate={selectedStudyDate}
                             onSelectDate={setSelectedStudyDate}
                         />
-                        <div className="mt-5 p-4 rounded-2xl border border-primary/20 bg-white/40">
+                        <div className="mt-5 p-4 rounded-2xl border border-primary/20 bg-surface/40">
                             <p className="text-sm font-bold capitalize">{selectedStudyDateLabel}</p>
                             {selectedStudyDate ? (
                                 <>
@@ -331,11 +423,11 @@ const Profile = () => {
                                     {hasStudiedOnSelectedDate && (
                                         <div className="mt-3 space-y-3">
                                             <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                <div className="rounded-xl border border-primary/20 bg-surface/70 p-2 text-center">
                                                     <div className="text-text-muted uppercase">Từ đã học</div>
                                                     <div className="text-base font-bold">{selectedStudySummary.totalWords}</div>
                                                 </div>
-                                                <div className="rounded-xl border border-primary/20 bg-white/70 p-2 text-center">
+                                                <div className="rounded-xl border border-primary/20 bg-surface/70 p-2 text-center">
                                                     <div className="text-text-muted uppercase">XP</div>
                                                     <div className="text-base font-bold">+{selectedStudySummary.totalXp}</div>
                                                 </div>
@@ -355,8 +447,8 @@ const Profile = () => {
                             )}
                         </div>
                     </div>
-                    <div className="glass-card p-8">
-                        <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="glass-card p-6 sm:p-7">
+                        <div className="flex items-start justify-between gap-4 mb-4">
                             <h3 className="text-xl">Từ đã học</h3>
                             <Button
                                 variant="ghost"
@@ -385,6 +477,65 @@ const Profile = () => {
                             </div>
                         )}
                     </div>
+                    <div className="glass-card p-6 sm:p-7">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <h3 className="text-lg sm:text-xl flex items-center gap-2">
+                                    <StickyNote size={18} className="text-primary" /> Danh sách ghi chú
+                                </h3>
+                                <p className="mt-1 text-xs text-text-muted">
+                                    {sortedStickyNotes.length} ghi chú, ghim hiển thị trước
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                className="px-4 py-2 shrink-0"
+                                onClick={async () => {
+                                    if (!currentUser?.userId) {
+                                        setStickyNotes([]);
+                                        return;
+                                    }
+                                    setIsLoadingStickyNotes(true);
+                                    try {
+                                        const items = await stickyNotesApi.getAll();
+                                        setStickyNotes(items);
+                                    } catch (error: any) {
+                                        onAddToast?.(error?.message || 'Không thể tải danh sách ghi chú.', 'info');
+                                    } finally {
+                                        setIsLoadingStickyNotes(false);
+                                    }
+                                }}
+                                disabled={isLoadingStickyNotes}
+                            >
+                                Làm mới
+                            </Button>
+                        </div>
+
+                        {isLoadingStickyNotes ? (
+                            <p className="text-sm text-text-muted">Đang tải ghi chú...</p>
+                        ) : sortedStickyNotes.length === 0 ? (
+                            <p className="text-sm text-text-muted">Bạn chưa có ghi chú nào.</p>
+                        ) : (
+                            <div className="max-h-[28rem] overflow-y-auto pr-1 rounded-2xl">
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    {sortedStickyNotes.map((note) => (
+                                        <div
+                                            key={note.stickyNoteId}
+                                            className={`rounded-xl border p-3 text-text-primary ${getNoteColorClass(note.color)}`}
+                                        >
+                                            <div className="text-[11px] uppercase tracking-wide text-text-muted mb-1.5 flex items-center justify-between gap-3">
+                                                <span>{note.isPinned ? 'Đã ghim' : 'Ghi chú'}</span>
+                                                <span className="shrink-0">{new Date(note.updatedAt).toLocaleDateString('vi-VN')}</span>
+                                            </div>
+                                            <p className="max-h-24 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line">
+                                                {note.content || 'Ghi chú trống'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -394,17 +545,17 @@ const Profile = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[700] bg-white/35 backdrop-blur-sm p-6 flex items-center justify-center"
+                        className="fixed inset-0 z-[700] bg-surface/35 backdrop-blur-sm p-6 flex items-center justify-center"
                     >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.96, y: 16 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 16 }}
                             transition={{ duration: 0.24, ease: 'easeOut' }}
-                            className="glass-card bg-white/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
+                            className="glass-card bg-surface/85 w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto"
                         >
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-2xl font-bold">Chỉnh sửa hồ sơ</h3>
+                                <h3 className={typography.modalTitle}>Chỉnh sửa hồ sơ</h3>
                                 <button
                                     className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
                                     onClick={() => setIsEditing(false)}
@@ -420,7 +571,7 @@ const Profile = () => {
                                     {avatarUrl ? (
                                         <img src={avatarUrl} alt="Avatar preview" className="w-20 h-20 rounded-full object-cover border border-primary/20" />
                                     ) : (
-                                        <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl font-display text-white">{initials}</div>
+                                        <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl font-display text-text-on-accent">{initials}</div>
                                     )}
                                     <Button
                                         type="button"
@@ -470,19 +621,29 @@ const Profile = () => {
                             </section>
 
                             <section className="space-y-4 border-t border-primary/10 pt-6">
-                                <h4 className="font-bold">Đổi mật khẩu</h4>
-                                <input
-                                    type="password"
-                                    className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
-                                    placeholder="Mật khẩu hiện tại"
-                                    value={currentPassword}
-                                    onChange={(e) => setCurrentPassword(e.target.value)}
-                                />
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <h4 className="font-bold">{passwordSectionTitle}</h4>
+                                    <span className="w-fit rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold text-text-secondary">
+                                        {accountAuthLabel}
+                                    </span>
+                                </div>
+                                {hasLocalPassword && (
+                                    <input
+                                        type="password"
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
+                                        placeholder="Mật khẩu hiện tại"
+                                        value={currentPassword}
+                                        autoComplete="current-password"
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
+                                    />
+                                )}
                                 <input
                                     type="password"
                                     className="w-full px-4 py-3 rounded-xl border-2 border-primary/10"
                                     placeholder="Mật khẩu mới"
                                     value={newPassword}
+                                    maxLength={PASSWORD_MAX_LENGTH}
+                                    autoComplete="new-password"
                                     onChange={(e) => {
                                         const nextValue = e.target.value;
                                         setNewPassword(nextValue);
@@ -499,11 +660,27 @@ const Profile = () => {
                                         );
                                     }}
                                 />
+                                <div className="rounded-xl border border-primary/15 bg-surface/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                                    <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
+                                    {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                                        const ok = newPasswordPolicy[key];
+                                        return (
+                                            <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
+                                                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
+                                                    {ok ? '✓' : ''}
+                                                </span>
+                                                {label}
+                                            </p>
+                                        );
+                                    })}
+                                </div>
                                 <input
                                     type="password"
                                     className={`w-full px-4 py-3 rounded-xl border-2 ${confirmPasswordError ? 'border-red-400' : 'border-primary/10'}`}
                                     placeholder="Xác nhận mật khẩu mới"
                                     value={confirmNewPassword}
+                                    maxLength={PASSWORD_MAX_LENGTH}
+                                    autoComplete="new-password"
                                     onChange={(e) => {
                                         const nextValue = e.target.value;
                                         setConfirmNewPassword(nextValue);
