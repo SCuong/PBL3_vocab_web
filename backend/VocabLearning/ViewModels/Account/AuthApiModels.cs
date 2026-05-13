@@ -16,6 +16,23 @@ namespace VocabLearning.ViewModels.Account
         public string Email { get; set; } = string.Empty;
 
         public string Password { get; set; } = string.Empty;
+
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    public sealed class GoogleLoginApiRequest
+    {
+        public string IdToken { get; set; } = string.Empty;
+    }
+
+    public sealed class VerifyEmailApiRequest
+    {
+        public string Token { get; set; } = string.Empty;
+    }
+
+    public sealed class ResendVerificationApiRequest
+    {
+        public string Email { get; set; } = string.Empty;
     }
 
     public sealed class UpdateProfileApiRequest
@@ -71,6 +88,8 @@ namespace VocabLearning.ViewModels.Account
 
         public bool HasLocalPassword { get; set; }
 
+        public bool IsEmailVerified { get; set; }
+
         public DateTime CreatedAt { get; set; }
     }
 
@@ -87,6 +106,8 @@ namespace VocabLearning.ViewModels.Account
         public bool UsedFallbackLink { get; set; }
 
         public string? ResetLink { get; set; }
+
+        public string? VerificationLink { get; set; }
 
         public string? InboxUrl { get; set; }
     }

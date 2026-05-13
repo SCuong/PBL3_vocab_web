@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VocabLearning.Data;
 
@@ -11,9 +12,11 @@ using VocabLearning.Data;
 namespace VocabLearning.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260509025036_Add_SM2_Quality_To_ExerciseResult")]
+    partial class Add_SM2_Quality_To_ExerciseResult
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -357,60 +360,6 @@ namespace VocabLearning.Migrations
                     b.ToTable("progress", (string)null);
                 });
 
-            modelBuilder.Entity("VocabLearning.Models.StickyNote", b =>
-                {
-                    b.Property<long>("StickyNoteId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("sticky_note_id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("StickyNoteId"));
-
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)")
-                        .HasDefaultValue("yellow")
-                        .HasColumnName("color");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)")
-                        .HasDefaultValue("")
-                        .HasColumnName("content");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("GETDATE()");
-
-                    b.Property<bool>("IsPinned")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_pinned");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("GETDATE()");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("StickyNoteId");
-
-                    b.HasIndex("UserId", "IsPinned", "UpdatedAt");
-
-                    b.ToTable("sticky_note", (string)null);
-                });
-
             modelBuilder.Entity("VocabLearning.Models.Topic", b =>
                 {
                     b.Property<long>("TopicId")
@@ -667,15 +616,6 @@ namespace VocabLearning.Migrations
                         .WithOne()
                         .HasForeignKey("VocabLearning.Models.Progress", "UserId", "VocabId")
                         .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VocabLearning.Models.StickyNote", b =>
-                {
-                    b.HasOne("VocabLearning.Models.Users", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

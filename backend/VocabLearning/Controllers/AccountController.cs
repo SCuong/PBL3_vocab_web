@@ -1,9 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
@@ -11,35 +10,33 @@ using VocabLearning.ViewModels.Account;
 
 namespace VocabLearning.Controllers
 {
-    public class AccountController : Controller
+    [ApiController]
+    public class AccountController : ControllerBase
     {
-        private readonly IConfiguration configuration;
         private readonly CustomAuthenticationService customAuthenticationService;
         private readonly AppDbContext appDbContext;
+        private readonly GoogleIdTokenVerifier googleIdTokenVerifier;
+        private readonly PasswordResetEmailService passwordResetEmailService;
+        private readonly IConfiguration configuration;
+        private readonly IWebHostEnvironment environment;
         private readonly ILogger<AccountController> logger;
 
         public AccountController(
-            IConfiguration configuration,
             CustomAuthenticationService customAuthenticationService,
             AppDbContext appDbContext,
+            GoogleIdTokenVerifier googleIdTokenVerifier,
+            PasswordResetEmailService passwordResetEmailService,
+            IConfiguration configuration,
+            IWebHostEnvironment environment,
             ILogger<AccountController> logger)
         {
-            this.configuration = configuration;
             this.customAuthenticationService = customAuthenticationService;
             this.appDbContext = appDbContext;
+            this.googleIdTokenVerifier = googleIdTokenVerifier;
+            this.passwordResetEmailService = passwordResetEmailService;
+            this.configuration = configuration;
+            this.environment = environment;
             this.logger = logger;
-        }
-
-        [AllowAnonymous]
-        public IActionResult Login(string? returnUrl = null)
-        {
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                return RedirectToLocal(returnUrl);
-            }
-
-            PopulateLoginViewData(returnUrl);
-            return View(new LoginViewModel());
         }
 
         [HttpGet("/api/auth/me")]
@@ -63,36 +60,9 @@ namespace VocabLearning.Controllers
             });
         }
 
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
-        {
-            PopulateLoginViewData(returnUrl);
-
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                return RedirectToLocal(returnUrl);
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var user = await customAuthenticationService.AuthenticateAsync(model.UsernameOrEmail, model.Password);
-            if (user is null)
-            {
-                ModelState.AddModelError(string.Empty, "Username/email or password is incorrect.");
-                return View(model);
-            }
-
-            await customAuthenticationService.SignInAsync(HttpContext, user, model.RememberMe);
-            return RedirectToLocal(returnUrl);
-        }
-
         [HttpPost("/api/auth/login")]
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthApiResponse>> LoginApi(
             [FromBody] LoginApiRequest? request,
             CancellationToken cancellationToken)
@@ -118,113 +88,27 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            var user = await customAuthenticationService.AuthenticateAsync(usernameOrEmail, password, cancellationToken);
-            if (user is null)
+            var loginResult = await customAuthenticationService.AuthenticateForLoginAsync(usernameOrEmail, password, cancellationToken);
+            if (loginResult.User is null)
             {
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Username/email or password is incorrect."
+                    Message = loginResult.ErrorMessage ?? "Username/email or password is incorrect."
                 });
             }
 
-            await customAuthenticationService.SignInAsync(HttpContext, user, request.RememberMe);
+            await customAuthenticationService.SignInAsync(HttpContext, loginResult.User, request.RememberMe);
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                User = MapAuthenticatedUser(user)
+                User = MapAuthenticatedUser(loginResult.User)
             });
-        }
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public IActionResult GoogleLogin(string? returnUrl = null, string? source = null)
-        {
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                return RedirectToLocal(returnUrl);
-            }
-
-            if (!IsGoogleLoginEnabled())
-            {
-                TempData["ErrorMessage"] = "Google sign-in is not configured yet. Please add ClientId and ClientSecret first.";
-                return RedirectToSource(source, returnUrl);
-            }
-
-            var redirectUrl = Url.Action(nameof(GoogleResponse), values: new { returnUrl, source }) ?? Url.Action(nameof(Login), values: new { returnUrl })!;
-            var properties = new AuthenticationProperties
-            {
-                RedirectUri = redirectUrl
-            };
-
-            return Challenge(properties, GoogleDefaults.AuthenticationScheme);
-        }
-
-        [AllowAnonymous]
-        public async Task<IActionResult> GoogleResponse(string? returnUrl = null, string? source = null, string? remoteError = null)
-        {
-            if (!string.IsNullOrWhiteSpace(remoteError))
-            {
-                TempData["ErrorMessage"] = $"Google sign-in failed: {remoteError}";
-                return RedirectToSource(source, returnUrl);
-            }
-
-            var externalResult = await HttpContext.AuthenticateAsync(AuthenticationSchemeNames.External);
-            if (!externalResult.Succeeded || externalResult.Principal is null)
-            {
-                TempData["ErrorMessage"] = "Google sign-in could not be completed.";
-                return RedirectToSource(source, returnUrl);
-            }
-
-            try
-            {
-                var externalPrincipal = externalResult.Principal;
-                var email = externalPrincipal.FindFirstValue(ClaimTypes.Email);
-                var googleSubject = externalPrincipal.FindFirstValue(ClaimTypes.NameIdentifier)
-                    ?? externalPrincipal.FindFirstValue("sub");
-                var displayName = externalPrincipal.FindFirstValue(ClaimTypes.Name);
-
-                var result = await customAuthenticationService.AuthenticateGoogleAsync(
-                    email ?? string.Empty,
-                    googleSubject ?? string.Empty,
-                    displayName);
-
-                if (!result.Succeeded || result.User is null)
-                {
-                    TempData["ErrorMessage"] = result.ErrorMessage ?? "Google sign-in could not be completed.";
-                    return RedirectToSource(source, returnUrl);
-                }
-
-                await customAuthenticationService.SignInAsync(
-                    HttpContext,
-                    result.User,
-                    false,
-                    GoogleDefaults.AuthenticationScheme,
-                    externalResult.Properties?.GetTokens());
-
-                return RedirectToLocal(returnUrl);
-            }
-            finally
-            {
-                await HttpContext.SignOutAsync(AuthenticationSchemeNames.External);
-            }
-        }
-
-        [AllowAnonymous]
-        public IActionResult Register()
-        {
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                return RedirectToAction("Index", "Home");
-            }
-
-            PopulateExternalAuthViewData();
-            return View(new RegisterViewModel());
         }
 
         [HttpPost("/api/auth/register")]
         [AllowAnonymous]
+        [EnableRateLimiting("auth")]
         public async Task<ActionResult<AuthApiResponse>> RegisterApi(
             [FromBody] RegisterApiRequest? request,
             CancellationToken cancellationToken)
@@ -241,15 +125,26 @@ namespace VocabLearning.Controllers
             var name = request.Name?.Trim() ?? string.Empty;
             var email = request.Email?.Trim() ?? string.Empty;
             var password = request.Password ?? string.Empty;
+            var confirmPassword = request.ConfirmPassword ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(name)
                 || string.IsNullOrWhiteSpace(email)
-                || string.IsNullOrWhiteSpace(password))
+                || string.IsNullOrWhiteSpace(password)
+                || string.IsNullOrWhiteSpace(confirmPassword))
             {
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Name, email, and password are required."
+                    Message = "Name, email, password, and confirmation are required."
+                });
+            }
+
+            if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Password confirmation does not match."
                 });
             }
 
@@ -263,11 +158,173 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            await customAuthenticationService.SignInAsync(HttpContext, result.User, false);
+            var deliveryResult = await IssueEmailVerificationAsync(result.User, cancellationToken);
+            if (!deliveryResult.Succeeded)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Verification email service is temporarily unavailable. Please try again later."
+                });
+            }
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = deliveryResult.Message,
+                EmailSent = deliveryResult.EmailSent,
+                UsedFallbackLink = deliveryResult.UsedFallbackLink,
+                VerificationLink = deliveryResult.VerificationLink,
+                InboxUrl = deliveryResult.InboxUrl
+            });
+        }
+
+        [HttpPost("/api/auth/google")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
+        public async Task<ActionResult<AuthApiResponse>> GoogleLoginApi(
+            [FromBody] GoogleLoginApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Google credential is required."
+                });
+            }
+
+            var verifiedToken = await googleIdTokenVerifier.VerifyAsync(request.IdToken, cancellationToken);
+            if (verifiedToken is null)
+            {
+                return Unauthorized(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Google login could not be verified."
+                });
+            }
+
+            var result = await customAuthenticationService.AuthenticateGoogleAsync(
+                verifiedToken.Email,
+                verifiedToken.Subject,
+                verifiedToken.Name,
+                cancellationToken);
+
+            if (!result.Succeeded || result.User is null)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = result.ErrorMessage ?? "Google login is not available for this account."
+                });
+            }
+
+            if (!string.Equals(result.User.Role, UserRoles.Learner, StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Google login is only available for learner accounts."
+                });
+            }
+
+            await customAuthenticationService.SignInAsync(HttpContext, result.User, true, "Google");
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
                 User = MapAuthenticatedUser(result.User)
+            });
+        }
+
+        [HttpPost("/api/auth/verify-email")]
+        [AllowAnonymous]
+        public async Task<ActionResult<AuthApiResponse>> VerifyEmailApi(
+            [FromBody] VerifyEmailApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Token))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Verification token is required."
+                });
+            }
+
+            var result = await customAuthenticationService.VerifyEmailAsync(
+                request.Token,
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                cancellationToken);
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = result.ErrorMessage ?? "Verification token is invalid or expired."
+                });
+            }
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = "Email verified successfully. You can now log in."
+            });
+        }
+
+        [HttpPost("/api/auth/resend-verification")]
+        [AllowAnonymous]
+        [EnableRateLimiting("forgot-password")]
+        public async Task<ActionResult<AuthApiResponse>> ResendVerificationApi(
+            [FromBody] ResendVerificationApiRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null || string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Email is required."
+                });
+            }
+
+            var tokenResult = await customAuthenticationService.CreateEmailVerificationTokenForEmailAsync(
+                request.Email,
+                cancellationToken);
+
+            if (!tokenResult.ShouldSendEmail)
+            {
+                return Ok(new AuthApiResponse
+                {
+                    Succeeded = true,
+                    Message = "If this learner account needs verification, a new email has been sent."
+                });
+            }
+
+            var deliveryResult = await SendEmailVerificationAsync(
+                tokenResult.Email,
+                tokenResult.Username,
+                tokenResult.Token,
+                cancellationToken);
+
+            if (!deliveryResult.Succeeded)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Verification email service is temporarily unavailable. Please try again later."
+                });
+            }
+
+            return Ok(new AuthApiResponse
+            {
+                Succeeded = true,
+                Message = deliveryResult.Message,
+                EmailSent = deliveryResult.EmailSent,
+                UsedFallbackLink = deliveryResult.UsedFallbackLink,
+                VerificationLink = deliveryResult.VerificationLink,
+                InboxUrl = deliveryResult.InboxUrl
             });
         }
 
@@ -344,14 +401,13 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            if (string.IsNullOrWhiteSpace(request.CurrentPassword)
-                || string.IsNullOrWhiteSpace(request.NewPassword)
+            if (string.IsNullOrWhiteSpace(request.NewPassword)
                 || string.IsNullOrWhiteSpace(request.ConfirmNewPassword))
             {
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Current password, new password, and confirmation are required."
+                    Message = "New password and confirmation are required."
                 });
             }
 
@@ -374,16 +430,17 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            var hasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
+            if (hasLocalPassword && string.IsNullOrWhiteSpace(request.CurrentPassword))
             {
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password is not available for this account."
+                    Message = "Current password is required."
                 });
             }
 
-            if (string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
+            if (hasLocalPassword && string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
             {
                 return BadRequest(new AuthApiResponse
                 {
@@ -394,7 +451,7 @@ namespace VocabLearning.Controllers
 
             var result = await customAuthenticationService.ChangePasswordAsync(
                 user.UserId,
-                request.CurrentPassword,
+                hasLocalPassword ? request.CurrentPassword : null,
                 request.NewPassword,
                 cancellationToken);
 
@@ -407,158 +464,24 @@ namespace VocabLearning.Controllers
                 });
             }
 
+            var refreshedUser = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (refreshedUser is not null)
+            {
+                var currentSession = await HttpContext.AuthenticateAsync(AuthenticationSchemeNames.Application);
+                await customAuthenticationService.SignInAsync(
+                    HttpContext,
+                    refreshedUser,
+                    currentSession.Properties?.IsPersistent ?? false,
+                    string.IsNullOrWhiteSpace(refreshedUser.GoogleSubject) ? "Password" : "Google+Password",
+                    currentSession.Properties?.GetTokens());
+            }
+
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Password changed successfully."
+                Message = hasLocalPassword ? "Password changed successfully." : "Password set successfully.",
+                User = refreshedUser is null ? null : MapAuthenticatedUser(refreshedUser)
             });
-        }
-
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(RegisterViewModel model)
-        {
-            PopulateExternalAuthViewData();
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var result = await customAuthenticationService.RegisterAsync(model.Name, model.Email, model.Password);
-            if (!result.Succeeded || result.User is null)
-            {
-                ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Registration failed.");
-                return View(model);
-            }
-
-            await customAuthenticationService.SignInAsync(HttpContext, result.User, false);
-            return RedirectToAction("Index", "Home");
-        }
-
-
-        [Authorize]
-        public async Task<IActionResult> Profile(CancellationToken cancellationToken)
-        {
-            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
-            if (user is null)
-            {
-                return await RedirectToLoginAsync();
-            }
-
-            return View(await BuildProfileViewModelAsync(user, cancellationToken));
-        }
-
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Profile(ProfileViewModel model, CancellationToken cancellationToken)
-        {
-            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
-            if (user is null)
-            {
-                return await RedirectToLoginAsync();
-            }
-
-            if (!ModelState.IsValid)
-            {
-                await PopulateProfileMetadataAsync(model, user, cancellationToken);
-                return View(model);
-            }
-
-            var result = await customAuthenticationService.UpdateProfileAsync(
-                user.UserId,
-                model.Username,
-                model.Email,
-                cancellationToken);
-
-            if (!result.Succeeded || result.User is null)
-            {
-                ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Profile could not be updated.");
-                await PopulateProfileMetadataAsync(model, user, cancellationToken);
-                return View(model);
-            }
-
-            var currentSession = await HttpContext.AuthenticateAsync(AuthenticationSchemeNames.Application);
-            var authenticationMethod = User.FindFirstValue(ClaimTypes.AuthenticationMethod) ?? "Password";
-
-            await customAuthenticationService.SignInAsync(
-                HttpContext,
-                result.User,
-                currentSession.Properties?.IsPersistent ?? false,
-                authenticationMethod,
-                currentSession.Properties?.GetTokens());
-
-            TempData["SuccessMessage"] = "Profile updated successfully.";
-            return RedirectToAction(nameof(Profile));
-        }
-
-        [Authorize]
-        public async Task<IActionResult> LearningLog(CancellationToken cancellationToken)
-        {
-            var userId = await customAuthenticationService.ResolveAuthenticatedUserIdAsync(User);
-            if (!userId.HasValue)
-            {
-                return await RedirectToLoginAsync();
-            }
-
-            var items = await appDbContext.LearningLogs
-                .Where(log => log.UserId == userId.Value)
-                .OrderByDescending(log => log.Date)
-                .Take(100)
-                .ToListAsync(cancellationToken);
-
-            return View(items);
-        }
-
-        [Authorize]
-        public IActionResult ChangePassword()
-        {
-            return View(new ChangePasswordViewModel
-            {
-                Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty
-            });
-        }
-
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
-        {
-            model.Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var userId = await customAuthenticationService.ResolveAuthenticatedUserIdAsync(User);
-            if (!userId.HasValue)
-            {
-                return await RedirectToLoginAsync();
-            }
-
-            var result = await customAuthenticationService.ChangePasswordAsync(userId.Value, model.CurrentPassword, model.NewPassword);
-            if (!result.Succeeded)
-            {
-                ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Password could not be changed.");
-                return View(model);
-            }
-
-            await customAuthenticationService.SignOutAsync(HttpContext);
-            TempData["InfoMessage"] = "Password changed successfully. Please sign in again.";
-            return RedirectToAction(nameof(Login));
-        }
-
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Logout()
-        {
-            await customAuthenticationService.SignOutAsync(HttpContext);
-            return RedirectToAction("Index", "Home");
         }
 
         [HttpPost("/api/auth/logout")]
@@ -644,235 +567,119 @@ namespace VocabLearning.Controllers
             });
         }
 
-        private IActionResult RedirectToLocal(string? returnUrl)
+        private async Task<EmailVerificationDeliveryResult> IssueEmailVerificationAsync(
+            Models.Users user,
+            CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            var tokenResult = await customAuthenticationService.CreateEmailVerificationTokenAsync(
+                user.UserId,
+                cancellationToken);
+
+            if (!tokenResult.ShouldSendEmail)
             {
-                return Redirect(returnUrl);
-            }
-
-            return RedirectToAction("Index", "Home");
-        }
-
-        private bool IsGoogleLoginEnabled()
-        {
-            return !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"])
-                && !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientSecret"]);
-        }
-
-        private void PopulateLoginViewData(string? returnUrl)
-        {
-            ViewData["ReturnUrl"] = returnUrl;
-            ViewData["GoogleLoginEnabled"] = IsGoogleLoginEnabled();
-        }
-
-        private void PopulateExternalAuthViewData()
-        {
-            ViewData["GoogleLoginEnabled"] = IsGoogleLoginEnabled();
-        }
-
-
-        private async Task<IActionResult> RedirectToLoginAsync()
-        {
-            await customAuthenticationService.SignOutAsync(HttpContext);
-            TempData["ErrorMessage"] = "Your session is no longer valid. Please sign in again.";
-            var returnUrl = $"{Request.Path}{Request.QueryString}";
-            return RedirectToAction(nameof(Login), new { returnUrl });
-        }
-
-        private IActionResult RedirectToSource(string? source, string? returnUrl)
-        {
-            if (string.Equals(source, nameof(Register), StringComparison.OrdinalIgnoreCase))
-            {
-                return RedirectToAction(nameof(Register));
-            }
-
-            return RedirectToAction(nameof(Login), new { returnUrl });
-        }
-
-        private async Task<ProfileViewModel> BuildProfileViewModelAsync(Models.Users user, CancellationToken cancellationToken)
-        {
-            var model = new ProfileViewModel
-            {
-                Username = user.Username,
-                Email = user.Email,
-                Role = user.Role,
-                Status = user.Status,
-                CreatedAt = user.CreatedAt,
-                HasGoogleLogin = !string.IsNullOrWhiteSpace(user.GoogleSubject),
-                HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash),
-                DisplayName = user.Username,
-                AvatarText = BuildAvatarText(user.Username)
-            };
-
-            await PopulateLearningSnapshotAsync(model, user.UserId, cancellationToken);
-            return model;
-        }
-
-        private async Task PopulateProfileMetadataAsync(ProfileViewModel model, Models.Users user, CancellationToken cancellationToken)
-        {
-            model.Role = user.Role;
-            model.Status = user.Status;
-            model.CreatedAt = user.CreatedAt;
-            model.HasGoogleLogin = !string.IsNullOrWhiteSpace(user.GoogleSubject);
-            model.HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
-            model.DisplayName = user.Username;
-            model.AvatarText = BuildAvatarText(user.Username);
-
-            await PopulateLearningSnapshotAsync(model, user.UserId, cancellationToken);
-        }
-
-        private async Task PopulateLearningSnapshotAsync(ProfileViewModel model, long userId, CancellationToken cancellationToken)
-        {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var todayStart = today.ToDateTime(TimeOnly.MinValue);
-            var todayEnd = today.ToDateTime(TimeOnly.MaxValue);
-
-            model.TotalLearnedWords = await appDbContext.UserVocabularies
-                .Where(item => item.UserId == userId)
-                .Select(item => item.VocabId)
-                .Distinct()
-                .CountAsync(cancellationToken);
-
-            model.DueReviewTodayCount = await appDbContext.Progresses
-                .Where(item =>
-                    item.UserId == userId
-                    && item.NextReviewDate.HasValue
-                    && item.NextReviewDate.Value <= todayEnd)
-                .CountAsync(cancellationToken);
-
-            model.LastStudiedAt = await appDbContext.LearningLogs
-                .Where(log => log.UserId == userId)
-                .Select(log => (DateTime?)log.Date)
-                .MaxAsync(cancellationToken);
-
-            var streakDates = await appDbContext.LearningLogs
-                .Where(log => log.UserId == userId)
-                .OrderByDescending(log => log.Date)
-                .Select(log => log.Date)
-                .ToListAsync(cancellationToken);
-
-            model.LearningStreakDays = CalculateLearningStreak(streakDates, today);
-
-            var fromLast7Days = todayStart.AddDays(-6);
-            var sevenDaySessions = await appDbContext.ExerciseSessions
-                .Where(session => session.UserId == userId && session.StartedAt >= fromLast7Days)
-                .Select(session => new { session.TotalQuestions, session.CorrectCount })
-                .ToListAsync(cancellationToken);
-
-            var totalQuestions = sevenDaySessions.Sum(item => Math.Max(0, item.TotalQuestions));
-            var correctAnswers = sevenDaySessions.Sum(item => Math.Max(0, item.CorrectCount));
-            model.AccuracyLast7Days = totalQuestions == 0
-                ? 0
-                : (float)Math.Round(correctAnswers * 100d / totalQuestions, 1);
-
-            var fromLast30Days = todayStart.AddDays(-29);
-            var logs = await appDbContext.LearningLogs
-                .Where(log => log.UserId == userId && log.Date >= fromLast30Days)
-                .Select(log => new LearningLogSnapshotItem
+                return new EmailVerificationDeliveryResult
                 {
-                    Date = log.Date,
-                    ActivityType = log.ActivityType,
-                    WordsStudied = log.WordsStudied
-                })
-                .ToListAsync(cancellationToken);
+                    Succeeded = true,
+                    Message = "Account created. Please verify your email before logging in."
+                };
+            }
 
-            model.Chart7Days = BuildLearningChartPoints(logs, today, 7);
-            model.Chart30Days = BuildLearningChartPoints(logs, today, 30);
+            return await SendEmailVerificationAsync(
+                tokenResult.Email,
+                tokenResult.Username,
+                tokenResult.Token,
+                cancellationToken);
         }
 
-        private static int CalculateLearningStreak(IEnumerable<DateTime> dateTimes, DateOnly today)
+        private async Task<EmailVerificationDeliveryResult> SendEmailVerificationAsync(
+            string email,
+            string username,
+            string token,
+            CancellationToken cancellationToken)
         {
-            var activeDays = dateTimes
-                .Select(DateOnly.FromDateTime)
-                .ToHashSet();
+            var verificationLink = BuildEmailVerificationLink(token);
+            var inboxUrl = BuildInboxUrl(email);
 
-            if (!activeDays.Any())
+            try
             {
-                return 0;
-            }
+                await passwordResetEmailService.SendEmailVerificationEmailAsync(
+                    email,
+                    username,
+                    verificationLink,
+                    cancellationToken);
 
-            var current = activeDays.Contains(today)
-                ? today
-                : today.AddDays(-1);
-
-            if (!activeDays.Contains(current))
-            {
-                return 0;
-            }
-
-            var streak = 0;
-            while (activeDays.Contains(current))
-            {
-                streak += 1;
-                current = current.AddDays(-1);
-            }
-
-            return streak;
-        }
-
-        private static List<ProfileLearningChartPointViewModel> BuildLearningChartPoints(
-            IEnumerable<LearningLogSnapshotItem> logs,
-            DateOnly today,
-            int days)
-        {
-            var fromDate = today.AddDays(-(days - 1));
-
-            var grouped = logs
-                .Select(log => new
+                return new EmailVerificationDeliveryResult
                 {
-                    Date = DateOnly.FromDateTime(log.Date),
-                    log.ActivityType,
-                    log.WordsStudied
-                })
-                .Where(item => item.Date >= fromDate)
-                .GroupBy(item => item.Date)
-                .ToDictionary(
-                    group => group.Key,
-                    group => new
+                    Succeeded = true,
+                    Message = "Account created. Please check your email to verify your account before logging in.",
+                    EmailSent = true,
+                    InboxUrl = inboxUrl
+                };
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send verification email to {Email}.", email);
+
+                if (ShouldExposeVerificationLinkFallback())
+                {
+                    return new EmailVerificationDeliveryResult
                     {
-                        LearnedWords = group
-                            .Where(item => string.Equals(item.ActivityType, LearningActivityTypes.Learn, StringComparison.OrdinalIgnoreCase))
-                            .Sum(item => Math.Max(0, item.WordsStudied)),
-                        ReviewedWords = group
-                            .Where(item => string.Equals(item.ActivityType, LearningActivityTypes.Review, StringComparison.OrdinalIgnoreCase))
-                            .Sum(item => Math.Max(0, item.WordsStudied))
-                    });
+                        Succeeded = true,
+                        Message = "Account created. Email service is not configured, so use the verification link below.",
+                        UsedFallbackLink = true,
+                        VerificationLink = verificationLink,
+                        InboxUrl = inboxUrl
+                    };
+                }
 
-            var chart = new List<ProfileLearningChartPointViewModel>();
-            for (var dayOffset = days - 1; dayOffset >= 0; dayOffset--)
-            {
-                var date = today.AddDays(-dayOffset);
-                grouped.TryGetValue(date, out var value);
-
-                chart.Add(new ProfileLearningChartPointViewModel
+                return new EmailVerificationDeliveryResult
                 {
-                    Date = date,
-                    Label = date.ToString("MM/dd"),
-                    LearnedWords = value?.LearnedWords ?? 0,
-                    ReviewedWords = value?.ReviewedWords ?? 0
-                });
+                    Succeeded = false,
+                    Message = "Verification email service is temporarily unavailable. Please try again later."
+                };
             }
-
-            return chart;
         }
 
-        private static string BuildAvatarText(string username)
+        private string BuildEmailVerificationLink(string token)
         {
-            if (string.IsNullOrWhiteSpace(username))
+            var frontendOrigin = configuration["Frontend:Origin"]?.Trim();
+            var encodedToken = Uri.EscapeDataString(token);
+            if (!string.IsNullOrWhiteSpace(frontendOrigin))
             {
-                return "U";
+                return $"{frontendOrigin.TrimEnd('/')}/verify-email?token={encodedToken}";
             }
 
-            var parts = username
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return $"{Request.Scheme}://{Request.Host}/verify-email?token={encodedToken}";
+        }
 
-            if (parts.Length >= 2)
+        private bool ShouldExposeVerificationLinkFallback()
+        {
+            var configuredValue = configuration["EmailVerification:ExposeVerificationLinkInResponse"];
+            if (bool.TryParse(configuredValue, out var explicitSetting))
             {
-                return string.Concat(parts[0][0], parts[1][0]).ToUpperInvariant();
+                return explicitSetting;
             }
 
-            return username.Trim()[0].ToString().ToUpperInvariant();
+            return environment.IsDevelopment();
+        }
+
+        private static string BuildInboxUrl(string email)
+        {
+            var normalizedEmail = email.Trim();
+            var atIndex = normalizedEmail.LastIndexOf('@');
+            if (atIndex < 0 || atIndex == normalizedEmail.Length - 1)
+            {
+                return "https://mail.google.com";
+            }
+
+            var domain = normalizedEmail[(atIndex + 1)..].ToLowerInvariant();
+            return domain switch
+            {
+                "gmail.com" or "googlemail.com" => "https://mail.google.com",
+                "outlook.com" or "hotmail.com" or "live.com" or "msn.com" => "https://outlook.live.com/mail/",
+                "yahoo.com" or "yahoo.com.vn" => "https://mail.yahoo.com/",
+                _ => "https://mail.google.com"
+            };
         }
 
         private static AuthenticatedUserViewModel MapAuthenticatedUser(Models.Users user)
@@ -886,17 +693,24 @@ namespace VocabLearning.Controllers
                 Status = user.Status,
                 HasGoogleLogin = !string.IsNullOrWhiteSpace(user.GoogleSubject),
                 HasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash),
+                IsEmailVerified = user.IsEmailVerified,
                 CreatedAt = user.CreatedAt
             };
         }
 
-        private sealed class LearningLogSnapshotItem
+        private sealed class EmailVerificationDeliveryResult
         {
-            public DateTime Date { get; set; }
+            public bool Succeeded { get; set; }
 
-            public string ActivityType { get; set; } = string.Empty;
+            public string Message { get; set; } = string.Empty;
 
-            public int WordsStudied { get; set; }
+            public bool EmailSent { get; set; }
+
+            public bool UsedFallbackLink { get; set; }
+
+            public string? VerificationLink { get; set; }
+
+            public string? InboxUrl { get; set; }
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+
 namespace VocabLearning.Services
 {
     public class PasswordResetEmailService
@@ -20,6 +21,35 @@ namespace VocabLearning.Services
             string username,
             string resetLink,
             CancellationToken cancellationToken = default)
+        {
+            await SendEmailAsync(
+                toEmail,
+                "Dat lai mat khau VocabLearning",
+                BuildPasswordResetHtmlBody(username, resetLink),
+                "Password reset",
+                cancellationToken);
+        }
+
+        public async Task SendEmailVerificationEmailAsync(
+            string toEmail,
+            string username,
+            string verificationLink,
+            CancellationToken cancellationToken = default)
+        {
+            await SendEmailAsync(
+                toEmail,
+                "Xac minh email VocabLearning",
+                BuildEmailVerificationHtmlBody(username, verificationLink),
+                "Email verification",
+                cancellationToken);
+        }
+
+        private async Task SendEmailAsync(
+            string toEmail,
+            string subject,
+            string htmlBody,
+            string logAction,
+            CancellationToken cancellationToken)
         {
             var host = configuration["Smtp:Host"];
             var portText = configuration["Smtp:Port"];
@@ -68,45 +98,53 @@ namespace VocabLearning.Services
                 && bool.TryParse(enableSslText, out var parsedEnableSsl)
                 && parsedEnableSsl;
 
-            var smtpPort = parsedPort;
-            var smtpFromEmail = fromEmail!;
-
             using var message = new MailMessage
             {
-                From = new MailAddress(smtpFromEmail, string.IsNullOrWhiteSpace(fromName) ? "VocabLearning" : fromName),
-                Subject = "Đặt lại mật khẩu VocabLearning",
+                From = new MailAddress(fromEmail!, string.IsNullOrWhiteSpace(fromName) ? "VocabLearning" : fromName),
+                Subject = subject,
                 IsBodyHtml = true,
-                Body = BuildHtmlBody(username, resetLink)
+                Body = htmlBody
             };
 
             message.To.Add(toEmail);
 
-            using var smtpClient = new SmtpClient(host, smtpPort)
+            using var smtpClient = new SmtpClient(host, parsedPort)
             {
                 EnableSsl = enableSsl,
                 DeliveryMethod = SmtpDeliveryMethod.Network,
-                UseDefaultCredentials = false
+                UseDefaultCredentials = false,
+                Credentials = new NetworkCredential(user, password)
             };
-
-            smtpClient.Credentials = new NetworkCredential(user, password);
 
             cancellationToken.ThrowIfCancellationRequested();
             await smtpClient.SendMailAsync(message);
             cancellationToken.ThrowIfCancellationRequested();
 
-            logger.LogInformation("Password reset email sent successfully to {Email}.", toEmail);
+            logger.LogInformation("{Action} email sent successfully to {Email}.", logAction, toEmail);
         }
 
-        private static string BuildHtmlBody(string username, string resetLink)
+        private static string BuildPasswordResetHtmlBody(string username, string resetLink)
         {
-            var displayName = string.IsNullOrWhiteSpace(username) ? "bạn" : WebUtility.HtmlEncode(username);
+            var displayName = string.IsNullOrWhiteSpace(username) ? "ban" : WebUtility.HtmlEncode(username);
             var safeLink = WebUtility.HtmlEncode(resetLink);
 
-            return $@"<p>Chào {displayName},</p>
-<p>Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản VocabLearning của bạn.</p>
-<p>Hãy nhấn vào liên kết dưới đây để tạo mật khẩu mới. Liên kết này có hiệu lực trong 30 phút:</p>
-<p><a href=""{safeLink}"">Đặt lại mật khẩu</a></p>
-<p>Nếu bạn không yêu cầu thao tác này, bạn có thể bỏ qua email.</p>";
+            return $@"<p>Chao {displayName},</p>
+<p>Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan VocabLearning cua ban.</p>
+<p>Hay nhan vao lien ket duoi day de tao mat khau moi. Lien ket nay co hieu luc trong 30 phut:</p>
+<p><a href=""{safeLink}"">Dat lai mat khau</a></p>
+<p>Neu ban khong yeu cau thao tac nay, ban co the bo qua email.</p>";
+        }
+
+        private static string BuildEmailVerificationHtmlBody(string username, string verificationLink)
+        {
+            var displayName = string.IsNullOrWhiteSpace(username) ? "ban" : WebUtility.HtmlEncode(username);
+            var safeLink = WebUtility.HtmlEncode(verificationLink);
+
+            return $@"<p>Chao {displayName},</p>
+<p>Cam on ban da dang ky VocabLearning.</p>
+<p>Hay nhan vao lien ket duoi day de xac minh email. Lien ket nay co hieu luc trong 24 gio va chi dung duoc mot lan:</p>
+<p><a href=""{safeLink}"">Xac minh email</a></p>
+<p>Neu ban khong tao tai khoan nay, hay bo qua email.</p>";
         }
     }
 }

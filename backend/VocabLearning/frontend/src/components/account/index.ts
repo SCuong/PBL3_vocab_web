@@ -1,1 +1,0 @@
-export { DeleteAccountModal } from './DeleteAccountModal';

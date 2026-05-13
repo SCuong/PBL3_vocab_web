@@ -27,6 +27,7 @@ publish/
 # ASP.NET Core local settings
 appsettings.Development.json
 secrets.json
+appsettings.json
 
 # Test and logs
 TestResults/
