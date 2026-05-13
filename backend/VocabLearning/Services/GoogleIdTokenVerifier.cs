@@ -36,8 +36,18 @@ namespace VocabLearning.Services
                 return null;
             }
 
-            if (string.IsNullOrWhiteSpace(cleanToken) || cleanToken.Length > MaxTokenLength)
+            if (string.IsNullOrWhiteSpace(cleanToken))
             {
+                logger.LogWarning("Google ID token verification failed because token is empty.");
+                return null;
+            }
+
+            if (cleanToken.Length > MaxTokenLength)
+            {
+                logger.LogWarning(
+                    "Google ID token verification failed because token length {TokenLength} exceeds limit {MaxTokenLength}.",
+                    cleanToken.Length,
+                    MaxTokenLength);
                 return null;
             }
 
@@ -45,6 +55,9 @@ namespace VocabLearning.Services
             using var response = await httpClient.GetAsync(requestUri, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                logger.LogWarning(
+                    "Google ID token verification failed because tokeninfo returned HTTP {StatusCode}.",
+                    (int)response.StatusCode);
                 return null;
             }
 
@@ -58,32 +71,42 @@ namespace VocabLearning.Services
                 || !TryGetString(root, "iss", out var issuer)
                 || !TryGetString(root, "exp", out var expiresAtRaw))
             {
+                logger.LogWarning("Google ID token verification failed because tokeninfo response is missing required claims.");
                 return null;
             }
 
             if (!string.Equals(audience, clientId, StringComparison.Ordinal))
             {
+                logger.LogWarning(
+                    "Google ID token verification failed because audience mismatch. Token audience: {Audience}.",
+                    audience);
                 return null;
             }
 
             if (issuer is not ("https://accounts.google.com" or "accounts.google.com"))
             {
+                logger.LogWarning(
+                    "Google ID token verification failed because issuer {Issuer} is not trusted.",
+                    issuer);
                 return null;
             }
 
             if (!long.TryParse(expiresAtRaw, NumberStyles.None, CultureInfo.InvariantCulture, out var expiresAtUnix)
                 || DateTimeOffset.FromUnixTimeSeconds(expiresAtUnix) <= DateTimeOffset.UtcNow)
             {
+                logger.LogWarning("Google ID token verification failed because token is expired or expiry claim is invalid.");
                 return null;
             }
 
             if (!TryGetBoolean(root, "email_verified", out var emailVerified) || !emailVerified)
             {
+                logger.LogWarning("Google ID token verification failed because Google email is not verified.");
                 return null;
             }
 
             if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(email))
             {
+                logger.LogWarning("Google ID token verification failed because subject or email is empty.");
                 return null;
             }
 

@@ -225,7 +225,7 @@ namespace VocabLearning.Services
 
         public async Task<(bool Succeeded, string? ErrorMessage)> ChangePasswordAsync(
             long userId,
-            string currentPassword,
+            string? currentPassword,
             string newPassword,
             CancellationToken cancellationToken = default)
         {
@@ -239,14 +239,28 @@ namespace VocabLearning.Services
                 return (false, "User account was not found.");
             }
 
-            var (verified, _) = VerifyPassword(user, currentPassword);
-            if (!verified)
+            var hasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
+            if (hasLocalPassword)
             {
-                return (false, "Current password is incorrect.");
+                if (string.IsNullOrWhiteSpace(currentPassword))
+                {
+                    return (false, "Current password is required.");
+                }
+
+                var (verified, _) = VerifyPassword(user, currentPassword);
+                if (!verified)
+                {
+                    return (false, "Current password is incorrect.");
+                }
             }
 
             if (!PasswordPolicyValidator.IsValid(newPassword))
                 return (false, PasswordPolicyValidator.ErrorMessage);
+
+            if (hasLocalPassword && string.Equals(currentPassword, newPassword, StringComparison.Ordinal))
+            {
+                return (false, "New password must be different from the current password.");
+            }
 
             user.PasswordHash = HashPassword(newPassword);
 

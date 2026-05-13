@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using System.Threading.RateLimiting;
+using VocabLearning.Configuration;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
@@ -32,6 +33,8 @@ if (envFile != null)
     }
 }
 
+EnvironmentVariableAliases.Apply();
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -40,7 +43,34 @@ builder.Logging.AddEventSourceLogger();
 
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
-var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localhost:3000";
+var googleCallbackPath = builder.Configuration["Authentication:Google:CallbackPath"] ?? "/signin-google";
+if (!googleCallbackPath.StartsWith('/'))
+{
+    throw new InvalidOperationException("Authentication:Google:CallbackPath must start with '/'.");
+}
+
+var frontendOrigin = builder.Configuration["Frontend:Origin"];
+if (string.IsNullOrWhiteSpace(frontendOrigin))
+{
+    if (builder.Environment.IsProduction())
+    {
+        throw new InvalidOperationException("Frontend:Origin must be configured in production.");
+    }
+
+    frontendOrigin = "http://localhost:3000";
+}
+if (builder.Environment.IsProduction())
+{
+    if (!Uri.TryCreate(frontendOrigin, UriKind.Absolute, out var frontendOriginUri))
+    {
+        throw new InvalidOperationException("Frontend:Origin must be an absolute URL in production.");
+    }
+
+    if (frontendOriginUri.IsLoopback)
+    {
+        throw new InvalidOperationException("Frontend:Origin cannot be localhost/loopback in production.");
+    }
+}
 
 builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<CustomAuthenticationService>();
@@ -123,7 +153,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     {
         options.ClientId = googleClientId;
         options.ClientSecret = googleClientSecret;
-        options.CallbackPath = "/signin-google";
+        options.CallbackPath = googleCallbackPath;
         options.SignInScheme = AuthenticationSchemeNames.External;
         options.SaveTokens = true;
         options.Scope.Add("email");
@@ -132,6 +162,8 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 }
 
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -194,6 +226,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
+app.UseSwagger();
+app.UseSwaggerUI();
 
 await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
 

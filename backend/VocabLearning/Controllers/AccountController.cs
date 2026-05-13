@@ -401,14 +401,13 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            if (string.IsNullOrWhiteSpace(request.CurrentPassword)
-                || string.IsNullOrWhiteSpace(request.NewPassword)
+            if (string.IsNullOrWhiteSpace(request.NewPassword)
                 || string.IsNullOrWhiteSpace(request.ConfirmNewPassword))
             {
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Current password, new password, and confirmation are required."
+                    Message = "New password and confirmation are required."
                 });
             }
 
@@ -431,16 +430,17 @@ namespace VocabLearning.Controllers
                 });
             }
 
-            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            var hasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
+            if (hasLocalPassword && string.IsNullOrWhiteSpace(request.CurrentPassword))
             {
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password is not available for this account."
+                    Message = "Current password is required."
                 });
             }
 
-            if (string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
+            if (hasLocalPassword && string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
             {
                 return BadRequest(new AuthApiResponse
                 {
@@ -451,7 +451,7 @@ namespace VocabLearning.Controllers
 
             var result = await customAuthenticationService.ChangePasswordAsync(
                 user.UserId,
-                request.CurrentPassword,
+                hasLocalPassword ? request.CurrentPassword : null,
                 request.NewPassword,
                 cancellationToken);
 
@@ -464,10 +464,23 @@ namespace VocabLearning.Controllers
                 });
             }
 
+            var refreshedUser = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            if (refreshedUser is not null)
+            {
+                var currentSession = await HttpContext.AuthenticateAsync(AuthenticationSchemeNames.Application);
+                await customAuthenticationService.SignInAsync(
+                    HttpContext,
+                    refreshedUser,
+                    currentSession.Properties?.IsPersistent ?? false,
+                    string.IsNullOrWhiteSpace(refreshedUser.GoogleSubject) ? "Password" : "Google+Password",
+                    currentSession.Properties?.GetTokens());
+            }
+
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Password changed successfully."
+                Message = hasLocalPassword ? "Password changed successfully." : "Password set successfully.",
+                User = refreshedUser is null ? null : MapAuthenticatedUser(refreshedUser)
             });
         }
 
