@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Mail;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,7 +20,15 @@ namespace VocabLearning.Services
         private const int KeySize = 32;
         private const int Iterations = 120_000;
         private const int PasswordResetTokenSize = 32;
+        private const int MinimumUsernameLength = 3;
+        private const int MaximumUsernameLength = 30;
         private static readonly TimeSpan PasswordResetTokenLifetime = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan EmailVerificationTokenLifetime = TimeSpan.FromHours(24);
+        private static readonly HashSet<string> AllowedEmailTopLevelDomains = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "com", "net", "org", "edu", "gov", "vn", "com.vn", "edu.vn", "gov.vn", "net.vn",
+            "info", "io", "co", "dev", "app", "me", "biz"
+        };
         private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
         private static readonly PasswordHasher<Users> LegacyPasswordHasher = new();
 
@@ -36,8 +45,18 @@ namespace VocabLearning.Services
             string password,
             CancellationToken cancellationToken = default)
         {
-            var cleanUsername = username.Trim();
+            var cleanUsername = NormalizeDisplayName(username);
             var cleanEmail = email.Trim();
+
+            if (!IsValidUsername(cleanUsername))
+            {
+                return (false, $"Display name must be {MinimumUsernameLength}-{MaximumUsernameLength} characters.", null);
+            }
+
+            if (!IsValidEmail(cleanEmail))
+            {
+                return (false, "Email format is invalid.", null);
+            }
 
             if (!PasswordPolicyValidator.IsValid(password))
                 return (false, PasswordPolicyValidator.ErrorMessage, null);
@@ -66,6 +85,7 @@ namespace VocabLearning.Services
                 PasswordHash = HashPassword(password),
                 Role = UserRoles.Learner,
                 Status = UserStatuses.Active,
+                IsEmailVerified = false,
                 CreatedAt = DateTime.Now
             };
 
@@ -76,6 +96,15 @@ namespace VocabLearning.Services
         }
 
         public async Task<Users?> AuthenticateAsync(
+            string usernameOrEmail,
+            string password,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await AuthenticateForLoginAsync(usernameOrEmail, password, cancellationToken);
+            return result.User;
+        }
+
+        public async Task<(Users? User, string? ErrorMessage)> AuthenticateForLoginAsync(
             string usernameOrEmail,
             string password,
             CancellationToken cancellationToken = default)
@@ -91,13 +120,18 @@ namespace VocabLearning.Services
 
             if (user is null)
             {
-                return null;
+                return (null, "Username/email or password is incorrect.");
             }
 
             var (verified, needsRehash) = VerifyPassword(user, password);
             if (!verified)
             {
-                return null;
+                return (null, "Username/email or password is incorrect.");
+            }
+
+            if (IsLearner(user) && !user.IsEmailVerified)
+            {
+                return (null, "Please verify your email before logging in.");
             }
 
             if (needsRehash)
@@ -106,7 +140,7 @@ namespace VocabLearning.Services
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            return user;
+            return (user, null);
         }
 
         public async Task<(bool Succeeded, string? ErrorMessage, Users? User)> AuthenticateGoogleAsync(
@@ -115,16 +149,18 @@ namespace VocabLearning.Services
             string? displayName,
             CancellationToken cancellationToken = default)
         {
-            var cleanEmail = email.Trim();
+            var normalizedEmail = NormalizeEmail(email);
             var cleanGoogleSubject = googleSubject.Trim();
 
-            if (string.IsNullOrWhiteSpace(cleanEmail) || string.IsNullOrWhiteSpace(cleanGoogleSubject))
+            if (string.IsNullOrWhiteSpace(normalizedEmail) || string.IsNullOrWhiteSpace(cleanGoogleSubject))
             {
                 return (false, "Google login did not return enough account information.", null);
             }
 
             var user = await dbContext.Users
-                .SingleOrDefaultAsync(item => item.GoogleSubject == cleanGoogleSubject, cancellationToken);
+                .SingleOrDefaultAsync(
+                    item => item.GoogleSubject == cleanGoogleSubject && !item.IsDeleted,
+                    cancellationToken);
 
             if (user is not null)
             {
@@ -133,18 +169,35 @@ namespace VocabLearning.Services
                     return (false, "This account is not active.", null);
                 }
 
+                if (!IsLearner(user))
+                {
+                    return (false, "Google login is only available for learner accounts.", null);
+                }
+
                 return (true, null, user);
             }
 
-            var normalizedEmail = NormalizeEmail(cleanEmail);
             user = await dbContext.Users
-                .SingleOrDefaultAsync(item => item.Email == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(
+                    item => item.Email == normalizedEmail && !item.IsDeleted,
+                    cancellationToken);
 
             if (user is not null)
             {
                 if (!IsUserActive(user))
                 {
                     return (false, "This account is not active.", null);
+                }
+
+                if (!IsLearner(user))
+                {
+                    return (false, "Google login is only available for learner accounts.", null);
+                }
+
+                if (!string.IsNullOrWhiteSpace(user.GoogleSubject)
+                    && !string.Equals(user.GoogleSubject, cleanGoogleSubject, StringComparison.Ordinal))
+                {
+                    return (false, "This email is already linked to another Google account.", null);
                 }
 
                 user.GoogleSubject = cleanGoogleSubject;
@@ -152,15 +205,16 @@ namespace VocabLearning.Services
                 return (true, null, user);
             }
 
-            var generatedUsername = await GenerateUniqueUsernameAsync(displayName, cleanEmail, cancellationToken);
+            var generatedUsername = await GenerateUniqueUsernameAsync(displayName, normalizedEmail, cancellationToken);
             user = new Users
             {
                 Username = generatedUsername,
-                Email = cleanEmail,
+                Email = normalizedEmail,
                 PasswordHash = string.Empty,
                 GoogleSubject = cleanGoogleSubject,
                 Role = UserRoles.Learner,
                 Status = UserStatuses.Active,
+                IsEmailVerified = true,
                 CreatedAt = DateTime.Now
             };
 
@@ -253,6 +307,107 @@ namespace VocabLearning.Services
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return (true, user.Email, user.Username, rawToken);
+        }
+
+        public async Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreateEmailVerificationTokenAsync(
+            long userId,
+            CancellationToken cancellationToken = default)
+        {
+            var user = await dbContext.Users
+                .SingleOrDefaultAsync(
+                    item => item.UserId == userId
+                        && item.Status == UserStatuses.Active
+                        && !item.IsDeleted,
+                    cancellationToken);
+
+            if (user is null || !IsLearner(user) || user.IsEmailVerified)
+            {
+                return (false, string.Empty, string.Empty, string.Empty);
+            }
+
+            var now = DateTime.UtcNow;
+            await RevokeActiveEmailVerificationTokensAsync(user.UserId, now, cancellationToken);
+
+            var rawToken = GenerateSecureToken();
+            dbContext.EmailVerificationTokens.Add(new EmailVerificationToken
+            {
+                UserId = user.UserId,
+                TokenHash = HashToken(rawToken),
+                ExpiresAt = now.Add(EmailVerificationTokenLifetime),
+                CreatedAt = now
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (true, user.Email, user.Username, rawToken);
+        }
+
+        public async Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreateEmailVerificationTokenForEmailAsync(
+            string email,
+            CancellationToken cancellationToken = default)
+        {
+            var normalizedEmail = NormalizeEmail(email);
+            if (string.IsNullOrWhiteSpace(normalizedEmail))
+            {
+                return (false, string.Empty, string.Empty, string.Empty);
+            }
+
+            var user = await dbContext.Users
+                .SingleOrDefaultAsync(
+                    item => item.Email == normalizedEmail
+                        && item.Status == UserStatuses.Active
+                        && !item.IsDeleted,
+                    cancellationToken);
+
+            if (user is null || !IsLearner(user) || user.IsEmailVerified)
+            {
+                return (false, string.Empty, string.Empty, string.Empty);
+            }
+
+            return await CreateEmailVerificationTokenAsync(user.UserId, cancellationToken);
+        }
+
+        public async Task<(bool Succeeded, string? ErrorMessage)> VerifyEmailAsync(
+            string token,
+            string? consumedByIp,
+            CancellationToken cancellationToken = default)
+        {
+            var cleanToken = token.Trim();
+            if (string.IsNullOrWhiteSpace(cleanToken))
+            {
+                return (false, "Verification token is required.");
+            }
+
+            var now = DateTime.UtcNow;
+            var tokenHash = HashToken(cleanToken);
+            var verificationToken = await dbContext.EmailVerificationTokens
+                .Include(item => item.User)
+                .SingleOrDefaultAsync(
+                    item => item.TokenHash == tokenHash
+                        && item.UsedAt == null
+                        && item.ExpiresAt > now,
+                    cancellationToken);
+
+            if (verificationToken?.User is null
+                || !IsLearner(verificationToken.User)
+                || !IsUserActive(verificationToken.User))
+            {
+                return (false, "Verification token is invalid or expired.");
+            }
+
+            verificationToken.User.IsEmailVerified = true;
+            verificationToken.UsedAt = now;
+            verificationToken.ConsumedByIp = string.IsNullOrWhiteSpace(consumedByIp)
+                ? null
+                : consumedByIp.Trim()[..Math.Min(consumedByIp.Trim().Length, 64)];
+
+            await RevokeActiveEmailVerificationTokensAsync(
+                verificationToken.UserId,
+                now,
+                cancellationToken,
+                verificationToken.EmailVerificationTokenId);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return (true, null);
         }
 
         public async Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordWithTokenAsync(
@@ -501,6 +656,7 @@ namespace VocabLearning.Services
                 PasswordHash = HashPassword(password),
                 Role = normalizedRole,
                 Status = normalizedStatus,
+                IsEmailVerified = true,
                 CreatedAt = DateTime.Now
             };
 
@@ -650,9 +806,23 @@ namespace VocabLearning.Services
                 .Where(item => item.UserId == userId)
                 .ToListAsync(cancellationToken);
 
-            dbContext.UserVocabularies.RemoveRange(userVocabularies);
-            dbContext.Progresses.RemoveRange(progresses);
+            var exerciseSessions = await dbContext.ExerciseSessions
+                .Where(item => item.UserId == userId)
+                .ToListAsync(cancellationToken);
+
+            var sessionIds = exerciseSessions
+                .Select(item => item.SessionId)
+                .ToList();
+
+            var learningLogs = await dbContext.LearningLogs
+                .Where(item => item.UserId == userId || sessionIds.Contains(item.SessionId))
+                .ToListAsync(cancellationToken);
+
+            dbContext.LearningLogs.RemoveRange(learningLogs);
             dbContext.ExerciseResults.RemoveRange(exerciseResults);
+            dbContext.ExerciseSessions.RemoveRange(exerciseSessions);
+            dbContext.Progresses.RemoveRange(progresses);
+            dbContext.UserVocabularies.RemoveRange(userVocabularies);
             dbContext.Users.Remove(user);
 
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -768,6 +938,25 @@ namespace VocabLearning.Services
             return Convert.ToBase64String(hash);
         }
 
+        private async Task RevokeActiveEmailVerificationTokensAsync(
+            long userId,
+            DateTime now,
+            CancellationToken cancellationToken,
+            long? exceptTokenId = null)
+        {
+            var activeTokens = await dbContext.EmailVerificationTokens
+                .Where(item => item.UserId == userId
+                    && item.UsedAt == null
+                    && item.ExpiresAt > now
+                    && (!exceptTokenId.HasValue || item.EmailVerificationTokenId != exceptTokenId.Value))
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in activeTokens)
+            {
+                item.UsedAt = now;
+            }
+        }
+
         private static (bool Verified, bool NeedsRehash) VerifyPassword(Users user, string password)
         {
             if (string.IsNullOrWhiteSpace(user.PasswordHash))
@@ -831,7 +1020,86 @@ namespace VocabLearning.Services
 
         private static bool IsUserActive(Users user)
         {
-            return string.Equals(user.Status?.Trim(), UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
+            return !user.IsDeleted
+                && string.Equals(user.Status?.Trim(), UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsLearner(Users user)
+        {
+            return string.Equals(user.Role?.Trim(), UserRoles.Learner, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsValidUsername(string username)
+        {
+            var normalized = NormalizeDisplayName(username);
+            if (normalized.Length is < MinimumUsernameLength or > MaximumUsernameLength)
+            {
+                return false;
+            }
+
+            var hasLetter = false;
+            var readableCharacterCount = 0;
+            foreach (var character in normalized)
+            {
+                if (char.IsLetter(character))
+                {
+                    hasLetter = true;
+                    readableCharacterCount++;
+                    continue;
+                }
+
+                if (char.IsDigit(character))
+                {
+                    readableCharacterCount++;
+                }
+            }
+
+            return hasLetter && readableCharacterCount >= MinimumUsernameLength;
+        }
+
+        private static string NormalizeDisplayName(string username)
+        {
+            return string.Join(
+                ' ',
+                username.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        private static bool IsValidEmail(string email)
+        {
+            var trimmed = email.Trim();
+            if (trimmed.Length is < 6 or > 254
+                || trimmed.Any(char.IsWhiteSpace)
+                || trimmed.Count(character => character == '@') != 1)
+            {
+                return false;
+            }
+
+            try
+            {
+                var address = new MailAddress(trimmed);
+                if (!string.Equals(address.Address, trimmed, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var parts = address.Host.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length < 2 || parts.Any(part => part.Length == 0))
+                {
+                    return false;
+                }
+
+                var topLevelDomain = parts[^1];
+                var twoPartTopLevelDomain = parts.Length >= 2
+                    ? $"{parts[^2]}.{parts[^1]}"
+                    : topLevelDomain;
+
+                return AllowedEmailTopLevelDomains.Contains(topLevelDomain)
+                    || AllowedEmailTopLevelDomains.Contains(twoPartTopLevelDomain);
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
 
         private static string? NormalizeRole(string role)

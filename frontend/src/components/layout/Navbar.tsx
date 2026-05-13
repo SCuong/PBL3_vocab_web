@@ -108,6 +108,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                                 user={currentUser}
                                 gameData={gameData}
                                 onStreakClick={onStreakClick}
+                                onLogout={onLogout}
                             />
                             <Button variant="ghost" className="!p-2 !min-w-0" onClick={onLogout}>
                                 <LogOut size={18} />

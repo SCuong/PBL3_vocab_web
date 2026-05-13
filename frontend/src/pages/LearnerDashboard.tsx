@@ -75,15 +75,15 @@ const LearnerDashboard = () => {
             .slice(0, 5)
             .map((day: any) => ({
                 id: day.date,
-                title: `${day.totalWords || 0} words studied`,
-                meta: new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
+                title: `Đã học ${day.totalWords || 0} từ`,
+                meta: new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
                     year: 'numeric',
                 }),
                 detail: Array.isArray(day.topicTitles) && day.topicTitles.length > 0
                     ? day.topicTitles.join(', ')
-                    : 'Learning session recorded',
+                    : 'Đã ghi nhận phiên học',
             }))
     ), [gameData?.studyHistoryDetails]);
 
@@ -92,9 +92,9 @@ const LearnerDashboard = () => {
         const xp = Number(gameData?.xp ?? 0);
         const learned = learnedWordIds.length || Number(gameData?.learnedWords ?? 0);
         return [
-            { label: 'First session', unlocked: historyDates.length > 0, icon: <Play size={16} /> },
-            { label: '7-day streak', unlocked: streak >= 7, icon: <Flame size={16} /> },
-            { label: '100 words', unlocked: learned >= 100, icon: <BookOpen size={16} /> },
+            { label: 'Phiên học đầu tiên', unlocked: historyDates.length > 0, icon: <Play size={16} /> },
+            { label: 'Chuỗi 7 ngày', unlocked: streak >= 7, icon: <Flame size={16} /> },
+            { label: '100 từ vựng', unlocked: learned >= 100, icon: <BookOpen size={16} /> },
             { label: '1,000 XP', unlocked: xp >= 1000, icon: <Trophy size={16} /> },
         ];
     }, [gameData?.learnedWords, gameData?.streak, gameData?.xp, historyDates.length, learnedWordIds.length]);
@@ -119,7 +119,7 @@ const LearnerDashboard = () => {
         try {
             const items = await vocabularyApi.getLearningByTopic(topicStats.nextTopic.id);
             if (!items || items.length === 0) {
-                addToast('No vocabulary available for this topic yet.', 'info');
+                addToast('Chưa có từ vựng cho chủ đề này.', 'info');
                 navigate(PATHS.learning);
                 return;
             }
@@ -131,7 +131,7 @@ const LearnerDashboard = () => {
                 },
             });
         } catch {
-            addToast('Could not load the next learning session.', 'info');
+            addToast('Không thể tải phiên học tiếp theo.', 'info');
         } finally {
             setContinuing(false);
         }
@@ -141,12 +141,11 @@ const LearnerDashboard = () => {
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
             <PageHeader
                 className="mb-8"
-                eyebrow="Learner dashboard"
-                title={`Welcome back${currentUser?.username ? `, ${currentUser.username}` : ''}`}
-                description="Track streak, mastery, SM-2 reviews, XP, and recent learning progress in one place."
+                eyebrow="Bảng điều khiển học tập"
+                title={`Chào mừng trở lại${currentUser?.username ? `, ${currentUser.username}` : ''}`}
                 action={(
                     <Button variant="primary" onClick={handleContinue} disabled={continuing}>
-                        <Play size={16} /> {continuing ? 'Loading...' : 'Continue learning'}
+                        <Play size={16} /> {continuing ? 'Đang tải...' : 'Tiếp tục học'}
                     </Button>
                 )}
             />
@@ -154,41 +153,41 @@ const LearnerDashboard = () => {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardStat
                     icon={<Flame size={20} />}
-                    label="Daily streak"
-                    value={`${Number(gameData?.streak ?? 0)} days`}
-                    detail={gameData?.lastStudyDate ? `Last activity ${gameData.lastStudyDate}` : 'Start today to build streak'}
+                    label="Chuỗi ngày học"
+                    value={`${Number(gameData?.streak ?? 0)} ngày`}
+                    detail={gameData?.lastStudyDate ? `Hoạt động gần nhất ${gameData.lastStudyDate}` : 'Bắt đầu hôm nay để tạo chuỗi'}
                     tone="warning"
                 />
                 <DashboardStat
                     icon={<Target size={20} />}
-                    label="Mastery"
+                    label="Mức độ thành thạo"
                     value={`${masteryPct}%`}
-                    detail={`${topicStats.totals.learned} of ${topicStats.totals.total} words mastered`}
+                    detail={`${topicStats.totals.learned} / ${topicStats.totals.total} từ đã thành thạo`}
                     tone="success"
                 />
                 <DashboardStat
                     icon={<CalendarClock size={20} />}
-                    label="Reviews due"
+                    label="Cần ôn tập"
                     value={reviewForecast.today}
-                    detail={`${reviewForecast.week} estimated this week`}
+                    detail={`Ước tính ${reviewForecast.week} lượt trong tuần`}
                     tone="primary"
                 />
                 <DashboardStat
                     icon={<Sparkles size={20} />}
-                    label="XP level"
-                    value={`Level ${level.level}`}
+                    label="Cấp độ XP"
+                    value={`Cấp ${level.level}`}
                     detail={`${level.currentLevelXp} / ${level.nextLevelXp} XP`}
                     tone="accent"
                 />
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
-                <DashboardCard title="Review forecast" subtitle="SM-2 queue snapshot from current progress state.">
+                <DashboardCard title="Dự báo ôn tập" subtitle="Tổng quan hàng đợi SM-2 theo tiến trình hiện tại.">
                     <div className="grid gap-4 md:grid-cols-3">
                         {[
-                            ['Today', reviewForecast.today, 'primary'],
-                            ['Tomorrow', reviewForecast.tomorrow, 'cyan'],
-                            ['This week', reviewForecast.week, 'accent'],
+                            ['Hôm nay', reviewForecast.today, 'primary'],
+                            ['Ngày mai', reviewForecast.tomorrow, 'cyan'],
+                            ['Tuần này', reviewForecast.week, 'accent'],
                         ].map(([label, value, tone]) => (
                             <div key={String(label)} className="rounded-2xl border border-border bg-surface p-5">
                                 <p className="text-xs font-display font-bold uppercase tracking-wide text-text-muted">{label}</p>
@@ -203,20 +202,20 @@ const LearnerDashboard = () => {
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p className="font-display font-bold text-text-primary">
-                                    {reviewForecast.today > 0 ? 'Reviews are waiting today' : 'No urgent reviews today'}
+                                    {reviewForecast.today > 0 ? 'Có lượt ôn tập đang chờ hôm nay' : 'Hôm nay chưa có lượt ôn gấp'}
                                 </p>
                                 <p className="mt-1 text-sm text-text-muted">
-                                    Prioritize due reviews before adding new vocabulary.
+                                    Ưu tiên ôn từ đến hạn trước khi học thêm từ mới.
                                 </p>
                             </div>
                             <Button variant="primary" onClick={handleContinue} disabled={continuing}>
-                                <Play size={16} /> {reviewForecast.today > 0 ? 'Review now' : 'Start learning'}
+                                <Play size={16} /> {reviewForecast.today > 0 ? 'Ôn tập ngay' : 'Bắt đầu học'}
                             </Button>
                         </div>
                     </div>
                 </DashboardCard>
 
-                <DashboardCard title="Quick continue" subtitle="Best next session, one click away.">
+                <DashboardCard title="Tiếp tục nhanh" subtitle="Phiên học phù hợp nhất, mở bằng một lần bấm.">
                     {topicStats.nextTopic ? (
                         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                             <div className="flex items-start gap-3">
@@ -227,35 +226,35 @@ const LearnerDashboard = () => {
                                     <p className="font-display font-bold text-text-primary">{topicStats.nextTopic.title}</p>
                                     <p className="mt-1 text-xs text-text-muted">
                                         {topicStats.nextTopic.stats?.review > 0
-                                            ? `${topicStats.nextTopic.stats.review} words ready for review`
-                                            : `${topicStats.nextTopic.stats?.new ?? 0} new words available`}
+                                            ? `${topicStats.nextTopic.stats.review} từ sẵn sàng ôn tập`
+                                            : `${topicStats.nextTopic.stats?.new ?? 0} từ mới có thể học`}
                                     </p>
                                 </div>
                             </div>
                             <Button variant="primary" className="mt-5 w-full" onClick={handleContinue} disabled={continuing}>
-                                <Play size={16} /> Start session
+                                <Play size={16} /> Bắt đầu phiên học
                             </Button>
                             <Button variant="ghost" className="mt-3 w-full" onClick={() => navigate(PATHS.learning)}>
-                                Browse topics
+                                Duyệt chủ đề
                             </Button>
                         </div>
                     ) : (
                         <EmptyState
                             icon={<BookOpen size={20} />}
-                            title="No session available"
-                            description="Add vocabulary topics or refresh learning progress to continue."
+                            title="Chưa có phiên học"
+                            description="Thêm chủ đề từ vựng hoặc làm mới tiến trình học để tiếp tục."
                         />
                     )}
                 </DashboardCard>
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-3">
-                <DashboardCard title="XP and mastery" subtitle="Level progress with vocabulary coverage.">
+                <DashboardCard title="XP và mức độ thành thạo" subtitle="Tiến độ cấp độ và phạm vi từ vựng đã nắm.">
                     <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                         <div className="flex items-end justify-between gap-4">
                             <div>
                                 <p className="text-xs font-display font-bold uppercase tracking-wide text-text-muted">
-                                    Level {level.level}
+                                    Cấp {level.level}
                                 </p>
                                 <p className={`mt-2 ${typography.metricValue}`}>{xp.toLocaleString()} XP</p>
                             </div>
@@ -267,40 +266,40 @@ const LearnerDashboard = () => {
                     </div>
                     <div className="mt-5">
                         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                            <span className="font-display font-bold text-text-primary">Mastery coverage</span>
+                            <span className="font-display font-bold text-text-primary">Phạm vi thành thạo</span>
                             <span className="text-text-muted">{topicStats.totals.learned}/{topicStats.totals.total}</span>
                         </div>
-                        <ProgressBar value={topicStats.totals.learned} max={topicStats.totals.total} tone="success" label={`${masteryPct}% mastered`} />
+                        <ProgressBar value={topicStats.totals.learned} max={topicStats.totals.total} tone="success" label={`${masteryPct}% đã thành thạo`} />
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                         <div className="rounded-xl bg-surface p-3">
                             <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.fresh}</p>
-                            <p className="text-[11px] text-text-muted">New</p>
+                            <p className="text-[11px] text-text-muted">Từ mới</p>
                         </div>
                         <div className="rounded-xl bg-surface p-3">
                             <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.review}</p>
-                            <p className="text-[11px] text-text-muted">Review</p>
+                            <p className="text-[11px] text-text-muted">Ôn tập</p>
                         </div>
                         <div className="rounded-xl bg-surface p-3">
                             <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.learned}</p>
-                            <p className="text-[11px] text-text-muted">Mastered</p>
+                            <p className="text-[11px] text-text-muted">Thành thạo</p>
                         </div>
                     </div>
                 </DashboardCard>
 
-                <DashboardCard title="Recent learning activity" subtitle="Latest saved study sessions.">
+                <DashboardCard title="Hoạt động học gần đây" subtitle="Các phiên học đã lưu gần nhất.">
                     {timelineItems.length > 0 ? (
                         <Timeline items={timelineItems} />
                     ) : (
                         <EmptyState
                             icon={<History size={20} />}
-                            title="No activity yet"
-                            description="Complete a learning session to populate your timeline."
+                            title="Chưa có hoạt động"
+                            description="Hoàn thành một phiên học để hiển thị dòng thời gian."
                         />
                     )}
                 </DashboardCard>
 
-                <DashboardCard title="Achievement badges" subtitle="Milestones unlock as you study.">
+                <DashboardCard title="Huy hiệu thành tích" subtitle="Các mốc sẽ mở khóa khi bạn học.">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {achievements.map(achievement => (
                             <div
@@ -316,7 +315,7 @@ const LearnerDashboard = () => {
                                 </div>
                                 <p className="text-xs font-display font-bold text-text-primary">{achievement.label}</p>
                                 <p className="mt-1 text-[11px] text-text-muted">
-                                    {achievement.unlocked ? 'Unlocked' : 'Locked'}
+                                    {achievement.unlocked ? 'Đã mở khóa' : 'Chưa mở khóa'}
                                 </p>
                             </div>
                         ))}
@@ -325,7 +324,7 @@ const LearnerDashboard = () => {
                         <div className="flex items-center gap-3">
                             <CheckCircle2 size={18} className="text-success-color" />
                             <p className="text-sm text-text-primary">
-                                Keep reviews current to protect long-term recall.
+                                Duy trì ôn tập đúng hạn để ghi nhớ lâu dài.
                             </p>
                         </div>
                     </div>
