@@ -5,29 +5,37 @@ services:
     container_name: vocablearning_db
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${SA_PASSWORD}"
       MSSQL_PID: "Express"
-      SA_PASSWORD: "${SA_PASSWORD}"
+      SA_PASSWORD: "${SA_PASSWORD:?SA_PASSWORD is required}"
+      MSSQL_SA_PASSWORD: "${SA_PASSWORD:?SA_PASSWORD is required}"
     volumes:
       - sqlserver_data:/var/opt/mssql
-      - ./database/init.sql:/init.sql
-      - ./database/init-db.sh:/init-db.sh
-    ports:
-      - "1433:1433"
+      - ./database/init.sql:/init.sql:ro
     command: >
-      bash -c "
+      /bin/bash -c '
+      set -euo pipefail;
       /opt/mssql/bin/sqlservr &
-      sleep 30 &&
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -Q \"IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'PBL3') CREATE DATABASE PBL3;\" &&
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$SA_PASSWORD\" -C -d PBL3 -i /init.sql &&
-      echo 'DB READY' &&
-      wait"
+      sql_pid=$$!;
+      echo "Waiting for SQL Server readiness...";
+      until /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -Q "SET NOCOUNT ON; SELECT 1" > /dev/null 2>&1; do
+        sleep 2;
+      done;
+      db_exists=$$(/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN DB_ID(CHAR(80)+CHAR(66)+CHAR(76)+CHAR(51)) IS NULL THEN 0 ELSE 1 END");
+      if [ "$$db_exists" = "0" ]; then
+        echo "Creating PBL3 and running init.sql...";
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -Q "CREATE DATABASE [PBL3]";
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -d PBL3 -i /init.sql;
+      else
+        echo "PBL3 already exists, skipping init.sql.";
+      fi;
+      wait "$$sql_pid"
+      '
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${SA_PASSWORD}\" -C -Q \"SET NOCOUNT ON; SELECT 1\" > /dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 120s
+      retries: 12
+      start_period: 40s
     restart: unless-stopped
 
   backend:
@@ -41,8 +49,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5152"
-      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=PBL3;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True;Connect Timeout=30;"
-      Frontend__Origin: "http://localhost:${FRONTEND_PORT:-3000}"
+      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=PBL3;User Id=sa;Password=${SA_PASSWORD:?SA_PASSWORD is required};TrustServerCertificate=True;MultipleActiveResultSets=True;Connect Timeout=30;"
+      Frontend__Origin: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       Frontend__AvatarPath: "/app/avatars"
       Jwt__Secret: "${JWT_SECRET}"
       Jwt__Issuer: "VocabLearning"
@@ -56,24 +64,16 @@ services:
       Smtp__FromName: "VocabLearning"
       Authentication__Google__ClientId: "${GOOGLE_CLIENT_ID}"
       Authentication__Google__ClientSecret: "${GOOGLE_CLIENT_SECRET}"
+      Authentication__Google__CallbackPath: "${GOOGLE_CALLBACK_PATH:-/signin-google}"
       PasswordReset__ExposeResetLinkInResponse: "false"
-      Cookie__SecurePolicy: "SameAsRequest"
-      Cookie__SameSite: "Lax"
+      Cookie__SecurePolicy: "${COOKIE_SECURE_POLICY:-Always}"
+      Cookie__SameSite: "${COOKIE_SAMESITE:-None}"
       Database__AutoMigrate: "true"
       Gemini__ApiKey: "${Gemini__ApiKey}"
+    ports:
+      - "${BACKEND_PORT:-5152}:5152"
     volumes:
       - avatar_data:/app/avatars
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: vocablearning_frontend
-    depends_on:
-      - backend
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
     restart: unless-stopped
 
 volumes:
