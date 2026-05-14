@@ -1,41 +1,20 @@
 services:
-
   db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: vocablearning_db
+    image: postgres:16-alpine
+    container_name: vocablearning_postgres
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_PID: "Express"
-      SA_PASSWORD: "${SA_PASSWORD:?SA_PASSWORD is required}"
-      MSSQL_SA_PASSWORD: "${SA_PASSWORD:?SA_PASSWORD is required}"
+      POSTGRES_DB: "${POSTGRES_DB:-vocablearning}"
+      POSTGRES_USER: "${POSTGRES_USER:-vocablearning}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
     volumes:
-      - sqlserver_data:/var/opt/mssql
-      - ./database/init.sql:/init.sql:ro
-    command: >
-      /bin/bash -c '
-      set -euo pipefail;
-      /opt/mssql/bin/sqlservr &
-      sql_pid=$$!;
-      echo "Waiting for SQL Server readiness...";
-      until /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -Q "SET NOCOUNT ON; SELECT 1" > /dev/null 2>&1; do
-        sleep 2;
-      done;
-      db_exists=$$(/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN DB_ID(CHAR(80)+CHAR(66)+CHAR(76)+CHAR(51)) IS NULL THEN 0 ELSE 1 END");
-      if [ "$$db_exists" = "0" ]; then
-        echo "Creating PBL3 and running init.sql...";
-        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -Q "CREATE DATABASE [PBL3]";
-        /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -C -d PBL3 -i /init.sql;
-      else
-        echo "PBL3 already exists, skipping init.sql.";
-      fi;
-      wait "$$sql_pid"
-      '
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/init.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${SA_PASSWORD}\" -C -Q \"SET NOCOUNT ON; SELECT 1\" > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 40s
+      start_period: 20s
     restart: unless-stopped
 
   backend:
@@ -49,27 +28,25 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5152"
-      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=PBL3;User Id=sa;Password=${SA_PASSWORD:?SA_PASSWORD is required};TrustServerCertificate=True;MultipleActiveResultSets=True;Connect Timeout=30;"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-vocablearning};Username=${POSTGRES_USER:-vocablearning};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};Pooling=true;Minimum Pool Size=0;Maximum Pool Size=100;Timeout=15;Command Timeout=30;Include Error Detail=false"
       Frontend__Origin: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       Frontend__AvatarPath: "/app/avatars"
-      Jwt__Secret: "${JWT_SECRET}"
-      Jwt__Issuer: "VocabLearning"
-      Jwt__Audience: "VocabLearningUsers"
       Smtp__Host: "${SMTP_HOST:-smtp.gmail.com}"
       Smtp__Port: "${SMTP_PORT:-587}"
-      Smtp__EnableSsl: "true"
-      Smtp__Username: "${SMTP_USERNAME}"
-      Smtp__Password: "${SMTP_PASSWORD}"
-      Smtp__FromEmail: "${SMTP_FROM_EMAIL}"
-      Smtp__FromName: "VocabLearning"
-      Authentication__Google__ClientId: "${GOOGLE_CLIENT_ID}"
-      Authentication__Google__ClientSecret: "${GOOGLE_CLIENT_SECRET}"
+      Smtp__EnableSsl: "${SMTP_ENABLE_SSL:-true}"
+      Smtp__Username: "${SMTP_USERNAME:-}"
+      Smtp__Password: "${SMTP_PASSWORD:-}"
+      Smtp__FromEmail: "${SMTP_FROM_EMAIL:-}"
+      Smtp__FromName: "${SMTP_FROM_NAME:-VocabLearning}"
+      Authentication__Google__ClientId: "${GOOGLE_CLIENT_ID:-}"
+      Authentication__Google__ClientSecret: "${GOOGLE_CLIENT_SECRET:-}"
       Authentication__Google__CallbackPath: "${GOOGLE_CALLBACK_PATH:-/signin-google}"
       PasswordReset__ExposeResetLinkInResponse: "false"
-      Cookie__SecurePolicy: "${COOKIE_SECURE_POLICY:-Always}"
-      Cookie__SameSite: "${COOKIE_SAMESITE:-None}"
-      Database__AutoMigrate: "true"
-      Gemini__ApiKey: "${Gemini__ApiKey}"
+      EmailVerification__ExposeVerificationLinkInResponse: "false"
+      Cookie__SecurePolicy: "Always"
+      Cookie__SameSite: "None"
+      Database__AutoMigrate: "false"
+      Gemini__ApiKey: "${GEMINI_API_KEY:-}"
     ports:
       - "${BACKEND_PORT:-5152}:5152"
     volumes:
@@ -77,7 +54,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  sqlserver_data:
-    name: vocablearning_sqlserver_data
+  postgres_data:
+    name: vocablearning_postgres_data
   avatar_data:
     name: vocablearning_avatar_data

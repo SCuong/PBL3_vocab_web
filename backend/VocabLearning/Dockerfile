@@ -1,28 +1,22 @@
-# ─── Stage 1: Build ──────────────────────────────────────────────────────────
-# .NET 10 SDK (matches VocabLearning.csproj TargetFramework=net10.0)
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
-# Copy csproj first for layer caching
 COPY VocabLearning.csproj ./
 RUN dotnet restore VocabLearning.csproj
 
-# Copy everything else and publish
-COPY . .
+COPY . ./
 RUN dotnet publish VocabLearning.csproj \
     -c Release \
-    -o /app/publish
+    -o /app/publish \
+    --no-restore
 
-# ─── Stage 2: Runtime ────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runner
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 WORKDIR /app
 
-# Copy published output
-COPY --from=builder /app/publish .
+COPY --from=build /app/publish ./
 
-# ASP.NET Core listens on 5152 (matches vite.config.ts proxy target)
 ENV ASPNETCORE_URLS=http://+:5152
 ENV ASPNETCORE_ENVIRONMENT=Production
 
