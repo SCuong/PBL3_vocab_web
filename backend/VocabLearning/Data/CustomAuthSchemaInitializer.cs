@@ -126,6 +126,12 @@ BEGIN
         WHERE [google_subject] IS NOT NULL;
 END;",
                 @"
+IF OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.topic', 'parent_topic_id') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[topic] ADD [parent_topic_id] BIGINT NULL;
+END;",
+                @"
 IF OBJECT_ID(N'dbo.password_reset_token', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[password_reset_token]
