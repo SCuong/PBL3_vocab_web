@@ -102,10 +102,14 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
         options.Cookie.HttpOnly = true;
         var sameSiteConfig = builder.Configuration["Cookie:SameSite"] ?? "None";
         var securePolicyConfig = builder.Configuration["Cookie:SecurePolicy"] ?? "Always";
-        options.Cookie.SameSite = sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
-        options.Cookie.SecurePolicy = securePolicyConfig == "SameAsRequest"
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
+        options.Cookie.SameSite = builder.Environment.IsProduction()
+            ? SameSiteMode.None
+            : sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
+        options.Cookie.SecurePolicy = builder.Environment.IsProduction()
+            ? CookieSecurePolicy.Always
+            : securePolicyConfig == "SameAsRequest"
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
         options.Events = new CookieAuthenticationEvents
         {
             OnRedirectToLogin = context =>
@@ -113,7 +117,12 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
                 if (context.Request.Path.StartsWithSegments("/api"))
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return Task.CompletedTask;
+                    context.Response.ContentType = "application/json";
+                    return context.Response.WriteAsJsonAsync(new
+                    {
+                        succeeded = false,
+                        message = "Not authenticated."
+                    });
                 }
 
                 context.Response.Redirect(context.RedirectUri);
@@ -124,7 +133,12 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
                 if (context.Request.Path.StartsWithSegments("/api"))
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    return Task.CompletedTask;
+                    context.Response.ContentType = "application/json";
+                    return context.Response.WriteAsJsonAsync(new
+                    {
+                        succeeded = false,
+                        message = "Access denied."
+                    });
                 }
 
                 context.Response.Redirect(context.RedirectUri);
@@ -138,10 +152,14 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
         options.Cookie.HttpOnly = true;
         var sameSiteConfig = builder.Configuration["Cookie:SameSite"] ?? "None";
         var securePolicyConfig = builder.Configuration["Cookie:SecurePolicy"] ?? "Always";
-        options.Cookie.SameSite = sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
-        options.Cookie.SecurePolicy = securePolicyConfig == "SameAsRequest"
-            ? CookieSecurePolicy.SameAsRequest
-            : CookieSecurePolicy.Always;
+        options.Cookie.SameSite = builder.Environment.IsProduction()
+            ? SameSiteMode.None
+            : sameSiteConfig == "Lax" ? SameSiteMode.Lax : SameSiteMode.None;
+        options.Cookie.SecurePolicy = builder.Environment.IsProduction()
+            ? CookieSecurePolicy.Always
+            : securePolicyConfig == "SameAsRequest"
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
     });
 
