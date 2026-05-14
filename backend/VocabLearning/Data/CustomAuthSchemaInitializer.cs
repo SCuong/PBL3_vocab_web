@@ -126,6 +126,33 @@ BEGIN
         WHERE [google_subject] IS NOT NULL;
 END;",
                 @"
+IF OBJECT_ID(N'dbo.topic', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[topic]
+    (
+        [topic_id] BIGINT IDENTITY(1,1) NOT NULL,
+        [name] NVARCHAR(100) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [parent_topic_id] BIGINT NULL,
+        CONSTRAINT [PK_topic] PRIMARY KEY ([topic_id])
+    );
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[vocabulary]
+    (
+        [vocab_id] BIGINT IDENTITY(1,1) NOT NULL,
+        [word] NVARCHAR(100) NULL,
+        [ipa] NVARCHAR(100) NULL,
+        [audio_url] NVARCHAR(255) NULL,
+        [level] NVARCHAR(10) NOT NULL CONSTRAINT [DF_vocabulary_level] DEFAULT N'A1',
+        [meaning_vi] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_vocabulary_meaning_vi] DEFAULT N'',
+        [topic_id] BIGINT NULL,
+        CONSTRAINT [PK_vocabulary] PRIMARY KEY ([vocab_id])
+    );
+END;",
+                @"
 IF OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
    AND COL_LENGTH('dbo.topic', 'description') IS NULL
 BEGIN
@@ -136,6 +163,12 @@ IF OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
    AND COL_LENGTH('dbo.topic', 'parent_topic_id') IS NULL
 BEGIN
     ALTER TABLE [dbo].[topic] ADD [parent_topic_id] BIGINT NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'word') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [word] NVARCHAR(100) NULL;
 END;",
                 @"
 IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
