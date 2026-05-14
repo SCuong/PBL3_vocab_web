@@ -31,6 +31,22 @@ export type ForgotPasswordResult = {
     inboxUrl: string;
 };
 
+const readAuthResponse = async (response: Response): Promise<AuthApiResponse> => {
+    if (response.status === 204) {
+        return { succeeded: response.ok };
+    }
+
+    const text = await response.text();
+    if (!text.trim()) {
+        return {
+            succeeded: false,
+            message: response.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : undefined
+        };
+    }
+
+    return JSON.parse(text) as AuthApiResponse;
+};
+
 export const authApi = {
     me: async (): Promise<AuthApiResponse | null> => {
         try {
@@ -40,7 +56,7 @@ export const authApi = {
                 return null;
             }
 
-            const data = (await response.json()) as AuthApiResponse;
+            const data = await readAuthResponse(response);
             return response.ok ? data : null;
         } catch {
             return null;
@@ -54,7 +70,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded || !data.user) {
             throw new Error(data.message || 'Đăng nhập thất bại.');
         }
@@ -69,7 +85,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Đăng ký thất bại.');
         }
@@ -84,7 +100,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Xác minh email thất bại.');
         }
@@ -99,7 +115,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Không thể gửi lại email xác minh.');
         }
@@ -114,7 +130,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded || !data.user) {
             throw new Error(data.message || 'Đăng nhập Google thất bại.');
         }
@@ -129,7 +145,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Không thể gửi yêu cầu quên mật khẩu.');
         }
@@ -155,7 +171,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Đặt lại mật khẩu thất bại.');
         }
@@ -170,7 +186,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded || !data.user) {
             throw new Error(data.message || 'Cập nhật hồ sơ thất bại.');
         }
@@ -185,7 +201,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Đổi mật khẩu thất bại.');
         }
@@ -204,7 +220,7 @@ export const authApi = {
             body: JSON.stringify(payload)
         });
 
-        const data = (await response.json()) as AuthApiResponse;
+        const data = await readAuthResponse(response);
         if (!response.ok || !data.succeeded) {
             throw new Error(data.message || 'Không thể xoá tài khoản.');
         }
