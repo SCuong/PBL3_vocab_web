@@ -10,6 +10,10 @@ using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Services;
 
+// Preserve current DateTime behavior during SQL Server -> PostgreSQL migration.
+// Follow-up should normalize persisted timestamps to UTC.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 // Load .env for local dev (Docker sets these as real env vars)
 // Try multiple paths since CWD differs between dotnet run / dotnet watch / IDE
 var envFile = new[]
@@ -162,6 +166,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 }
 
 builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -220,10 +225,19 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add services to the container.
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(defaultConnection))
+{
+    throw new InvalidOperationException("ConnectionStrings:DefaultConnection must be configured.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        defaultConnection,
+        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null)));
 
 var app = builder.Build();
 app.UseSwagger();
@@ -233,11 +247,19 @@ app.UseSwaggerUI();
 var autoMigrateDatabase = app.Configuration.GetValue<bool>("Database:AutoMigrate");
 if (autoMigrateDatabase)
 {
-    await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
-
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var providerName = db.Database.ProviderName ?? string.Empty;
+
+    if (!providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Database:AutoMigrate uses legacy SQL Server T-SQL and is disabled for PostgreSQL. Use database/postgres/init.sql or reviewed EF migrations.");
+    }
+
+    await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
+
     try
     {
         // Kiểm tra xem bảng vocabulary đã tồn tại chưa
@@ -324,6 +346,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();

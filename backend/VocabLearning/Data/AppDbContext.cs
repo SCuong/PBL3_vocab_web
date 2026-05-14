@@ -27,6 +27,12 @@ namespace VocabLearning.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            var isPostgreSql = Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+            var currentTimestampSql = isPostgreSql ? "CURRENT_TIMESTAMP" : "GETDATE()";
+            var googleSubjectIsNotNullFilter = isPostgreSql
+                ? "google_subject IS NOT NULL"
+                : "[google_subject] IS NOT NULL";
+
             modelBuilder.Entity<Users>(entity =>
             {
                 entity.ToTable("users");
@@ -34,7 +40,7 @@ namespace VocabLearning.Data
 
                 entity.Property(user => user.UserId)
                     .HasColumnName("user_id")
-                    .UseIdentityColumn();
+                    .ValueGeneratedOnAdd();
 
                 entity.Property(user => user.Username)
                     .HasColumnName("username")
@@ -66,7 +72,7 @@ namespace VocabLearning.Data
 
                 entity.Property(user => user.CreatedAt)
                     .HasColumnName("created_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.Property(user => user.IsDeleted)
                     .HasColumnName("is_deleted")
@@ -79,7 +85,7 @@ namespace VocabLearning.Data
                 entity.HasIndex(user => user.Email).IsUnique();
                 entity.HasIndex(user => user.GoogleSubject)
                     .IsUnique()
-                    .HasFilter("[google_subject] IS NOT NULL");
+                    .HasFilter(googleSubjectIsNotNullFilter);
             });
 
             modelBuilder.Entity<Topic>(entity =>
@@ -189,7 +195,7 @@ namespace VocabLearning.Data
                 entity.Property(exercise => exercise.MatchMode).HasColumnName("match_mode");
                 entity.Property(exercise => exercise.CreatedAt)
                     .HasColumnName("created_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.HasIndex(exercise => new { exercise.VocabId, exercise.Type, exercise.MatchMode })
                     .IsUnique();
@@ -295,7 +301,7 @@ namespace VocabLearning.Data
 
                 entity.Property(item => item.PasswordResetTokenId)
                     .HasColumnName("password_reset_token_id")
-                    .UseIdentityColumn();
+                    .ValueGeneratedOnAdd();
 
                 entity.Property(item => item.UserId).HasColumnName("user_id");
 
@@ -307,7 +313,7 @@ namespace VocabLearning.Data
 
                 entity.Property(item => item.CreatedAt)
                     .HasColumnName("created_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.Property(item => item.UsedAt).HasColumnName("used_at");
 
@@ -332,7 +338,7 @@ namespace VocabLearning.Data
 
                 entity.Property(item => item.EmailVerificationTokenId)
                     .HasColumnName("email_verification_token_id")
-                    .UseIdentityColumn();
+                    .ValueGeneratedOnAdd();
 
                 entity.Property(item => item.UserId).HasColumnName("user_id");
 
@@ -344,7 +350,7 @@ namespace VocabLearning.Data
 
                 entity.Property(item => item.CreatedAt)
                     .HasColumnName("created_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.Property(item => item.UsedAt).HasColumnName("used_at");
 
@@ -369,7 +375,7 @@ namespace VocabLearning.Data
 
                 entity.Property(note => note.StickyNoteId)
                     .HasColumnName("sticky_note_id")
-                    .UseIdentityColumn();
+                    .ValueGeneratedOnAdd();
 
                 entity.Property(note => note.UserId)
                     .HasColumnName("user_id");
@@ -390,11 +396,11 @@ namespace VocabLearning.Data
 
                 entity.Property(note => note.CreatedAt)
                     .HasColumnName("created_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.Property(note => note.UpdatedAt)
                     .HasColumnName("updated_at")
-                    .HasDefaultValueSql("GETDATE()");
+                    .HasDefaultValueSql(currentTimestampSql);
 
                 entity.HasOne<Users>()
                     .WithMany()
