@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Models;
+using VocabLearning.ViewModels.Account;
 
 namespace VocabLearning.Services
 {
@@ -597,6 +598,42 @@ namespace VocabLearning.Services
                 : null;
         }
 
+        public async Task<AuthenticatedUserViewModel?> ResolveAuthenticatedUserViewAsync(
+            ClaimsPrincipal principal,
+            CancellationToken cancellationToken = default)
+        {
+            if (principal.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            var userIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (long.TryParse(userIdClaim, out var userId))
+            {
+                var userById = await QueryAuthenticatedUserView()
+                    .SingleOrDefaultAsync(user => user.UserId == userId, cancellationToken);
+
+                if (userById is not null && IsActiveStatus(userById.Status))
+                {
+                    return userById;
+                }
+            }
+
+            var email = principal.FindFirstValue(ClaimTypes.Email)?.Trim();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return null;
+            }
+
+            var normalizedEmail = NormalizeEmail(email);
+            var userByEmail = await QueryAuthenticatedUserView()
+                .SingleOrDefaultAsync(user => user.Email == normalizedEmail, cancellationToken);
+
+            return userByEmail is not null && IsActiveStatus(userByEmail.Status)
+                ? userByEmail
+                : null;
+        }
+
         public async Task<long?> ResolveAuthenticatedUserIdAsync(
             ClaimsPrincipal principal,
             CancellationToken cancellationToken = default)
@@ -1035,7 +1072,31 @@ namespace VocabLearning.Services
         private static bool IsUserActive(Users user)
         {
             return !user.IsDeleted
-                && string.Equals(user.Status?.Trim(), UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
+                && IsActiveStatus(user.Status);
+        }
+
+        private static bool IsActiveStatus(string? status)
+        {
+            return string.Equals(status?.Trim(), UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private IQueryable<AuthenticatedUserViewModel> QueryAuthenticatedUserView()
+        {
+            return dbContext.Users
+                .AsNoTracking()
+                .Where(user => !user.IsDeleted)
+                .Select(user => new AuthenticatedUserViewModel
+                {
+                    UserId = user.UserId,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Role = user.Role,
+                    Status = user.Status,
+                    HasGoogleLogin = user.GoogleSubject != null && user.GoogleSubject != string.Empty,
+                    HasLocalPassword = user.PasswordHash != string.Empty,
+                    IsEmailVerified = user.IsEmailVerified,
+                    CreatedAt = user.CreatedAt
+                });
         }
 
         private static bool IsLearner(Users user)
