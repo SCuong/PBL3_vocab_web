@@ -231,7 +231,7 @@ app.UseSwaggerUI();
 
 await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
 
-// Auto-initialize database in production (Docker environment)
+// Auto-apply EF Core migrations when configured for deployment environments.
 if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 {
     using var scope = app.Services.CreateScope();
@@ -239,37 +239,13 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
-        // Kiểm tra xem bảng vocabulary đã tồn tại chưa
-        var exists = await db.Database.ExecuteSqlRawAsync(
-            "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'vocabulary') " +
-            "BEGIN RAISERROR('NEEDS_INIT', 16, 1) END"
-        );
-    }
-    catch (Exception ex) when (ex.Message.Contains("NEEDS_INIT"))
-    {
-        logger.LogInformation("First run — running init.sql...");
-        var initSqlPath = "/docker-entrypoint-initdb.d/init.sql";
-        if (File.Exists(initSqlPath))
-        {
-            var sql = await File.ReadAllTextAsync(initSqlPath);
-            var batches = System.Text.RegularExpressions.Regex
-                .Split(sql, @"^\s*GO\s*$", System.Text.RegularExpressions.RegexOptions.Multiline)
-                .Select(b => b.Trim())
-                .Where(b => b.Length > 0);
-            foreach (var batch in batches)
-            {
-                try { await db.Database.ExecuteSqlRawAsync(batch); }
-                catch (Exception batchEx)
-                {
-                    logger.LogWarning("Batch warning (non-fatal): {Msg}", batchEx.Message);
-                }
-            }
-            logger.LogInformation("Database initialized successfully.");
-        }
+        logger.LogInformation("Database migration started.");
+        await db.Database.MigrateAsync();
+        logger.LogInformation("Database migration completed successfully.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Database initialization failed.");
+        logger.LogError(ex, "Database migration failed.");
         throw;
     }
 }
