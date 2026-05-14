@@ -44,6 +44,7 @@ builder.Logging.AddEventSourceLogger();
 var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
 var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
 var googleCallbackPath = builder.Configuration["Authentication:Google:CallbackPath"] ?? "/signin-google";
+const string productionFrontendOrigin = "https://pbl-3-vocab-web.vercel.app";
 if (!googleCallbackPath.StartsWith('/'))
 {
     throw new InvalidOperationException("Authentication:Google:CallbackPath must start with '/'.");
@@ -52,12 +53,9 @@ if (!googleCallbackPath.StartsWith('/'))
 var frontendOrigin = builder.Configuration["Frontend:Origin"];
 if (string.IsNullOrWhiteSpace(frontendOrigin))
 {
-    if (builder.Environment.IsProduction())
-    {
-        throw new InvalidOperationException("Frontend:Origin must be configured in production.");
-    }
-
-    frontendOrigin = "http://localhost:3000";
+    frontendOrigin = builder.Environment.IsProduction()
+        ? productionFrontendOrigin
+        : "http://localhost:3000";
 }
 if (builder.Environment.IsProduction())
 {
@@ -68,7 +66,7 @@ if (builder.Environment.IsProduction())
 
     if (frontendOriginUri.IsLoopback)
     {
-        throw new InvalidOperationException("Frontend:Origin cannot be localhost/loopback in production.");
+        frontendOrigin = productionFrontendOrigin;
     }
 }
 
