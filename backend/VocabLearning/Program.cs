@@ -229,11 +229,12 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
-
 // Auto-initialize database in production (Docker environment)
-if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+var autoMigrateDatabase = app.Configuration.GetValue<bool>("Database:AutoMigrate");
+if (autoMigrateDatabase)
 {
+    await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
+
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
