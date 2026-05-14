@@ -649,7 +649,7 @@ namespace VocabLearning.Migrations
                     b.HasOne("VocabLearning.Models.Users", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("User");
