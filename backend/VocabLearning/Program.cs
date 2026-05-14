@@ -229,8 +229,6 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
-
 // Auto-apply EF Core migrations when configured for deployment environments.
 if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 {
@@ -249,6 +247,9 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
         throw;
     }
 }
+
+await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
+
 // Must be first: rewrites RemoteIpAddress from X-Forwarded-For before rate limiter and auth read it.
 // HTTPS is terminated at Nginx — UseHttpsRedirection is intentionally disabled.
 app.UseForwardedHeaders();

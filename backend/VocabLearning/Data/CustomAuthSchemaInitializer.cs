@@ -372,6 +372,7 @@ BEGIN
 END;",
                 $@"
 IF OBJECT_ID(N'dbo.exercise', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH('dbo.exercise', 'match_mode') IS NULL
     BEGIN
