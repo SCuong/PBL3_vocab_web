@@ -140,7 +140,7 @@ BEGIN
         CONSTRAINT [PK_password_reset_token] PRIMARY KEY ([password_reset_token_id]),
         CONSTRAINT [FK_password_reset_token_users]
             FOREIGN KEY ([user_id]) REFERENCES [dbo].[users]([user_id])
-            ON DELETE CASCADE
+            ON DELETE NO ACTION
     );
 END;",
                 @"
