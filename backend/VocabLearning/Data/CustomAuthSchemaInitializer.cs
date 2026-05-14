@@ -127,9 +127,45 @@ BEGIN
 END;",
                 @"
 IF OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.topic', 'description') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[topic] ADD [description] NVARCHAR(MAX) NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.topic', N'U') IS NOT NULL
    AND COL_LENGTH('dbo.topic', 'parent_topic_id') IS NULL
 BEGIN
     ALTER TABLE [dbo].[topic] ADD [parent_topic_id] BIGINT NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'ipa') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [ipa] NVARCHAR(100) NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'audio_url') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [audio_url] NVARCHAR(255) NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'meaning_vi') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [meaning_vi] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_vocabulary_meaning_vi_upgrade] DEFAULT N'';
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'topic_id') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [topic_id] BIGINT NULL;
+END;",
+                @"
+IF OBJECT_ID(N'dbo.vocabulary', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.vocabulary', 'level') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[vocabulary] ADD [level] NVARCHAR(10) NOT NULL CONSTRAINT [DF_vocabulary_level_upgrade] DEFAULT N'A1';
 END;",
                 @"
 IF OBJECT_ID(N'dbo.password_reset_token', N'U') IS NULL
