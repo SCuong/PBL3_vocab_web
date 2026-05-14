@@ -43,7 +43,7 @@ namespace VocabLearning.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<AuthApiResponse>> GetCurrentUserApi(CancellationToken cancellationToken)
         {
-            var user = await customAuthenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
+            var user = await customAuthenticationService.ResolveAuthenticatedUserViewAsync(User, cancellationToken);
             if (user is null)
             {
                 return Unauthorized(new AuthApiResponse
@@ -56,7 +56,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                User = MapAuthenticatedUser(user)
+                User = user
             });
         }
 
