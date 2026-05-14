@@ -318,7 +318,7 @@ namespace VocabLearning.Data
                 entity.HasOne(item => item.User)
                     .WithMany()
                     .HasForeignKey(item => item.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.NoAction);
 
                 entity.HasIndex(item => item.TokenHash);
                 entity.HasIndex(item => new { item.UserId, item.CreatedAt });
