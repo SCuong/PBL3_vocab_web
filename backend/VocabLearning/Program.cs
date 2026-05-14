@@ -228,7 +228,13 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 // Auto-apply EF Core migrations when configured for deployment environments.
-if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+var autoMigrate = app.Configuration.GetValue<bool>("Database:AutoMigrate");
+if (app.Environment.IsProduction())
+{
+    autoMigrate = false;
+}
+
+if (autoMigrate)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
