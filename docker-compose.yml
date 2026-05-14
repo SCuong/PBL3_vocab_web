@@ -28,7 +28,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5152"
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-vocablearning};Username=${POSTGRES_USER:-vocablearning};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};Pooling=true;Minimum Pool Size=0;Maximum Pool Size=100;Timeout=15;Command Timeout=30;Include Error Detail=false"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:-vocablearning};Username=${POSTGRES_USER:-vocablearning};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};Pooling=true;Minimum Pool Size=0;Maximum Pool Size=100;Timeout=15;Command Timeout=30;Include Error Detail=false;GSS Encryption Mode=Disable"
       Frontend__Origin: "${FRONTEND_ORIGIN:?FRONTEND_ORIGIN is required}"
       Frontend__AvatarPath: "/app/avatars"
       Smtp__Host: "${SMTP_HOST:-smtp.gmail.com}"

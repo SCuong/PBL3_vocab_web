@@ -362,24 +362,20 @@ namespace VocabLearning.Services
                 return false;
             }
 
-            try
-            {
-                _context.Database.ExecuteSqlRaw(
-                    "DELETE FROM [exercise_result] WHERE [exercise_id] IN (SELECT [exercise_id] FROM [exercise] WHERE [vocab_id] = {0})",
-                    id);
-
-                _context.Database.ExecuteSqlRaw(
-                    "DELETE FROM [exercise] WHERE [vocab_id] = {0}",
-                    id);
-            }
-            catch
-            {
-            }
-
+            var exerciseIds = _context.Exercises
+                .Where(exercise => exercise.VocabId == id)
+                .Select(exercise => exercise.ExerciseId)
+                .ToList();
+            var exerciseResults = _context.ExerciseResults
+                .Where(result => exerciseIds.Contains(result.ExerciseId))
+                .ToList();
+            var exercises = _context.Exercises.Where(exercise => exercise.VocabId == id).ToList();
             var progresses = _context.Progresses.Where(progress => progress.VocabId == id).ToList();
             var userVocabularies = _context.UserVocabularies.Where(item => item.VocabId == id).ToList();
             var examples = _context.Examples.Where(example => example.VocabId == id).ToList();
 
+            _context.ExerciseResults.RemoveRange(exerciseResults);
+            _context.Exercises.RemoveRange(exercises);
             _context.Progresses.RemoveRange(progresses);
             _context.UserVocabularies.RemoveRange(userVocabularies);
             _context.Examples.RemoveRange(examples);

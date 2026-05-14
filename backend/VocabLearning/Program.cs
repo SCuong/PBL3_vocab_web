@@ -247,54 +247,8 @@ app.UseSwaggerUI();
 var autoMigrateDatabase = app.Configuration.GetValue<bool>("Database:AutoMigrate");
 if (autoMigrateDatabase)
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var providerName = db.Database.ProviderName ?? string.Empty;
-
-    if (!providerName.Contains("SqlServer", StringComparison.OrdinalIgnoreCase))
-    {
-        throw new InvalidOperationException(
-            "Database:AutoMigrate uses legacy SQL Server T-SQL and is disabled for PostgreSQL. Use database/postgres/init.sql or reviewed EF migrations.");
-    }
-
-    await CustomAuthSchemaInitializer.InitializeAsync(app.Services);
-
-    try
-    {
-        // Kiểm tra xem bảng vocabulary đã tồn tại chưa
-        var exists = await db.Database.ExecuteSqlRawAsync(
-            "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'vocabulary') " +
-            "BEGIN RAISERROR('NEEDS_INIT', 16, 1) END"
-        );
-    }
-    catch (Exception ex) when (ex.Message.Contains("NEEDS_INIT"))
-    {
-        logger.LogInformation("First run — running init.sql...");
-        var initSqlPath = "/docker-entrypoint-initdb.d/init.sql";
-        if (File.Exists(initSqlPath))
-        {
-            var sql = await File.ReadAllTextAsync(initSqlPath);
-            var batches = System.Text.RegularExpressions.Regex
-                .Split(sql, @"^\s*GO\s*$", System.Text.RegularExpressions.RegexOptions.Multiline)
-                .Select(b => b.Trim())
-                .Where(b => b.Length > 0);
-            foreach (var batch in batches)
-            {
-                try { await db.Database.ExecuteSqlRawAsync(batch); }
-                catch (Exception batchEx)
-                {
-                    logger.LogWarning("Batch warning (non-fatal): {Msg}", batchEx.Message);
-                }
-            }
-            logger.LogInformation("Database initialized successfully.");
-        }
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Database initialization failed.");
-        throw;
-    }
+    throw new InvalidOperationException(
+        "Database:AutoMigrate is disabled. Use database/postgres/init.sql for empty PostgreSQL databases or a reviewed migration.");
 }
 // Must be first: rewrites RemoteIpAddress from X-Forwarded-For before rate limiter and auth read it.
 // HTTPS is terminated at Nginx — UseHttpsRedirection is intentionally disabled.
