@@ -22,6 +22,56 @@ namespace VocabLearning.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("VocabLearning.Models.EmailVerificationToken", b =>
+                {
+                    b.Property<long>("EmailVerificationTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("email_verification_token_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("EmailVerificationTokenId"));
+
+                    b.Property<string>("ConsumedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("consumed_by_ip");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("used_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("EmailVerificationTokenId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("email_verification_token", (string)null);
+                });
+
             modelBuilder.Entity("VocabLearning.Models.Example", b =>
                 {
                     b.Property<long>("ExampleId")
@@ -223,7 +273,8 @@ namespace VocabLearning.Migrations
                     b.HasKey("LogId");
 
                     b.HasIndex("SessionId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[session_id] <> 0");
 
                     b.HasIndex("UserId", "Date");
 
@@ -504,6 +555,12 @@ namespace VocabLearning.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsEmailVerified")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_email_verified");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -581,6 +638,17 @@ namespace VocabLearning.Migrations
                     b.HasIndex("TopicId");
 
                     b.ToTable("vocabulary", (string)null);
+                });
+
+            modelBuilder.Entity("VocabLearning.Models.EmailVerificationToken", b =>
+                {
+                    b.HasOne("VocabLearning.Models.Users", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("VocabLearning.Models.Example", b =>
@@ -666,7 +734,7 @@ namespace VocabLearning.Migrations
                     b.HasOne("VocabLearning.Models.UserVocabulary", null)
                         .WithOne()
                         .HasForeignKey("VocabLearning.Models.Progress", "UserId", "VocabId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

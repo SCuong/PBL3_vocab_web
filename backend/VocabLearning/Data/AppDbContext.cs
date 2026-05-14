@@ -269,7 +269,9 @@ namespace VocabLearning.Data
                     .OnDelete(DeleteBehavior.NoAction);
 
                 entity.HasIndex(log => new { log.UserId, log.Date });
-                entity.HasIndex(log => log.SessionId).IsUnique();
+                entity.HasIndex(log => log.SessionId)
+                    .IsUnique()
+                    .HasFilter("[session_id] <> 0");
             });
 
             modelBuilder.Entity<Meaning>(entity =>
