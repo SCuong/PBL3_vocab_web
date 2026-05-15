@@ -40,36 +40,22 @@ namespace VocabLearning.Middleware
                 return;
             }
 
-            var isApiRequest = context.Request.Path.StartsWithSegments("/api");
+            // Single response shape for all failures (API + MVC). Matches the
+            // {succeeded, message} convention used by controller error returns
+            // so the SPA does not need a separate parser for unhandled errors.
+            // exception.Message is intentionally not included — internal details
+            // stay in server-side logs only.
+            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            context.Response.ContentType = "application/json";
 
-            if (isApiRequest)
+            var response = new
             {
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                context.Response.ContentType = "application/json";
+                succeeded = false,
+                message = "An unexpected error occurred.",
+                status = 500
+            };
 
-                var response = new
-                {
-                    error = "An unexpected error occurred.",
-                    status = 500
-                };
-
-                var json = JsonSerializer.Serialize(response);
-                await context.Response.WriteAsync(json);
-            }
-            else
-            {
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                context.Response.ContentType = "application/json";
-
-                var response = new
-                {
-                    error = "An unexpected error occurred.",
-                    status = 500
-                };
-
-                var json = JsonSerializer.Serialize(response);
-                await context.Response.WriteAsync(json);
-            }
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
         }
     }
 }
