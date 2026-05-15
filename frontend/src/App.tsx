@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { PATHS } from './routes/paths';
 import { AdminRoute } from './routes/guards/AdminRoute';
 import { ProtectedRoute } from './routes/guards/ProtectedRoute';
@@ -207,10 +208,12 @@ const AppShell = () => {
 
 export default function App() {
     return (
-        <BrowserRouter>
-            <AppProvider>
-                <AppShell />
-            </AppProvider>
-        </BrowserRouter>
+        <ErrorBoundary>
+            <BrowserRouter>
+                <AppProvider>
+                    <AppShell />
+                </AppProvider>
+            </BrowserRouter>
+        </ErrorBoundary>
     );
 }
