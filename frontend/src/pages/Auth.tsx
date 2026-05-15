@@ -568,7 +568,7 @@ const Auth = () => {
             <div className={`auth-flip-root ${flipState}`}>
 
                 {/* ── Login panel (LEFT) ─────────────────────────────────── */}
-                <div className="auth-panel auth-panel-login">
+                <div className="auth-panel auth-panel-login" data-testid="login-panel">
                     <div className="auth-panel-content">
                         <div className="text-center mb-6">
                             <h2 className="text-3xl font-bold text-text-primary">Đăng nhập</h2>
@@ -654,7 +654,7 @@ const Auth = () => {
                 </div>
 
                 {/* ── Register panel (RIGHT) ─────────────────────────────── */}
-                <div className="auth-panel auth-panel-register">
+                <div className="auth-panel auth-panel-register" data-testid="register-panel">
                     <div className="auth-panel-content">
                         <div className="text-center mb-3">
                             <h2 className="text-3xl font-bold text-text-primary">Đăng ký</h2>

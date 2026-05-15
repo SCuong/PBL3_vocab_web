@@ -1,8 +1,8 @@
-const DEFAULT_PRODUCTION_API_URL = 'https://pbl3-vocab-api.azurewebsites.net';
-
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
-export const API_BASE_URL = (configuredApiUrl || DEFAULT_PRODUCTION_API_URL).replace(/\/+$/, '');
+// Empty base = relative requests. Dev: Vite proxies /api to the local .NET
+// backend (vite.config.ts). Prod: frontend and API served same-origin.
+export const API_BASE_URL = (configuredApiUrl ?? '').replace(/\/+$/, '');
 
 export const buildApiUrl = (path: string) => {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;

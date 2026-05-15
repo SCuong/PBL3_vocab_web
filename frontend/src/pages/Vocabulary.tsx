@@ -14,13 +14,12 @@ const PAGE_SIZE = 24;
 const Vocabulary = () => {
     const { topicFilters: topics } = useAppContext();
     const [selectedWord, setSelectedWord] = useState<any>(null);
-    const onSelectWord = async (word: any) => {
-        try {
-            const detail = await vocabularyApi.getById(word.id);
-            setSelectedWord(mapVocabularyToUiModel(detail));
-        } catch {
-            setSelectedWord(word);
-        }
+    const onSelectWord = (word: any) => {
+        setSelectedWord(word);
+        void vocabularyApi.getById(word.id)
+            .then(detail => setSelectedWord(prev =>
+                prev?.id === word.id ? mapVocabularyToUiModel(detail) : prev))
+            .catch(() => { /* keep list-row data */ });
     };
     const onCloseWordDetail = () => setSelectedWord(null);
     const [items, setItems] = useState<any[]>([]);
@@ -212,7 +211,13 @@ const Vocabulary = () => {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {items.map((v: any) => (
-                    <div key={v.id} className="glass-card p-6 cursor-pointer group" onClick={() => onSelectWord(v)}>
+                    <div
+                        key={v.id}
+                        data-testid="vocab-card"
+                        data-vocab-id={v.id}
+                        className="glass-card p-6 cursor-pointer group"
+                        onClick={() => onSelectWord(v)}
+                    >
                         <div className="flex justify-between items-start mb-4">
                             <Badge variant="purple">{v.cefr}</Badge>
                             <Button
@@ -302,7 +307,8 @@ const Vocabulary = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[700] bg-black/35 backdrop-blur-sm p-4 md:p-6 flex items-center justify-center"
+                        data-testid="vocab-modal"
+                        className="fixed inset-0 z-[700] bg-black/50 p-4 md:p-6 flex items-center justify-center"
                         onClick={onCloseWordDetail}
                     >
                         <motion.div
@@ -310,6 +316,7 @@ const Vocabulary = () => {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 20 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
+                            data-testid="vocab-modal-content"
                             className="glass-card bg-surface/90 w-full max-w-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}
                         >

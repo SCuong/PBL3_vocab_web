@@ -23,88 +23,102 @@ type TopicGroupUiModel = {
     topics: TopicUiModel[];
 };
 
-const CATEGORY_ICONS_BY_PARENT_TOPIC_ID: Record<number, string> = {
-    1: '💬',
-    11: '💼',
-    20: '💪',
-    25: '✈️',
-    29: '🏠',
-    39: '💭',
-    42: '🌍'
-};
+const DEFAULT_CATEGORY_ICON = '📚';
+const DEFAULT_TOPIC_ICON = '📘';
 
-const CATEGORY_ICONS_BY_TITLE: Record<string, string> = {
+// Keyed by normalized topic name (trim + lowercase). Names are stable across
+// DB migrations; topic_id is not — Postgres IDENTITY reassigns ids based on
+// insert order, so the previous id-keyed maps broke after migrating off SQL
+// Server. Both '&' and 'and' spellings are accepted for parent titles.
+const CATEGORY_ICONS_BY_NAME: Record<string, string> = {
     'daily communication': '💬',
-    'work & education': '💼',
     'work and education': '💼',
-    health: '💪',
-    'entertainment & travel': '✈️',
+    'work & education': '💼',
+    'health': '💪',
     'entertainment and travel': '✈️',
+    'entertainment & travel': '✈️',
     'daily life': '🏠',
-    'emotions & opinions': '💭',
     'emotions and opinions': '💭',
-    'culture & science': '🌍',
-    'culture and science': '🌍'
+    'emotions & opinions': '💭',
+    'culture and science': '🌍',
+    'culture & science': '🌍'
 };
 
-const TOPIC_ICONS_BY_TOPIC_ID: Record<number, string> = {
-    1: '👋',
-    2: '👨‍👩‍👧‍👦',
-    3: '🤝',
-    4: '☀️',
-    5: '📅',
-    6: '🎨',
-    7: '🏠',
-    8: '📍',
-    9: '🛍️',
-    10: '🍽️',
-    11: '👨‍💼',
-    12: '🏢',
-    13: '🎓',
-    14: '📧',
-    15: '📝',
-    16: '👥',
-    17: '⏰',
-    18: '🖨️',
-    19: '🤝',
-    20: '🦶',
-    21: '🤒',
-    22: '🏃',
-    23: '🥗',
-    24: '🍎',
-    25: '🎬',
-    26: '🌍',
-    27: '🗽',
-    28: '🏨',
-    29: '🍔',
-    30: '🛒',
-    31: '🚌',
-    32: '🐶',
-    33: '🪁',
-    34: '👗',
-    35: '🚿',
-    36: '🍳',
-    37: '🧹',
-    38: '🌐',
-    39: '😊',
-    40: '🎨',
-    41: '💬',
-    42: '🌿',
-    43: '🦁',
-    44: '📚'
+const TOPIC_ICONS_BY_NAME: Record<string, string> = {
+    // Daily Communication
+    'greetings and introductions': '👋',
+    'family': '👨‍👩‍👧‍👦',
+    'friends and relationships': '🤝',
+    'weather': '☀️',
+    'numbers and dates': '📅',
+    'colors': '🎨',
+    'household items': '🏠',
+    'asking for and giving directions': '📍',
+    'shopping': '🛍️',
+    'ordering food': '🍽️',
+
+    // Work and Education
+    'jobs and occupations': '👨‍💼',
+    'office': '🏢',
+    'school and education': '🎓',
+    'basic email communication': '📧',
+    'daily tasks at work': '📝',
+    'team meetings': '👥',
+    'schedules and time': '⏰',
+    'office equipment': '🖨️',
+    'colleagues': '🤝',
+
+    // Health
+    'body parts': '🦶',
+    'illnesses and health': '🤒',
+    'exercise and sports': '🏃',
+    'healthy habits': '🥗',
+    'diet and nutrition': '🍎',
+
+    // Entertainment and Travel
+    'movies and music': '🎬',
+    'travel and exploration': '🌍',
+    'famous places': '🗽',
+    'hotels and accommodation': '🏨',
+    'outdoor activities': '🏕️',
+
+    // Daily Life
+    'food and drinks': '🍔',
+    'supermarket': '🛒',
+    'transportation': '🚌',
+    'pets and animals': '🐶',
+    'leisure time': '🪁',
+    'clothing and shopping': '👗',
+    'daily routines': '🚿',
+    'kitchen and cooking': '🍳',
+    'house cleaning': '🧹',
+    'technology and internet': '🌐',
+
+    // Emotions and Opinions
+    'feelings and emotions': '😊',
+    'hobbies': '🎨',
+    'personal opinions': '💬',
+    'future plans': '🎯',
+    'festivals and events': '🎉',
+
+    // Culture and Science
+    'nature and environment': '🌿',
+    'wildlife': '🦁',
+    'books and literature': '📚',
+    'history and culture': '🏛️',
+    'traditions and customs': '🎎',
+    'holidays around the world': '🌎'
 };
 
 type TopicProgressLookup = Record<number, LearningProgressTopicStateItem>;
 
-const getCategoryIcon = (parent: VocabularyTopicItem) => {
-    const iconById = CATEGORY_ICONS_BY_PARENT_TOPIC_ID[parent.topicId];
-    if (iconById) {
-        return iconById;
-    }
+const normalizeTopicKey = (name: string) => name.trim().toLowerCase();
 
-    const normalizedTitle = parent.name.trim().toLowerCase();
-    return CATEGORY_ICONS_BY_TITLE[normalizedTitle] ?? '📚';
-};
+const getCategoryIcon = (parent: VocabularyTopicItem) =>
+    CATEGORY_ICONS_BY_NAME[normalizeTopicKey(parent.name)] ?? DEFAULT_CATEGORY_ICON;
+
+const getTopicIcon = (topic: VocabularyTopicItem) =>
+    TOPIC_ICONS_BY_NAME[normalizeTopicKey(topic.name)] ?? DEFAULT_TOPIC_ICON;
 
 const createProgressLookup = (progressState: LearningProgressState | null): TopicProgressLookup => {
     if (!progressState?.topics) {
@@ -147,7 +161,7 @@ export const buildLearningTopicGroups = (
         id: topic.topicId,
         title: topic.name,
         description: topic.description,
-        icon: TOPIC_ICONS_BY_TOPIC_ID[topic.topicId] ?? '📘',
+        icon: getTopicIcon(topic),
         stats: calculateTopicStats(topic.wordCount ?? 0, progressLookup[topic.topicId])
     });
 
@@ -156,7 +170,7 @@ export const buildLearningTopicGroups = (
             {
                 id: 'all',
                 title: 'Chủ đề học tập',
-                icon: '📚',
+                icon: DEFAULT_CATEGORY_ICON,
                 topics: [...topicFilters]
                     .sort((a, b) => a.topicId - b.topicId)
                     .map(toTopicUiModel)
