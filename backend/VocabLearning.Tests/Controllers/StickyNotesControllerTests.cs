@@ -22,7 +22,8 @@ namespace VocabLearning.Tests.Controllers
         {
             _context = TestDbContextFactory.Create();
             _authService = new CustomAuthenticationService(_context);
-            _controller = new StickyNotesController(_context, _authService);
+            var stickyNoteService = new StickyNoteService(_context);
+            _controller = new StickyNotesController(stickyNoteService, _authService);
 
             _context.Users.AddRange(
                 new Users

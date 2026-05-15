@@ -1,8 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VocabLearning.Data;
-using VocabLearning.Models;
 using VocabLearning.Services;
 using VocabLearning.ViewModels.Notes;
 
@@ -12,14 +9,14 @@ namespace VocabLearning.Controllers
     [ApiController]
     public class StickyNotesController : ControllerBase
     {
-        private static readonly string[] AllowedColors = { "yellow", "blue", "green", "pink", "purple" };
-
-        private readonly AppDbContext _dbContext;
+        private readonly IStickyNoteService _stickyNoteService;
         private readonly ICustomAuthenticationService _authenticationService;
 
-        public StickyNotesController(AppDbContext dbContext, ICustomAuthenticationService authenticationService)
+        public StickyNotesController(
+            IStickyNoteService stickyNoteService,
+            ICustomAuthenticationService authenticationService)
         {
-            _dbContext = dbContext;
+            _stickyNoteService = stickyNoteService;
             _authenticationService = authenticationService;
         }
 
@@ -32,14 +29,7 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new { succeeded = false, message = "Not authenticated." });
             }
 
-            var notes = await _dbContext.StickyNotes
-                .AsNoTracking()
-                .Where(note => note.UserId == user.UserId)
-                .OrderByDescending(note => note.IsPinned)
-                .ThenByDescending(note => note.UpdatedAt)
-                .Select(note => Map(note))
-                .ToListAsync(cancellationToken);
-
+            var notes = await _stickyNoteService.GetForUserAsync(user.UserId, cancellationToken);
             return Ok(notes);
         }
 
@@ -54,21 +44,8 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new { succeeded = false, message = "Not authenticated." });
             }
 
-            var now = DateTime.UtcNow;
-            var stickyNote = new StickyNote
-            {
-                UserId = user.UserId,
-                Content = SanitizeContent(request?.Content),
-                Color = NormalizeColor(request?.Color),
-                IsPinned = false,
-                CreatedAt = now,
-                UpdatedAt = now,
-            };
-
-            _dbContext.StickyNotes.Add(stickyNote);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            return Ok(Map(stickyNote));
+            var created = await _stickyNoteService.CreateAsync(user.UserId, request, cancellationToken);
+            return Ok(created);
         }
 
         [HttpPut("/api/sticky-notes/{stickyNoteId:long}")]
@@ -83,33 +60,13 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new { succeeded = false, message = "Not authenticated." });
             }
 
-            var stickyNote = await _dbContext.StickyNotes
-                .FirstOrDefaultAsync(note => note.StickyNoteId == stickyNoteId && note.UserId == user.UserId, cancellationToken);
-            if (stickyNote == null)
+            var updated = await _stickyNoteService.UpdateAsync(user.UserId, stickyNoteId, request, cancellationToken);
+            if (updated == null)
             {
                 return NotFound(new { succeeded = false, message = "Sticky note not found." });
             }
 
-            if (request != null)
-            {
-                if (request.Content != null)
-                {
-                    stickyNote.Content = SanitizeContent(request.Content);
-                }
-                if (request.Color != null)
-                {
-                    stickyNote.Color = NormalizeColor(request.Color);
-                }
-                if (request.IsPinned.HasValue)
-                {
-                    stickyNote.IsPinned = request.IsPinned.Value;
-                }
-            }
-
-            stickyNote.UpdatedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            return Ok(Map(stickyNote));
+            return Ok(updated);
         }
 
         [HttpDelete("/api/sticky-notes/{stickyNoteId:long}")]
@@ -121,42 +78,13 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new { succeeded = false, message = "Not authenticated." });
             }
 
-            var stickyNote = await _dbContext.StickyNotes
-                .FirstOrDefaultAsync(note => note.StickyNoteId == stickyNoteId && note.UserId == user.UserId, cancellationToken);
-            if (stickyNote == null)
+            var deleted = await _stickyNoteService.DeleteAsync(user.UserId, stickyNoteId, cancellationToken);
+            if (!deleted)
             {
                 return NotFound(new { succeeded = false, message = "Sticky note not found." });
             }
 
-            _dbContext.StickyNotes.Remove(stickyNote);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
             return Ok(new { succeeded = true });
-        }
-
-        private static StickyNoteViewModel Map(StickyNote note)
-        {
-            return new StickyNoteViewModel
-            {
-                StickyNoteId = note.StickyNoteId,
-                Content = note.Content,
-                Color = note.Color,
-                IsPinned = note.IsPinned,
-                CreatedAt = note.CreatedAt,
-                UpdatedAt = note.UpdatedAt,
-            };
-        }
-
-        private static string SanitizeContent(string? content)
-        {
-            var normalized = (content ?? string.Empty).Trim();
-            return normalized.Length > 1000 ? normalized[..1000] : normalized;
-        }
-
-        private static string NormalizeColor(string? color)
-        {
-            var normalized = (color ?? "yellow").Trim().ToLowerInvariant();
-            return AllowedColors.Contains(normalized) ? normalized : "yellow";
         }
     }
 }
