@@ -158,6 +158,25 @@ namespace VocabLearning.Controllers
                 });
             }
 
+            // Development only: auto-verify the account so the local auth flow
+            // (register -> login) is testable without a working SMTP server.
+            // Production falls through to real email verification below.
+            if (environment.IsDevelopment())
+            {
+                result.User.IsEmailVerified = true;
+                await appDbContext.SaveChangesAsync(cancellationToken);
+                logger.LogWarning(
+                    "Development environment: auto-verified email for {Email}; SMTP verification skipped.",
+                    result.User.Email);
+
+                return Ok(new AuthApiResponse
+                {
+                    Succeeded = true,
+                    Message = "Account created and auto-verified (Development mode). You can log in now.",
+                    EmailSent = false
+                });
+            }
+
             var deliveryResult = await IssueEmailVerificationAsync(result.User, cancellationToken);
             if (!deliveryResult.Succeeded)
             {

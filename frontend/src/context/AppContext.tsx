@@ -128,12 +128,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         let disposed = false;
         const bootstrap = async () => {
-            const splashTimer = new Promise(resolve => setTimeout(resolve, 1200));
             const [session] = await Promise.all([authApi.me(), loadTopics()]);
             if (!disposed && session?.succeeded && session.user) {
                 syncUserGameData(session.user);
             }
-            await splashTimer;
             if (!disposed) setIsLoading(false);
         };
         void bootstrap();
@@ -174,19 +172,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         );
     }, [learningTopicGroups, currentUser]);
 
+    const value = useMemo<AppContextValue>(() => ({
+        currentUser, syncUserGameData, handleLogout, handleUserUpdated,
+        addToast, removeToast, toasts,
+        gameData: gameData.currentUser,
+        fullGameData: gameData,
+        addXP, triggerStreakCheck, xpFloats,
+        learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
+        totalReviewCount,
+        handleWordsLearned, handleRecordStudyHistory,
+        showStreakModal, setShowStreakModal,
+        isLoading,
+    }), [
+        currentUser, syncUserGameData, handleLogout, handleUserUpdated,
+        addToast, removeToast, toasts,
+        gameData,
+        addXP, triggerStreakCheck, xpFloats,
+        learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
+        totalReviewCount,
+        handleWordsLearned, handleRecordStudyHistory,
+        showStreakModal,
+        isLoading,
+    ]);
+
     return (
-        <AppContext.Provider value={{
-            currentUser, syncUserGameData, handleLogout, handleUserUpdated,
-            addToast, removeToast, toasts,
-            gameData: gameData.currentUser,
-            fullGameData: gameData,
-            addXP, triggerStreakCheck, xpFloats,
-            learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
-            totalReviewCount,
-            handleWordsLearned, handleRecordStudyHistory,
-            showStreakModal, setShowStreakModal,
-            isLoading,
-        }}>
+        <AppContext.Provider value={value}>
             {children}
         </AppContext.Provider>
     );

@@ -4,6 +4,11 @@ namespace ImportVocabularyPBL3.Services
 {
     internal class VocabImportService
     {
+        private int _topicsCreated, _topicsReused;
+        private int _vocabCreated, _vocabReused;
+        private int _examplesCreated, _examplesReused;
+        private int _rowsOk, _rowsSkipped;
+
         public void ImportFromExcel(string excelPath)
         {
             var rows = ExcelReader.Read(excelPath);
@@ -19,27 +24,28 @@ namespace ImportVocabularyPBL3.Services
             {
                 foreach (var row in rows)
                 {
+                    string sp = $"r{rowIndex}";
+                    Exec(conn, tran, $"SAVEPOINT {sp}");
                     try
                     {
                         long? topicId = ResolveTopicId(conn, tran, row, schema);
                         long vocabId = GetOrCreateVocab(conn, tran, row, schema, topicId);
                         long? meaningId = null;
 
-                        // Only call meaning table when example actually needs meaning_id FK.
-                        // Current PostgreSQL schema: example.meaning_id does not exist → skip.
                         if (schema.HasMeaningTable && schema.ExampleHasMeaningId)
-                        {
                             meaningId = GetOrCreateMeaning(conn, tran, vocabId, row);
-                        }
 
                         GetOrCreateExample(conn, tran, schema, vocabId, meaningId, row);
                         AttachTopic(conn, tran, schema, vocabId, topicId);
+
+                        Exec(conn, tran, $"RELEASE SAVEPOINT {sp}");
+                        _rowsOk++;
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(
-                            $"SKIP row {rowIndex} | Word='{row.Word}' | Type='{row.Type}' | Reason={ex.Message}"
-                        );
+                        Exec(conn, tran, $"ROLLBACK TO SAVEPOINT {sp}");
+                        _rowsSkipped++;
+                        Console.WriteLine($"SKIP row {rowIndex} | Word='{row.Word}' | {ex.Message}");
                     }
 
                     rowIndex++;
@@ -52,6 +58,23 @@ namespace ImportVocabularyPBL3.Services
                 tran.Rollback();
                 throw;
             }
+
+            PrintSummary();
+        }
+
+        private void PrintSummary()
+        {
+            Console.WriteLine("=== Import complete ===");
+            Console.WriteLine($"  Rows: {_rowsOk} ok, {_rowsSkipped} skipped");
+            Console.WriteLine($"  Topics:   {_topicsCreated} created, {_topicsReused} reused");
+            Console.WriteLine($"  Vocab:    {_vocabCreated} created, {_vocabReused} reused");
+            Console.WriteLine($"  Examples: {_examplesCreated} created, {_examplesReused} reused");
+        }
+
+        private static void Exec(NpgsqlConnection conn, NpgsqlTransaction tran, string sql)
+        {
+            using var cmd = new NpgsqlCommand(sql, conn, tran);
+            cmd.ExecuteNonQuery();
         }
 
         private long GetOrCreateVocab(
@@ -66,16 +89,6 @@ namespace ImportVocabularyPBL3.Services
             string? meaningVi = schema.VocabularyHasMeaningVi
                 ? RequireText(row.MeaningVN, "MeaningVN")
                 : null;
-
-            // PostgreSQL schema has UNIQUE(word) — check by word only.
-            // If word already exists (possibly with different topic/meaning), reuse it.
-            using var check = new NpgsqlCommand(
-                "SELECT vocab_id FROM vocabulary WHERE word = @w",
-                conn, tran);
-            check.Parameters.AddWithValue("@w", word);
-
-            var id = check.ExecuteScalar();
-            if (id != null) return (long)id;
 
             var columns = "word, ipa, audio_url, level";
             var values = "@w, @ipa, @audio, @level";
@@ -92,8 +105,9 @@ namespace ImportVocabularyPBL3.Services
                 values += ", @topicId";
             }
 
+            // ON CONFLICT (word) DO NOTHING: safe for re-runs; RETURNING returns null on conflict.
             using var insert = new NpgsqlCommand(
-                $"INSERT INTO vocabulary({columns}) VALUES ({values}) RETURNING vocab_id",
+                $"INSERT INTO vocabulary({columns}) VALUES ({values}) ON CONFLICT (word) DO NOTHING RETURNING vocab_id",
                 conn, tran);
 
             insert.Parameters.AddWithValue("@w", word);
@@ -107,7 +121,25 @@ namespace ImportVocabularyPBL3.Services
             if (schema.VocabularyHasTopicId)
                 insert.Parameters.AddWithValue("@topicId", RequireTopicId(topicId));
 
-            return (long)insert.ExecuteScalar()!;
+            var newId = insert.ExecuteScalar();
+            if (newId != null)
+            {
+                _vocabCreated++;
+                Console.WriteLine($"  VOCAB created: '{word}'");
+                return (long)newId;
+            }
+
+            using var sel = new NpgsqlCommand(
+                "SELECT vocab_id FROM vocabulary WHERE word = @w",
+                conn, tran);
+            sel.Parameters.AddWithValue("@w", word);
+            var existingRaw = sel.ExecuteScalar();
+            if (existingRaw == null)
+                throw new InvalidOperationException($"Vocabulary word '{word}' not found after ON CONFLICT — unexpected DB state.");
+            var existingId = (long)existingRaw;
+            _vocabReused++;
+            Console.WriteLine($"  VOCAB reused: '{word}' (id={existingId})");
+            return existingId;
         }
 
         private long GetOrCreateMeaning(
@@ -116,9 +148,6 @@ namespace ImportVocabularyPBL3.Services
             long vocabId,
             ExcelVocabRow row)
         {
-            // Only reached when ExampleHasMeaningId = true (not the case in current PostgreSQL schema).
-            // PostgreSQL meaning.meaning_en is NOT NULL — requires an English meaning source column in Excel.
-            // Add MeaningEN to ExcelVocabRow and ExcelReader before enabling this path.
             throw new NotSupportedException(
                 "Meaning table import not supported: " +
                 "meaning_en is NOT NULL in PostgreSQL schema but has no source column in the Excel file. " +
@@ -134,7 +163,6 @@ namespace ImportVocabularyPBL3.Services
             long? meaningId,
             ExcelVocabRow row)
         {
-            // PostgreSQL schema: example.sentence and example.translation are NOT NULL and not blank.
             if (string.IsNullOrWhiteSpace(row.Example))
                 return 0;
 
@@ -174,8 +202,12 @@ namespace ImportVocabularyPBL3.Services
             check.Parameters.AddWithValue("@s", sentence);
             check.Parameters.AddWithValue("@t", translation);
 
-            var id = check.ExecuteScalar();
-            if (id != null) return (long)id;
+            var existing = check.ExecuteScalar();
+            if (existing != null)
+            {
+                _examplesReused++;
+                return (long)existing;
+            }
 
             using var insert = new NpgsqlCommand(
                 $"INSERT INTO example ({ownerColumn}, sentence, translation, audio_url) " +
@@ -186,7 +218,11 @@ namespace ImportVocabularyPBL3.Services
             insert.Parameters.AddWithValue("@t", translation);
             insert.Parameters.AddWithValue("@a", ToDbValue(row.ExampleAudioUrl));
 
-            return (long)insert.ExecuteScalar()!;
+            var newExRaw = insert.ExecuteScalar();
+            if (newExRaw == null)
+                throw new InvalidOperationException("INSERT INTO example returned null — unexpected DB state.");
+            _examplesCreated++;
+            return (long)newExRaw;
         }
 
         private long GetOrCreateTopic(
@@ -196,39 +232,43 @@ namespace ImportVocabularyPBL3.Services
             long? parentTopicId,
             bool topicHasParentTopicId)
         {
-            // topic.name is CITEXT in PostgreSQL — comparison is case-insensitive automatically.
-            using var cmd = new NpgsqlCommand(
+            string trimmed = name.Trim();
+
+            // INSERT ON CONFLICT (name) DO NOTHING is idempotent for re-runs and
+            // safe within the same transaction when the same name appears in multiple rows.
+            string insertSql = topicHasParentTopicId
+                ? "INSERT INTO topic(name, description, parent_topic_id) VALUES (@name, '', @parentTopicId) ON CONFLICT (name) DO NOTHING"
+                : "INSERT INTO topic(name, description) VALUES (@name, '') ON CONFLICT (name) DO NOTHING";
+
+            using var insert = new NpgsqlCommand(insertSql, conn, tran);
+            insert.Parameters.AddWithValue("@name", trimmed);
+            if (topicHasParentTopicId)
+                insert.Parameters.AddWithValue("@parentTopicId",
+                    parentTopicId.HasValue ? (object)parentTopicId.Value : DBNull.Value);
+
+            bool created = insert.ExecuteNonQuery() > 0;
+
+            using var sel = new NpgsqlCommand(
                 "SELECT topic_id FROM topic WHERE name = @name",
                 conn, tran);
-            cmd.Parameters.AddWithValue("@name", name.Trim());
+            sel.Parameters.AddWithValue("@name", trimmed);
+            var raw = sel.ExecuteScalar();
+            if (raw == null)
+                throw new InvalidOperationException($"Topic '{trimmed}' not found after INSERT ON CONFLICT — unexpected DB state.");
+            long id = (long)raw;
 
-            var id = cmd.ExecuteScalar();
-            if (id != null) return (long)id;
-
-            NpgsqlCommand insert;
-
-            if (topicHasParentTopicId)
+            if (created)
             {
-                insert = new NpgsqlCommand(
-                    "INSERT INTO topic(name, description, parent_topic_id) " +
-                    "VALUES (@name, '', @parentTopicId) RETURNING topic_id",
-                    conn, tran);
-                insert.Parameters.AddWithValue(
-                    "@parentTopicId",
-                    parentTopicId.HasValue ? (object)parentTopicId.Value : DBNull.Value);
+                _topicsCreated++;
+                Console.WriteLine($"  TOPIC created: '{trimmed}' (id={id})");
             }
             else
             {
-                insert = new NpgsqlCommand(
-                    "INSERT INTO topic(name, description) VALUES (@name, '') RETURNING topic_id",
-                    conn, tran);
+                _topicsReused++;
+                Console.WriteLine($"  TOPIC reused: '{trimmed}' (id={id})");
             }
 
-            insert.Parameters.AddWithValue("@name", name.Trim());
-
-            var result = (long)insert.ExecuteScalar()!;
-            insert.Dispose();
-            return result;
+            return id;
         }
 
         private void InsertVocabTopic(
