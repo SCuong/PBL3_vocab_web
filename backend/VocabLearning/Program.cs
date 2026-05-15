@@ -86,6 +86,8 @@ builder.Services.AddScoped<ILearningService>(sp => sp.GetRequiredService<Learnin
 builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
 builder.Services.AddScoped<IPasswordResetEmailService>(sp => sp.GetRequiredService<PasswordResetEmailService>());
+builder.Services.AddScoped<StickyNoteService>();
+builder.Services.AddScoped<IStickyNoteService>(sp => sp.GetRequiredService<StickyNoteService>());
 builder.Services.AddHttpClient<GoogleIdTokenVerifier>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(10);
