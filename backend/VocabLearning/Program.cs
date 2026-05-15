@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.FileProviders;
 using System.Threading.RateLimiting;
 using VocabLearning.Configuration;
@@ -182,7 +183,11 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 }
 
 builder.Services.AddControllers();
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<VocabLearning.Health.DbReadinessHealthCheck>(
+        name: "db",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: new[] { "ready" });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -256,8 +261,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorCodesToAdd: null)));
 
 var app = builder.Build();
-app.UseSwagger();
-app.UseSwaggerUI();
+
+// Swagger UI is restricted to Development to avoid exposing API surface in production.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 // Auto-initialize database in production (Docker environment)
 var autoMigrateDatabase = app.Configuration.GetValue<bool>("Database:AutoMigrate");
@@ -316,7 +326,25 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-app.MapHealthChecks("/health");
+
+// Liveness: process is alive. Excludes all checks (returns 200 if app started).
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false
+});
+
+// Readiness: app can serve traffic (DB reachable).
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready")
+});
+
+// Backwards-compatible alias: /health returns readiness for existing probes.
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready")
+});
+
 app.MapControllers();
 
 app.Run();
