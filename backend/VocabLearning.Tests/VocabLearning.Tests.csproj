@@ -19,6 +19,15 @@
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="FluentAssertions" Version="8.3.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
+    <!--
+      Production references Microsoft.EntityFrameworkCore.Tools with PrivateAssets=all,
+      so its transitive Microsoft.EntityFrameworkCore.Relational 10.0.5 does not flow
+      to test consumers. Without an explicit pin, the test bin gets 10.0.4 (via InMemory
+      transitive), but VocabLearning.dll was compiled against Relational 10.0.5 and
+      AppDbContext.OnModelCreating calls HasDefaultValueSql, producing
+      FileNotFoundException at runtime. Pin to match production.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.5" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
   </ItemGroup>
 
