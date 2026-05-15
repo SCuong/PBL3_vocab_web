@@ -8,12 +8,12 @@ namespace VocabLearning.Tests.Integration
 {
     public class AuthSecurityIntegrationTests
     {
-        public static bool IsSqlIntegrationConfigured => SqlServerIntegrationWebAppFactory.IsConfigured;
+        public static bool IsSqlIntegrationConfigured => PostgreSqlIntegrationWebAppFactory.IsConfigured;
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LoginApi_FailedCredentials_ShouldReturnUnauthorized_AndNotAuthenticateSession()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -21,19 +21,19 @@ namespace VocabLearning.Tests.Integration
             });
 
             var loginResponse = await client.LoginAsync(
-                SqlServerIntegrationWebAppFactory.LearnerEmail,
+                PostgreSqlIntegrationWebAppFactory.LearnerEmail,
                 "wrong-password");
-            var meResponse = await client.GetAsync("/api/v1/auth/me");
+            var meResponse = await client.GetAsync("/api/auth/me");
 
             loginResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
             meResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
             loginResponse.GetAuthCookies().Should().BeEmpty();
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task ProtectedMvcEndpoints_Unauthenticated_ShouldRedirectToLogin()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -54,10 +54,10 @@ namespace VocabLearning.Tests.Integration
             adminResponse.Headers.Location!.OriginalString.Should().Contain("ReturnUrl=%2FAdmin");
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task AdminEndpoint_LearnerUser_ShouldRedirectToAccessDeniedPath()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -75,20 +75,20 @@ namespace VocabLearning.Tests.Integration
             response.Headers.Location!.OriginalString.Should().Contain("ReturnUrl=%2FAdmin");
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LoginApi_WithoutXsrfToken_ShouldRejectRequest()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
                 AllowAutoRedirect = false
             });
 
-            var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
+            var response = await client.PostAsJsonAsync("/api/auth/login", new
             {
-                usernameOrEmail = SqlServerIntegrationWebAppFactory.LearnerEmail,
-                password = SqlServerIntegrationWebAppFactory.LearnerPassword,
+                usernameOrEmail = PostgreSqlIntegrationWebAppFactory.LearnerEmail,
+                password = PostgreSqlIntegrationWebAppFactory.LearnerPassword,
                 rememberMe = false
             });
 
@@ -96,10 +96,10 @@ namespace VocabLearning.Tests.Integration
             response.GetAuthCookies().Should().BeEmpty();
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LogoutApi_WithoutXsrfToken_ShouldRejectRequest_AndKeepSessionAuthenticated()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -109,8 +109,8 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var logoutResponse = await client.PostAsJsonAsync("/api/v1/auth/logout", new { });
-            var meResponse = await client.GetAsync("/api/v1/auth/me");
+            var logoutResponse = await client.PostAsJsonAsync("/api/auth/logout", new { });
+            var meResponse = await client.GetAsync("/api/auth/me");
 
             logoutResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -120,10 +120,10 @@ namespace VocabLearning.Tests.Integration
             document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeTrue();
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LogoutApi_ShouldInvalidateAuthCookie_AndBlockProtectedEndpoints()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -136,11 +136,11 @@ namespace VocabLearning.Tests.Integration
             var authCookie = loginResponse.GetAuthCookies().Should().ContainSingle().Subject;
 
             var token = await client.GetAntiforgeryTokenAsync();
-            using var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/logout");
+            using var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
             logoutRequest.Headers.Add("X-XSRF-TOKEN", token);
 
             var logoutResponse = await client.SendAsync(logoutRequest);
-            var meResponse = await client.GetAsync("/api/v1/auth/me");
+            var meResponse = await client.GetAsync("/api/auth/me");
             var learningResponse = await client.GetAsync("/Learning");
 
             logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -160,6 +160,69 @@ namespace VocabLearning.Tests.Integration
             var separatorIndex = setCookieHeader.IndexOf('=');
             separatorIndex.Should().BeGreaterThan(0);
             return setCookieHeader[..separatorIndex];
+        }
+
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
+        public async Task LogoutApi_RealRoute_WithoutXsrfToken_ShouldRejectRequest()
+        {
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
+            await factory.InitializeAsync();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            var loginResponse = await client.LoginAsSeededLearnerAsync();
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var logoutResponse = await client.PostAsJsonAsync("/api/auth/logout", new { });
+
+            logoutResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
+        public async Task LogoutApi_RealRoute_WithXsrfToken_ShouldSucceed()
+        {
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
+            await factory.InitializeAsync();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            var loginResponse = await client.LoginAsSeededLearnerAsync();
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var token = await client.GetAntiforgeryTokenAsync();
+            using var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+            logoutRequest.Headers.Add("X-XSRF-TOKEN", token);
+
+            var logoutResponse = await client.SendAsync(logoutRequest);
+
+            logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
+        public async Task ChangePasswordApi_WithoutXsrfToken_ShouldRejectRequest()
+        {
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
+            await factory.InitializeAsync();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            var loginResponse = await client.LoginAsSeededLearnerAsync();
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var response = await client.PostAsJsonAsync("/api/account/change-password", new
+            {
+                currentPassword = PostgreSqlIntegrationWebAppFactory.LearnerPassword,
+                newPassword = "BrandNewSecret#2026",
+                confirmNewPassword = "BrandNewSecret#2026"
+            });
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
     }
 

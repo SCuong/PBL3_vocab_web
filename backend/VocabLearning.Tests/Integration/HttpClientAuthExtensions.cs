@@ -7,7 +7,7 @@ namespace VocabLearning.Tests.Integration
     {
         public static async Task<string> GetAntiforgeryTokenAsync(this HttpClient client)
         {
-            var response = await client.GetAsync("/api/v1/auth/antiforgery");
+            var response = await client.GetAsync("/api/auth/antiforgery");
             response.EnsureSuccessStatusCode();
 
             await using var stream = await response.Content.ReadAsStreamAsync();
@@ -19,15 +19,15 @@ namespace VocabLearning.Tests.Integration
         public static async Task<HttpResponseMessage> LoginAsSeededLearnerAsync(this HttpClient client)
         {
             return await client.LoginAsync(
-                SqlServerIntegrationWebAppFactory.LearnerEmail,
-                SqlServerIntegrationWebAppFactory.LearnerPassword);
+                PostgreSqlIntegrationWebAppFactory.LearnerEmail,
+                PostgreSqlIntegrationWebAppFactory.LearnerPassword);
         }
 
         public static async Task<HttpResponseMessage> LoginAsSeededAdminAsync(this HttpClient client)
         {
             return await client.LoginAsync(
-                SqlServerIntegrationWebAppFactory.AdminEmail,
-                SqlServerIntegrationWebAppFactory.AdminPassword);
+                PostgreSqlIntegrationWebAppFactory.AdminEmail,
+                PostgreSqlIntegrationWebAppFactory.AdminPassword);
         }
 
         public static async Task<HttpResponseMessage> LoginAsync(
@@ -37,7 +37,7 @@ namespace VocabLearning.Tests.Integration
             bool rememberMe = false)
         {
             var token = await client.GetAntiforgeryTokenAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/login")
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
             {
                 Content = JsonContent.Create(new
                 {

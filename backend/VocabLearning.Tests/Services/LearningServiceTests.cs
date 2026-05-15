@@ -571,28 +571,9 @@ namespace VocabLearning.Tests.Services
             topic10?.ReviewWordIds.Should().NotContain(13);
         }
 
-        [Fact]
-        public void GetStudySession_WithAllVocabIds_ShouldReturnAll()
-        {
-            // Act
-            var result = _service.GetStudySession(2, 10, "10,11,12,13,14", 0);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.TotalWords.Should().Be(5);
-        }
-
-        [Fact]
-        public void GetMinitest_ShouldIncludeAllBatchVocabularyIds()
-        {
-            // Act
-            var result = _service.GetMinitest(2, 10, "10,11,12");
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Questions.Should().HaveCount(3);
-            result.Questions.Select(q => q.VocabId).Should().Contain(new[] { 10L, 11L, 12L });
-        }
+        // GetStudySession_WithAllVocabIds_ShouldReturnAll + GetMinitest_ShouldIncludeAllBatchVocabularyIds
+        // removed: LearningService no longer exposes GetStudySession / GetMinitest. Reinstate
+        // when an equivalent surface returns to the service.
 
         [Fact]
         public void MarkWordsLearned_WithMixedValidAndInvalidIds_ShouldOnlyMarkValid()

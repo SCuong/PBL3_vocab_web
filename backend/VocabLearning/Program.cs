@@ -182,7 +182,27 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     });
 }
 
-builder.Services.AddControllers();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.Name = "XSRF-TOKEN";
+    // Non-HttpOnly so SPA JS can read it for double-submit pattern.
+    options.Cookie.HttpOnly = false;
+    options.Cookie.SameSite = builder.Environment.IsProduction()
+        ? SameSiteMode.None
+        : SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsProduction()
+        ? CookieSecurePolicy.Always
+        : CookieSecurePolicy.SameAsRequest;
+});
+
+builder.Services.AddControllers(options =>
+{
+    // Validate antiforgery on every unsafe HTTP method (POST/PUT/PATCH/DELETE).
+    // Endpoints that legitimately cannot present a token (e.g. token-issuance
+    // bootstrap) opt out via [IgnoreAntiforgeryToken].
+    options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
+});
 builder.Services.AddHealthChecks()
     .AddCheck<VocabLearning.Health.DbReadinessHealthCheck>(
         name: "db",
