@@ -12,9 +12,9 @@ namespace VocabLearning.Controllers
     [Authorize(Roles = UserRoles.Admin)]
     public sealed class AdminVocabularyApiController : ControllerBase
     {
-        private readonly VocabularyService _vocabularyService;
+        private readonly IVocabularyService _vocabularyService;
 
-        public AdminVocabularyApiController(VocabularyService vocabularyService)
+        public AdminVocabularyApiController(IVocabularyService vocabularyService)
         {
             _vocabularyService = vocabularyService;
         }

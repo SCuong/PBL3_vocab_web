@@ -76,11 +76,14 @@ if (builder.Environment.IsProduction())
 }
 
 builder.Services.AddScoped<VocabularyService>();
+builder.Services.AddScoped<IVocabularyService>(sp => sp.GetRequiredService<VocabularyService>());
 builder.Services.AddScoped<CustomAuthenticationService>();
 builder.Services.AddScoped<AdminDataService>();
 builder.Services.AddScoped<LearningService>();
+builder.Services.AddScoped<ILearningService>(sp => sp.GetRequiredService<LearningService>());
 builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
+builder.Services.AddScoped<IPasswordResetEmailService>(sp => sp.GetRequiredService<PasswordResetEmailService>());
 builder.Services.AddHttpClient<GoogleIdTokenVerifier>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(10);

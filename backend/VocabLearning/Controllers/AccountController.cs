@@ -16,7 +16,7 @@ namespace VocabLearning.Controllers
         private readonly CustomAuthenticationService customAuthenticationService;
         private readonly AppDbContext appDbContext;
         private readonly GoogleIdTokenVerifier googleIdTokenVerifier;
-        private readonly PasswordResetEmailService passwordResetEmailService;
+        private readonly IPasswordResetEmailService passwordResetEmailService;
         private readonly IConfiguration configuration;
         private readonly IWebHostEnvironment environment;
         private readonly ILogger<AccountController> logger;
@@ -25,7 +25,7 @@ namespace VocabLearning.Controllers
             CustomAuthenticationService customAuthenticationService,
             AppDbContext appDbContext,
             GoogleIdTokenVerifier googleIdTokenVerifier,
-            PasswordResetEmailService passwordResetEmailService,
+            IPasswordResetEmailService passwordResetEmailService,
             IConfiguration configuration,
             IWebHostEnvironment environment,
             ILogger<AccountController> logger)

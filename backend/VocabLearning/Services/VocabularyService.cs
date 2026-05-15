@@ -5,7 +5,7 @@ using VocabLearning.Models;
 
 namespace VocabLearning.Services
 {
-    public class VocabularyService
+    public class VocabularyService : IVocabularyService
     {
         private const int MaxVocabularyPageSize = 100;
         private readonly AppDbContext _context;

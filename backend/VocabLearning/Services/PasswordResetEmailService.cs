@@ -3,7 +3,7 @@ using System.Net.Mail;
 
 namespace VocabLearning.Services
 {
-    public class PasswordResetEmailService
+    public class PasswordResetEmailService : IPasswordResetEmailService
     {
         private readonly IConfiguration configuration;
         private readonly ILogger<PasswordResetEmailService> logger;
