@@ -15,9 +15,9 @@ namespace VocabLearning.Controllers
         private static readonly string[] AllowedColors = { "yellow", "blue", "green", "pink", "purple" };
 
         private readonly AppDbContext _dbContext;
-        private readonly CustomAuthenticationService _authenticationService;
+        private readonly ICustomAuthenticationService _authenticationService;
 
-        public StickyNotesController(AppDbContext dbContext, CustomAuthenticationService authenticationService)
+        public StickyNotesController(AppDbContext dbContext, ICustomAuthenticationService authenticationService)
         {
             _dbContext = dbContext;
             _authenticationService = authenticationService;

@@ -5,7 +5,7 @@ namespace VocabLearning.Services
 {
     public interface IAdminDataService
     {
-        List<User> GetUsers();
+        List<Users> GetUsers();
         List<Vocabulary> GetVocabularies();
         List<Topic> GetTopics();
         List<Exercise> GetExercises();

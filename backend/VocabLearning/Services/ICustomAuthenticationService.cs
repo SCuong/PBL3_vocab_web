@@ -1,20 +1,25 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using VocabLearning.Models;
+using VocabLearning.ViewModels.Account;
 
 namespace VocabLearning.Services
 {
     public interface ICustomAuthenticationService
     {
-        Task<(bool Succeeded, string? ErrorMessage, User? User)> RegisterAsync(
+        Task<(bool Succeeded, string? ErrorMessage, Users? User)> RegisterAsync(
             string username, string email, string password,
             CancellationToken cancellationToken = default);
 
-        Task<User?> AuthenticateAsync(
+        Task<Users?> AuthenticateAsync(
             string usernameOrEmail, string password,
             CancellationToken cancellationToken = default);
 
-        Task<(bool Succeeded, string? ErrorMessage, User? User)> AuthenticateGoogleAsync(
+        Task<(Users? User, string? ErrorMessage)> AuthenticateForLoginAsync(
+            string usernameOrEmail, string password,
+            CancellationToken cancellationToken = default);
+
+        Task<(bool Succeeded, string? ErrorMessage, Users? User)> AuthenticateGoogleAsync(
             string email, string googleSubject, string? displayName,
             CancellationToken cancellationToken = default);
 
@@ -27,25 +32,38 @@ namespace VocabLearning.Services
         Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreatePasswordResetTokenAsync(
             string email, CancellationToken cancellationToken = default);
 
+        Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreateEmailVerificationTokenAsync(
+            long userId, CancellationToken cancellationToken = default);
+
+        Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreateEmailVerificationTokenForEmailAsync(
+            string email, CancellationToken cancellationToken = default);
+
+        Task<(bool Succeeded, string? ErrorMessage)> VerifyEmailAsync(
+            string token, string? consumedByIp,
+            CancellationToken cancellationToken = default);
+
         Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordWithTokenAsync(
             string email, string token, string newPassword, string? consumedByIp,
             CancellationToken cancellationToken = default);
 
-        Task<(bool Succeeded, string? ErrorMessage, User? User)> UpdateProfileAsync(
+        Task<(bool Succeeded, string? ErrorMessage, Users? User)> UpdateProfileAsync(
             long userId, string username, string email,
             CancellationToken cancellationToken = default);
 
-        Task<List<User>> GetUsersAsync(CancellationToken cancellationToken = default);
+        Task<List<Users>> GetUsersAsync(CancellationToken cancellationToken = default);
 
-        Task<User?> GetUserByIdAsync(long userId, CancellationToken cancellationToken = default);
+        Task<Users?> GetUserByIdAsync(long userId, CancellationToken cancellationToken = default);
 
-        Task<User?> ResolveAuthenticatedUserAsync(
+        Task<Users?> ResolveAuthenticatedUserAsync(
+            ClaimsPrincipal principal, CancellationToken cancellationToken = default);
+
+        Task<AuthenticatedUserViewModel?> ResolveAuthenticatedUserViewAsync(
             ClaimsPrincipal principal, CancellationToken cancellationToken = default);
 
         Task<long?> ResolveAuthenticatedUserIdAsync(
             ClaimsPrincipal principal, CancellationToken cancellationToken = default);
 
-        Task<(bool Succeeded, string? ErrorMessage, User? User)> CreateUserAsync(
+        Task<(bool Succeeded, string? ErrorMessage, Users? User)> CreateUserAsync(
             string username, string email, string password, string role, string status,
             CancellationToken cancellationToken = default);
 
@@ -59,7 +77,7 @@ namespace VocabLearning.Services
             CancellationToken cancellationToken = default);
 
         Task SignInAsync(
-            HttpContext httpContext, User user, bool isPersistent,
+            HttpContext httpContext, Users user, bool isPersistent,
             string authenticationMethod = "Password",
             IEnumerable<AuthenticationToken>? tokens = null);
 

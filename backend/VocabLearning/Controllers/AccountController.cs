@@ -13,7 +13,7 @@ namespace VocabLearning.Controllers
     [ApiController]
     public class AccountController : ControllerBase
     {
-        private readonly CustomAuthenticationService customAuthenticationService;
+        private readonly ICustomAuthenticationService customAuthenticationService;
         private readonly AppDbContext appDbContext;
         private readonly GoogleIdTokenVerifier googleIdTokenVerifier;
         private readonly IPasswordResetEmailService passwordResetEmailService;
@@ -22,7 +22,7 @@ namespace VocabLearning.Controllers
         private readonly ILogger<AccountController> logger;
 
         public AccountController(
-            CustomAuthenticationService customAuthenticationService,
+            ICustomAuthenticationService customAuthenticationService,
             AppDbContext appDbContext,
             GoogleIdTokenVerifier googleIdTokenVerifier,
             IPasswordResetEmailService passwordResetEmailService,

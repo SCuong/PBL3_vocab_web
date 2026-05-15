@@ -12,14 +12,14 @@ namespace VocabLearning.Controllers
         private const string GenericForgotPasswordMessage = "Nếu email tồn tại, hệ thống đã gửi liên kết đặt lại mật khẩu.";
         private readonly IConfiguration configuration;
         private readonly IWebHostEnvironment environment;
-        private readonly CustomAuthenticationService customAuthenticationService;
+        private readonly ICustomAuthenticationService customAuthenticationService;
         private readonly IPasswordResetEmailService passwordResetEmailService;
         private readonly ILogger<PasswordResetController> logger;
 
         public PasswordResetController(
             IConfiguration configuration,
             IWebHostEnvironment environment,
-            CustomAuthenticationService customAuthenticationService,
+            ICustomAuthenticationService customAuthenticationService,
             IPasswordResetEmailService passwordResetEmailService,
             ILogger<PasswordResetController> logger)
         {

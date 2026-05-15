@@ -14,7 +14,7 @@ using VocabLearning.ViewModels.Account;
 
 namespace VocabLearning.Services
 {
-    public class CustomAuthenticationService
+    public class CustomAuthenticationService : ICustomAuthenticationService
     {
         private const string CustomHashPrefix = "PBKDF2";
         private const int SaltSize = 16;

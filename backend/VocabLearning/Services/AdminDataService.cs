@@ -5,7 +5,7 @@ using VocabLearning.ViewModels.Admin;
 
 namespace VocabLearning.Services
 {
-    public class AdminDataService
+    public class AdminDataService : IAdminDataService
     {
         private readonly AppDbContext _context;
 

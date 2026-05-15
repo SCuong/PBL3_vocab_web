@@ -11,12 +11,12 @@ namespace VocabLearning.Controllers
     public class LearningController : ControllerBase
     {
         private readonly ILearningService _learningService;
-        private readonly CustomAuthenticationService _authenticationService;
+        private readonly ICustomAuthenticationService _authenticationService;
         private readonly ILogger<LearningController> _logger;
 
         public LearningController(
             ILearningService learningService,
-            CustomAuthenticationService authenticationService,
+            ICustomAuthenticationService authenticationService,
             ILogger<LearningController> logger)
         {
             _learningService = learningService;
