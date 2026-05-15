@@ -12,13 +12,16 @@ namespace VocabLearning.Controllers
     {
         private readonly LearningService _learningService;
         private readonly CustomAuthenticationService _authenticationService;
+        private readonly ILogger<LearningController> _logger;
 
         public LearningController(
             LearningService learningService,
-            CustomAuthenticationService authenticationService)
+            CustomAuthenticationService authenticationService,
+            ILogger<LearningController> logger)
         {
             _learningService = learningService;
             _authenticationService = authenticationService;
+            _logger = logger;
         }
 
         [HttpGet("/api/learning/progress")]
@@ -40,10 +43,11 @@ namespace VocabLearning.Controllers
             }
             catch (Exception exception)
             {
+                _logger.LogError(exception, "Failed to get learning progress for user {UserId}.", currentUser.UserId);
                 return BadRequest(new
                 {
                     succeeded = false,
-                    message = exception.Message
+                    message = "Could not get learning progress."
                 });
             }
         }
@@ -84,10 +88,11 @@ namespace VocabLearning.Controllers
             }
             catch (Exception exception)
             {
+                _logger.LogError(exception, "Failed to mark words learned for user {UserId}, topic {TopicId}.", currentUser.UserId, topicId);
                 return BadRequest(new
                 {
                     succeeded = false,
-                    message = exception.Message
+                    message = "Could not mark words as learned."
                 });
             }
         }
@@ -141,7 +146,8 @@ namespace VocabLearning.Controllers
             }
             catch (Exception exception)
             {
-                return BadRequest(new { succeeded = false, message = exception.Message });
+                _logger.LogError(exception, "Failed to submit single-word review for user {UserId}, vocab {VocabId}.", currentUser.UserId, request.VocabId);
+                return BadRequest(new { succeeded = false, message = "Could not submit review." });
             }
         }
 
@@ -181,10 +187,11 @@ namespace VocabLearning.Controllers
             }
             catch (Exception exception)
             {
+                _logger.LogError(exception, "Failed to mark words reviewed for user {UserId}, topic {TopicId}.", currentUser.UserId, topicId);
                 return BadRequest(new
                 {
                     succeeded = false,
-                    message = exception.Message
+                    message = "Could not mark words as reviewed."
                 });
             }
         }
