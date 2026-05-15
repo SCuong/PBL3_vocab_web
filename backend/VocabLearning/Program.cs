@@ -282,6 +282,19 @@ app.UseForwardedHeaders();
 
 app.UseMiddleware<VocabLearning.Middleware.GlobalExceptionHandlerMiddleware>();
 
+// Security response headers applied to every response. CSP is handled at the
+// Vercel edge for the SPA; backend serves JSON, so we set only the headers
+// that defend against MIME sniffing, clickjacking, and referrer leakage.
+app.Use(async (ctx, next) =>
+{
+    var headers = ctx.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
+    await next();
+});
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
