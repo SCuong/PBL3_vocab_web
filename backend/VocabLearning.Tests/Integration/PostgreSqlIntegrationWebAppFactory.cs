@@ -1,11 +1,11 @@
 using System.Data.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Models;
@@ -13,9 +13,9 @@ using VocabLearning.Services;
 
 namespace VocabLearning.Tests.Integration
 {
-    public sealed class SqlServerIntegrationWebAppFactory : WebApplicationFactory<Program>, IAsyncDisposable
+    public sealed class PostgreSqlIntegrationWebAppFactory : WebApplicationFactory<Program>, IAsyncDisposable
     {
-        public const string ConnectionStringEnvironmentVariable = "VOCABLEARNING_TEST_SQL_CONNECTION_STRING";
+        public const string ConnectionStringEnvironmentVariable = "VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING";
         public const string AdminEmail = "admin.integration@example.com";
         public const string AdminPassword = "AdminPassw0rd!";
         public const string LearnerEmail = "learner.integration@example.com";
@@ -25,7 +25,7 @@ namespace VocabLearning.Tests.Integration
         public const long FirstVocabularyId = 1000;
         public const long SecondVocabularyId = 1001;
 
-        private readonly string databaseName = $"VocabLearningIntegration_{Guid.NewGuid():N}";
+        private readonly string databaseName = $"vocablearning_int_{Guid.NewGuid():N}";
         private bool initialized;
 
         public static bool IsConfigured =>
@@ -35,10 +35,9 @@ namespace VocabLearning.Tests.Integration
         {
             get
             {
-                var builder = new SqlConnectionStringBuilder(GetBaseConnectionString())
+                var builder = new NpgsqlConnectionStringBuilder(GetBaseConnectionString())
                 {
-                    InitialCatalog = databaseName,
-                    MultipleActiveResultSets = true
+                    Database = databaseName
                 };
 
                 return builder.ConnectionString;
@@ -66,7 +65,7 @@ namespace VocabLearning.Tests.Integration
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
-                services.AddDbContext<AppDbContext>(options => options.UseSqlServer(ConnectionString));
+                services.AddDbContext<AppDbContext>(options => options.UseNpgsql(ConnectionString));
             });
         }
 
@@ -99,12 +98,14 @@ namespace VocabLearning.Tests.Integration
 
         private async Task RecreateDatabaseAsync()
         {
+            await DropDatabaseAsync();
+            await CreateDatabaseAsync();
+
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseSqlServer(ConnectionString)
+                .UseNpgsql(ConnectionString)
                 .Options;
 
             await using var dbContext = new AppDbContext(options);
-            await dbContext.Database.EnsureDeletedAsync();
             await dbContext.Database.EnsureCreatedAsync();
         }
 
@@ -112,7 +113,7 @@ namespace VocabLearning.Tests.Integration
         {
             using var scope = Services.CreateScope();
             var serviceProvider = scope.ServiceProvider;
-            var authService = serviceProvider.GetRequiredService<ICustomAuthenticationService>();
+            var authService = serviceProvider.GetRequiredService<CustomAuthenticationService>();
             var dbContext = serviceProvider.GetRequiredService<AppDbContext>();
 
             var learnerResult = await authService.CreateUserAsync(
@@ -193,28 +194,49 @@ namespace VocabLearning.Tests.Integration
             await dbContext.SaveChangesAsync();
         }
 
-        private async Task DropDatabaseAsync()
+        private async Task CreateDatabaseAsync()
         {
-            var builder = new SqlConnectionStringBuilder(ConnectionString)
-            {
-                InitialCatalog = "master"
-            };
-
-            await using DbConnection connection = new SqlConnection(builder.ConnectionString);
+            await using DbConnection connection = new NpgsqlConnection(GetMaintenanceConnectionString());
             await connection.OpenAsync();
 
             await using var command = connection.CreateCommand();
-            command.CommandText =
-                $"IF DB_ID(N'{databaseName}') IS NOT NULL " +
-                $"BEGIN ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{databaseName}]; END";
+            command.CommandText = $"CREATE DATABASE \"{databaseName}\"";
             await command.ExecuteNonQueryAsync();
+        }
+
+        private async Task DropDatabaseAsync()
+        {
+            await using DbConnection connection = new NpgsqlConnection(GetMaintenanceConnectionString());
+            await connection.OpenAsync();
+
+            await using (var terminate = connection.CreateCommand())
+            {
+                terminate.CommandText =
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity " +
+                    $"WHERE datname = '{databaseName}' AND pid <> pg_backend_pid()";
+                await terminate.ExecuteNonQueryAsync();
+            }
+
+            await using var drop = connection.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS \"{databaseName}\"";
+            await drop.ExecuteNonQueryAsync();
         }
 
         private static string GetBaseConnectionString()
         {
             return Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable)
                 ?? throw new InvalidOperationException(
-                    $"Set {ConnectionStringEnvironmentVariable} to an admin-capable SQL Server connection string before running integration tests.");
+                    $"Set {ConnectionStringEnvironmentVariable} to a PostgreSQL connection string with CREATEDB privileges before running integration tests.");
+        }
+
+        private static string GetMaintenanceConnectionString()
+        {
+            var builder = new NpgsqlConnectionStringBuilder(GetBaseConnectionString())
+            {
+                Database = "postgres"
+            };
+
+            return builder.ConnectionString;
         }
     }
 }

@@ -10,12 +10,12 @@ namespace VocabLearning.Tests.Integration
 {
     public class LearningControllerIntegrationTests
     {
-        public static bool IsSqlIntegrationConfigured => SqlServerIntegrationWebAppFactory.IsConfigured;
+        public static bool IsSqlIntegrationConfigured => PostgreSqlIntegrationWebAppFactory.IsConfigured;
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LearningIndex_Unauthenticated_ShouldRedirectToLogin()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -29,10 +29,10 @@ namespace VocabLearning.Tests.Integration
             response.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task LoginApi_WithAntiforgery_ShouldAuthenticateUser_AndAllowLearningRequests()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -40,7 +40,7 @@ namespace VocabLearning.Tests.Integration
             });
 
             var loginResponse = await client.LoginAsSeededLearnerAsync();
-            var meResponse = await client.GetAsync("/api/v1/auth/me");
+            var meResponse = await client.GetAsync("/api/auth/me");
             var learningResponse = await client.GetAsync("/Learning");
 
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -51,13 +51,13 @@ namespace VocabLearning.Tests.Integration
             using var document = await JsonDocument.ParseAsync(stream);
 
             document.RootElement.GetProperty("succeeded").GetBoolean().Should().BeTrue();
-            document.RootElement.GetProperty("user").GetProperty("email").GetString().Should().Be(SqlServerIntegrationWebAppFactory.LearnerEmail);
+            document.RootElement.GetProperty("user").GetProperty("email").GetString().Should().Be(PostgreSqlIntegrationWebAppFactory.LearnerEmail);
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsLearnedApi_Authenticated_ShouldPersistProgressInSqlServer()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -68,12 +68,12 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var antiforgeryToken = await client.GetAntiforgeryTokenAsync();
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/learning/progress/learn")
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/learning/progress/learn")
             {
                 Content = JsonContent.Create(new
                 {
-                    topicId = SqlServerIntegrationWebAppFactory.ChildTopicId,
-                    wordIds = new[] { SqlServerIntegrationWebAppFactory.FirstVocabularyId }
+                    topicId = PostgreSqlIntegrationWebAppFactory.ChildTopicId,
+                    wordIds = new[] { PostgreSqlIntegrationWebAppFactory.FirstVocabularyId }
                 })
             };
             request.Headers.Add("X-XSRF-TOKEN", antiforgeryToken);
@@ -85,14 +85,14 @@ namespace VocabLearning.Tests.Integration
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
             dbContext.UserVocabularies.Should().Contain(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId);
 
             dbContext.Progresses.Should().Contain(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId &&
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId &&
                 item.NextReviewDate.HasValue);
 
             await using var stream = await response.Content.ReadAsStreamAsync();
@@ -101,10 +101,10 @@ namespace VocabLearning.Tests.Integration
             topics.GetArrayLength().Should().BeGreaterThan(0);
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsLearnedApi_InvalidTopicId_ShouldReturnCurrentStateWithoutPersistence()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -115,15 +115,15 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.PostLearningProgressAsync(
-                "/api/v1/learning/progress/learn",
+                "/api/learning/progress/learn",
                 topicId: 999999,
-                wordIds: [SqlServerIntegrationWebAppFactory.FirstVocabularyId]);
+                wordIds: [PostgreSqlIntegrationWebAppFactory.FirstVocabularyId]);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
 
             dbContext.UserVocabularies.Should().NotContain(item => item.UserId == learner.UserId);
             dbContext.Progresses.Should().NotContain(item => item.UserId == learner.UserId);
@@ -132,10 +132,10 @@ namespace VocabLearning.Tests.Integration
             topics.Should().BeEmpty();
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsLearnedApi_EmptyLearningBatch_ShouldReturnCurrentStateWithoutPersistence()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -146,15 +146,15 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.PostLearningProgressAsync(
-                "/api/v1/learning/progress/learn",
-                topicId: SqlServerIntegrationWebAppFactory.ChildTopicId,
+                "/api/learning/progress/learn",
+                topicId: PostgreSqlIntegrationWebAppFactory.ChildTopicId,
                 wordIds: []);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
 
             dbContext.UserVocabularies.Should().NotContain(item => item.UserId == learner.UserId);
             dbContext.Progresses.Should().NotContain(item => item.UserId == learner.UserId);
@@ -163,10 +163,10 @@ namespace VocabLearning.Tests.Integration
             topics.Should().BeEmpty();
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task Study_InvalidIndex_ShouldClampToAvailableWord()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -177,7 +177,7 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.GetAsync(
-                $"/Learning/Study?topicId={SqlServerIntegrationWebAppFactory.ChildTopicId}&ids={SqlServerIntegrationWebAppFactory.FirstVocabularyId},{SqlServerIntegrationWebAppFactory.SecondVocabularyId}&index=999");
+                $"/Learning/Study?topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}&ids={PostgreSqlIntegrationWebAppFactory.FirstVocabularyId},{PostgreSqlIntegrationWebAppFactory.SecondVocabularyId}&index=999");
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -186,10 +186,10 @@ namespace VocabLearning.Tests.Integration
             html.Should().Contain(">beta<");
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsLearnedApi_DuplicateIds_ShouldPersistSingleLearningRecord()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -200,39 +200,39 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.PostLearningProgressAsync(
-                "/api/v1/learning/progress/learn",
-                topicId: SqlServerIntegrationWebAppFactory.ChildTopicId,
+                "/api/learning/progress/learn",
+                topicId: PostgreSqlIntegrationWebAppFactory.ChildTopicId,
                 wordIds:
                 [
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId
                 ]);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
 
             dbContext.UserVocabularies.Count(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
 
             dbContext.Progresses.Count(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
 
             var topics = await response.ReadTopicsAsync();
-            topics.Should().ContainSingle(topic => topic.TopicId == SqlServerIntegrationWebAppFactory.ChildTopicId);
-            topics.Single(topic => topic.TopicId == SqlServerIntegrationWebAppFactory.ChildTopicId)
-                .LearnedWordIds.Should().Equal(SqlServerIntegrationWebAppFactory.FirstVocabularyId);
+            topics.Should().ContainSingle(topic => topic.TopicId == PostgreSqlIntegrationWebAppFactory.ChildTopicId);
+            topics.Single(topic => topic.TopicId == PostgreSqlIntegrationWebAppFactory.ChildTopicId)
+                .LearnedWordIds.Should().Equal(PostgreSqlIntegrationWebAppFactory.FirstVocabularyId);
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsReviewedApi_DuplicateIds_ShouldPersistSingleReviewRecord()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -243,41 +243,41 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.PostLearningProgressAsync(
-                "/api/v1/learning/progress/review",
-                topicId: SqlServerIntegrationWebAppFactory.ChildTopicId,
+                "/api/learning/progress/review",
+                topicId: PostgreSqlIntegrationWebAppFactory.ChildTopicId,
                 wordIds:
                 [
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId
                 ]);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
 
             dbContext.UserVocabularies.Count(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
 
             dbContext.Progresses.Count(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId).Should().Be(1);
 
             var progress = dbContext.Progresses.Single(item =>
                 item.UserId == learner.UserId &&
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId);
 
             progress.NextReviewDate.Should().NotBeNull();
             progress.NextReviewDate.Should().BeAfter(DateTime.Now);
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task MarkWordsLearnedApi_MixedValidAndInvalidIds_ShouldPersistOnlyValidWords()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -288,41 +288,41 @@ namespace VocabLearning.Tests.Integration
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var response = await client.PostLearningProgressAsync(
-                "/api/v1/learning/progress/learn",
-                topicId: SqlServerIntegrationWebAppFactory.ChildTopicId,
+                "/api/learning/progress/learn",
+                topicId: PostgreSqlIntegrationWebAppFactory.ChildTopicId,
                 wordIds:
                 [
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
                     -5,
                     999999,
-                    SqlServerIntegrationWebAppFactory.SecondVocabularyId
+                    PostgreSqlIntegrationWebAppFactory.SecondVocabularyId
                 ]);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             using var scope = factory.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var learner = dbContext.Users.Single(user => user.Email == SqlServerIntegrationWebAppFactory.LearnerEmail);
+            var learner = dbContext.Users.Single(user => user.Email == PostgreSqlIntegrationWebAppFactory.LearnerEmail);
 
             dbContext.UserVocabularies.Count(item => item.UserId == learner.UserId).Should().Be(2);
             dbContext.Progresses.Count(item => item.UserId == learner.UserId).Should().Be(2);
             dbContext.UserVocabularies.Should().OnlyContain(item =>
                 item.UserId != learner.UserId ||
-                item.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId ||
-                item.VocabId == SqlServerIntegrationWebAppFactory.SecondVocabularyId);
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId ||
+                item.VocabId == PostgreSqlIntegrationWebAppFactory.SecondVocabularyId);
 
             var topics = await response.ReadTopicsAsync();
-            topics.Should().ContainSingle(topic => topic.TopicId == SqlServerIntegrationWebAppFactory.ChildTopicId);
-            topics.Single(topic => topic.TopicId == SqlServerIntegrationWebAppFactory.ChildTopicId)
+            topics.Should().ContainSingle(topic => topic.TopicId == PostgreSqlIntegrationWebAppFactory.ChildTopicId);
+            topics.Single(topic => topic.TopicId == PostgreSqlIntegrationWebAppFactory.ChildTopicId)
                 .LearnedWordIds.Should().Equal(
-                    SqlServerIntegrationWebAppFactory.FirstVocabularyId,
-                    SqlServerIntegrationWebAppFactory.SecondVocabularyId);
+                    PostgreSqlIntegrationWebAppFactory.FirstVocabularyId,
+                    PostgreSqlIntegrationWebAppFactory.SecondVocabularyId);
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task Study_InvalidTopicId_ShouldRedirectToIndex()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -339,10 +339,10 @@ namespace VocabLearning.Tests.Integration
             response.Headers.Location!.OriginalString.Should().Be("/Learning");
         }
 
-        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.")]
+        [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
         public async Task Result_WithoutTempData_ShouldRedirectToIndex()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -352,11 +352,11 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var response = await client.GetAsync($"/Learning/Result?topicId={SqlServerIntegrationWebAppFactory.ChildTopicId}");
+            var response = await client.GetAsync($"/Learning/Result?topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}");
 
             response.StatusCode.Should().Be(HttpStatusCode.Redirect);
             response.Headers.Location.Should().NotBeNull();
-            response.Headers.Location!.OriginalString.Should().Be($"/Learning?parentTopicId={SqlServerIntegrationWebAppFactory.ParentTopicId}");
+            response.Headers.Location!.OriginalString.Should().Be($"/Learning?parentTopicId={PostgreSqlIntegrationWebAppFactory.ParentTopicId}");
         }
 
     }

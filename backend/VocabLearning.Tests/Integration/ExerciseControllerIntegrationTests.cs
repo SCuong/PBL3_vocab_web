@@ -8,17 +8,17 @@ namespace VocabLearning.Tests.Integration
 {
     public class ExerciseControllerIntegrationTests
     {
-        public static bool IsSqlIntegrationConfigured => SqlServerIntegrationWebAppFactory.IsConfigured;
+        public static bool IsSqlIntegrationConfigured => PostgreSqlIntegrationWebAppFactory.IsConfigured;
 
         private const string SkipMessage =
-            "Set VOCABLEARNING_TEST_SQL_CONNECTION_STRING to run SQL-backed integration tests.";
+            "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.";
 
         #region Authorization
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseIndex_Unauthenticated_ShouldRedirectToLogin()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -35,7 +35,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseCreate_Unauthenticated_ShouldRedirectToLogin()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -52,7 +52,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseIndex_LearnerAuthenticated_ShouldRedirectToAccessDenied()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -72,7 +72,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseCreate_LearnerAuthenticated_ShouldRedirectToAccessDenied()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -97,7 +97,7 @@ namespace VocabLearning.Tests.Integration
         public async Task ExerciseCreate_InvalidModelState_ShouldReturnFormView()
         {
             // VocabId=0 fails [Range(1, long.MaxValue)] and empty Type fails [Required] → ModelState invalid
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -120,7 +120,7 @@ namespace VocabLearning.Tests.Integration
         public async Task ExerciseCreate_NonExistentVocabId_ShouldReturnFormWithServiceError()
         {
             // VocabId=999999 passes model validation but vocab is absent → service returns failure
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -144,7 +144,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseCreate_UnsupportedExerciseType_ShouldReturnFormWithServiceError()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -156,7 +156,7 @@ namespace VocabLearning.Tests.Integration
 
             var response = await client.PostExerciseFormAsync("/Exercise/Create", new Dictionary<string, string>
             {
-                ["VocabId"] = SqlServerIntegrationWebAppFactory.FirstVocabularyId.ToString(),
+                ["VocabId"] = PostgreSqlIntegrationWebAppFactory.FirstVocabularyId.ToString(),
                 ["Type"] = "BOGUS_TYPE"
             });
 
@@ -168,7 +168,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseCreate_MatchMeaningWithUnsupportedMatchMode_ShouldReturnFormWithServiceError()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -180,7 +180,7 @@ namespace VocabLearning.Tests.Integration
 
             var response = await client.PostExerciseFormAsync("/Exercise/Create", new Dictionary<string, string>
             {
-                ["VocabId"] = SqlServerIntegrationWebAppFactory.FirstVocabularyId.ToString(),
+                ["VocabId"] = PostgreSqlIntegrationWebAppFactory.FirstVocabularyId.ToString(),
                 ["Type"] = "MATCH_MEANING",
                 ["MatchMode"] = "BOGUS_MODE"
             });
@@ -197,7 +197,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseCreate_ValidFillingExercise_ShouldPersistAndRedirectToIndex()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -209,7 +209,7 @@ namespace VocabLearning.Tests.Integration
 
             var response = await client.PostExerciseFormAsync("/Exercise/Create", new Dictionary<string, string>
             {
-                ["VocabId"] = SqlServerIntegrationWebAppFactory.FirstVocabularyId.ToString(),
+                ["VocabId"] = PostgreSqlIntegrationWebAppFactory.FirstVocabularyId.ToString(),
                 ["Type"] = "FILLING"
             });
 
@@ -220,7 +220,7 @@ namespace VocabLearning.Tests.Integration
             using var scope = factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Exercises.Should().Contain(exercise =>
-                exercise.VocabId == SqlServerIntegrationWebAppFactory.FirstVocabularyId &&
+                exercise.VocabId == PostgreSqlIntegrationWebAppFactory.FirstVocabularyId &&
                 exercise.Type == "FILLING");
         }
 
@@ -231,7 +231,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseEdit_NonExistentId_ShouldReturnNotFound()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -250,7 +250,7 @@ namespace VocabLearning.Tests.Integration
         public async Task ExerciseEdit_PostNonExistentExerciseId_ShouldReturnFormWithServiceError()
         {
             // ExerciseId=999999 passes model validation; service UpdateExercise returns failure (not found)
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -263,7 +263,7 @@ namespace VocabLearning.Tests.Integration
             var response = await client.PostExerciseFormAsync("/Exercise/Edit", new Dictionary<string, string>
             {
                 ["ExerciseId"] = "999999",
-                ["VocabId"] = SqlServerIntegrationWebAppFactory.FirstVocabularyId.ToString(),
+                ["VocabId"] = PostgreSqlIntegrationWebAppFactory.FirstVocabularyId.ToString(),
                 ["Type"] = "FILLING"
             });
 
@@ -279,7 +279,7 @@ namespace VocabLearning.Tests.Integration
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = SkipMessage)]
         public async Task ExerciseDelete_NonExistentId_ShouldReturnNotFound()
         {
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {
@@ -298,7 +298,7 @@ namespace VocabLearning.Tests.Integration
         public async Task ExerciseDeleteConfirmed_NonExistentId_ShouldReturnNotFound()
         {
             // POST /Exercise/Delete with id=999999 → DeleteConfirmed → service returns false → NotFound
-            await using var factory = new SqlServerIntegrationWebAppFactory();
+            await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
             {

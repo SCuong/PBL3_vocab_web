@@ -1,9 +1,13 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using VocabLearning.Constants;
 using VocabLearning.Controllers;
@@ -25,7 +29,24 @@ namespace VocabLearning.Tests.Controllers
             _context = TestDbContextFactory.Create();
             _authService = new CustomAuthenticationService(_context);
 
-            _controller = new AccountController(_authService, _context);
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            var googleVerifier = new GoogleIdTokenVerifier(
+                new HttpClient(),
+                configuration,
+                NullLogger<GoogleIdTokenVerifier>.Instance);
+            var passwordResetEmailService = new PasswordResetEmailService(
+                configuration,
+                NullLogger<PasswordResetEmailService>.Instance);
+            var environment = Mock.Of<IWebHostEnvironment>();
+
+            _controller = new AccountController(
+                _authService,
+                _context,
+                googleVerifier,
+                passwordResetEmailService,
+                configuration,
+                environment,
+                NullLogger<AccountController>.Instance);
 
             // Set up HttpContext with a mock IAuthenticationService so SignInAsync works
             var authServiceMock = new Mock<IAuthenticationService>();
