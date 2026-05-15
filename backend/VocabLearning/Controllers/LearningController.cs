@@ -10,12 +10,12 @@ namespace VocabLearning.Controllers
     [ApiController]
     public class LearningController : ControllerBase
     {
-        private readonly LearningService _learningService;
+        private readonly ILearningService _learningService;
         private readonly CustomAuthenticationService _authenticationService;
         private readonly ILogger<LearningController> _logger;
 
         public LearningController(
-            LearningService learningService,
+            ILearningService learningService,
             CustomAuthenticationService authenticationService,
             ILogger<LearningController> logger)
         {

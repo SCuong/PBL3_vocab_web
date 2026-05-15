@@ -8,9 +8,9 @@ namespace VocabLearning.Controllers
     [ApiController]
     public class VocabularyController : ControllerBase
     {
-        private readonly VocabularyService _service;
+        private readonly IVocabularyService _service;
 
-        public VocabularyController(VocabularyService service)
+        public VocabularyController(IVocabularyService service)
         {
             _service = service;
         }

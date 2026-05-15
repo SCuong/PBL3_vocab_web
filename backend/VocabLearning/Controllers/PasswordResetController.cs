@@ -13,14 +13,14 @@ namespace VocabLearning.Controllers
         private readonly IConfiguration configuration;
         private readonly IWebHostEnvironment environment;
         private readonly CustomAuthenticationService customAuthenticationService;
-        private readonly PasswordResetEmailService passwordResetEmailService;
+        private readonly IPasswordResetEmailService passwordResetEmailService;
         private readonly ILogger<PasswordResetController> logger;
 
         public PasswordResetController(
             IConfiguration configuration,
             IWebHostEnvironment environment,
             CustomAuthenticationService customAuthenticationService,
-            PasswordResetEmailService passwordResetEmailService,
+            IPasswordResetEmailService passwordResetEmailService,
             ILogger<PasswordResetController> logger)
         {
             this.configuration = configuration;

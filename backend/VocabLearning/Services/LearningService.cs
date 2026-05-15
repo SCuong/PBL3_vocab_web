@@ -9,7 +9,7 @@ using VocabLearning.ViewModels.Learning;
 
 namespace VocabLearning.Services
 {
-    public class LearningService
+    public class LearningService : ILearningService
     {
         private const int BatchSize = 10;
 
