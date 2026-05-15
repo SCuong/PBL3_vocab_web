@@ -11,11 +11,11 @@ namespace VocabLearning.Controllers
     public sealed class DashboardController : ControllerBase
     {
         private readonly IDashboardAnalyticsService _analyticsService;
-        private readonly CustomAuthenticationService _authenticationService;
+        private readonly ICustomAuthenticationService _authenticationService;
 
         public DashboardController(
             IDashboardAnalyticsService analyticsService,
-            CustomAuthenticationService authenticationService)
+            ICustomAuthenticationService authenticationService)
         {
             _analyticsService = analyticsService;
             _authenticationService = authenticationService;

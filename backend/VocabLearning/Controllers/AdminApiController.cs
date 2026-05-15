@@ -12,12 +12,12 @@ namespace VocabLearning.Controllers
     [Authorize(Roles = UserRoles.Admin)]
     public sealed class AdminApiController : ControllerBase
     {
-        private readonly CustomAuthenticationService _authService;
-        private readonly AdminDataService _adminDataService;
+        private readonly ICustomAuthenticationService _authService;
+        private readonly IAdminDataService _adminDataService;
 
         public AdminApiController(
-            CustomAuthenticationService authService,
-            AdminDataService adminDataService)
+            ICustomAuthenticationService authService,
+            IAdminDataService adminDataService)
         {
             _authService = authService;
             _adminDataService = adminDataService;

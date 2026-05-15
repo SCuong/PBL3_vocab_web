@@ -78,7 +78,9 @@ if (builder.Environment.IsProduction())
 builder.Services.AddScoped<VocabularyService>();
 builder.Services.AddScoped<IVocabularyService>(sp => sp.GetRequiredService<VocabularyService>());
 builder.Services.AddScoped<CustomAuthenticationService>();
+builder.Services.AddScoped<ICustomAuthenticationService>(sp => sp.GetRequiredService<CustomAuthenticationService>());
 builder.Services.AddScoped<AdminDataService>();
+builder.Services.AddScoped<IAdminDataService>(sp => sp.GetRequiredService<AdminDataService>());
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<ILearningService>(sp => sp.GetRequiredService<LearningService>());
 builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
