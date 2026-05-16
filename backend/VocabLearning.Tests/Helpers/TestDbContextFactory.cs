@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using VocabLearning.Constants;
 using VocabLearning.Data;
 using VocabLearning.Models;
@@ -15,6 +16,7 @@ namespace VocabLearning.Tests.Helpers
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseInMemoryDatabase(databaseName ?? Guid.NewGuid().ToString())
+                .ConfigureWarnings(builder => builder.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                 .Options;
 
             return new AppDbContext(options);
