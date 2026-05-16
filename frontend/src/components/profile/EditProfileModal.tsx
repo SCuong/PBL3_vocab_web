@@ -4,12 +4,6 @@ import { Button, typography } from '../ui';
 import { authApi, type AuthenticatedUser } from '../../services/authApi';
 import { AVATAR_PRESETS, normalizeAvatarUrl } from '../../utils/avatarPresets';
 import { saveProfilePreferences } from '../../utils/profilePreferences';
-import {
-    checkPasswordPolicy,
-    isPasswordPolicyValid,
-    PASSWORD_MAX_LENGTH,
-    PASSWORD_POLICY_LABELS,
-} from '../../utils/passwordPolicy';
 
 type ToastFn = (message: string, kind?: 'success' | 'info' | 'error') => void;
 
@@ -41,13 +35,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(initialAvatarUrl);
     const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmNewPassword, setConfirmNewPassword] = useState('');
-    const [confirmPasswordError, setConfirmPasswordError] = useState('');
-
     const [isSavingProfile, setIsSavingProfile] = useState(false);
-    const [isSavingPassword, setIsSavingPassword] = useState(false);
 
     // `active` drives the .is-open class on the overlay one frame after mount,
     // so the CSS transition fires from opacity:0 → 1 instead of skipping.
@@ -62,10 +50,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         setEmail(initialEmail);
         setAvatarUrl(initialAvatarUrl);
         setIsAvatarPickerOpen(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmNewPassword('');
-        setConfirmPasswordError('');
         const id = requestAnimationFrame(() => setActive(true));
         return () => cancelAnimationFrame(id);
     }, [isOpen, initialUsername, initialEmail, initialAvatarUrl]);
@@ -74,9 +58,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         const source = (username || '').trim();
         return source ? source[0].toUpperCase() : 'U';
     }, [username]);
-
-    const newPasswordPolicy = useMemo(() => checkPasswordPolicy(newPassword), [newPassword]);
-    const isNewPasswordValid = isPasswordPolicyValid(newPasswordPolicy);
 
     const handleSaveProfile = async () => {
         if (isSavingProfile) return;
@@ -94,34 +75,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             onAddToast?.(error?.message || 'Không thể cập nhật hồ sơ.', 'info');
         } finally {
             setIsSavingProfile(false);
-        }
-    };
-
-    const handleChangePassword = async () => {
-        if (isSavingPassword) return;
-
-        if (!isNewPasswordValid) {
-            setConfirmPasswordError('Mật khẩu chưa đúng định dạng yêu cầu.');
-            return;
-        }
-        if (newPassword !== confirmNewPassword) {
-            setConfirmPasswordError('Mật khẩu xác nhận không khớp với mật khẩu mới.');
-            return;
-        }
-
-        setConfirmPasswordError('');
-        setIsSavingPassword(true);
-        try {
-            await authApi.changePassword({ currentPassword, newPassword, confirmNewPassword });
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmNewPassword('');
-            setConfirmPasswordError('');
-            onAddToast?.('Đổi mật khẩu thành công.', 'success');
-        } catch (error: any) {
-            onAddToast?.(error?.message || 'Không thể đổi mật khẩu.', 'info');
-        } finally {
-            setIsSavingPassword(false);
         }
     };
 
@@ -202,73 +155,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         />
                         <Button className="w-full" variant="primary" onClick={handleSaveProfile} disabled={isSavingProfile}>
                             {isSavingProfile ? 'Đang lưu...' : 'Lưu hồ sơ'}
-                        </Button>
-                    </section>
-
-                    <section className="space-y-4 border-t border-primary/10 pt-6">
-                        <h4 className="font-bold text-sm uppercase tracking-wide text-text-muted">Đổi mật khẩu</h4>
-                        <input
-                            type="password"
-                            className="profile-input"
-                            placeholder="Mật khẩu hiện tại"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                        />
-                        <input
-                            type="password"
-                            className="profile-input"
-                            placeholder="Mật khẩu mới"
-                            value={newPassword}
-                            maxLength={PASSWORD_MAX_LENGTH}
-                            onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setNewPassword(nextValue);
-                                if (!confirmNewPassword) {
-                                    setConfirmPasswordError('');
-                                    return;
-                                }
-                                setConfirmPasswordError(
-                                    nextValue === confirmNewPassword
-                                        ? ''
-                                        : 'Mật khẩu xác nhận không khớp với mật khẩu mới.'
-                                );
-                            }}
-                        />
-                        <div className="rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
-                            <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
-                            {PASSWORD_POLICY_LABELS.map(([key, label]) => {
-                                const ok = newPasswordPolicy[key];
-                                return (
-                                    <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
-                                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover text-text-muted'}`}>
-                                            {ok ? '✓' : '·'}
-                                        </span>
-                                        {label}
-                                    </p>
-                                );
-                            })}
-                        </div>
-                        <input
-                            type="password"
-                            className={`profile-input${confirmPasswordError ? ' is-invalid' : ''}`}
-                            placeholder="Xác nhận mật khẩu mới"
-                            value={confirmNewPassword}
-                            maxLength={PASSWORD_MAX_LENGTH}
-                            onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setConfirmNewPassword(nextValue);
-                                setConfirmPasswordError(
-                                    nextValue === newPassword
-                                        ? ''
-                                        : 'Mật khẩu xác nhận không khớp với mật khẩu mới.'
-                                );
-                            }}
-                        />
-                        {confirmPasswordError && (
-                            <p className="text-sm text-red-500 -mt-2">{confirmPasswordError}</p>
-                        )}
-                        <Button className="w-full" variant="secondary" onClick={handleChangePassword} disabled={isSavingPassword}>
-                            {isSavingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
                         </Button>
                     </section>
                 </div>
