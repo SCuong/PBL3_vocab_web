@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VocabLearning.Constants;
 using VocabLearning.Data;
@@ -379,6 +381,378 @@ namespace VocabLearning.Services
             progress.Repetitions = plan.NewState.Repetitions;
             progress.LastReviewDate = plan.NewState.LastReviewDate ?? progress.LastReviewDate;
             progress.NextReviewDate = plan.NextReviewDate;
+        }
+
+        public async Task<LearningSessionResponse> StartSessionAsync(
+            long userId,
+            StartLearningSessionRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (!LearningSessionModes.IsValid(request.Mode))
+            {
+                throw new ArgumentException("Invalid mode. Allowed: STUDY, REVIEW.", nameof(request));
+            }
+
+            var distinctIds = request.VocabIds
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+            if (distinctIds.Count == 0)
+            {
+                throw new ArgumentException("VocabIds must contain at least one id.", nameof(request));
+            }
+
+            if (request.TopicId.HasValue)
+            {
+                var topicExists = await _context.Topics
+                    .AsNoTracking()
+                    .AnyAsync(topic => topic.TopicId == request.TopicId.Value, cancellationToken);
+                if (!topicExists)
+                {
+                    throw new KeyNotFoundException($"Topic {request.TopicId.Value} not found.");
+                }
+            }
+
+            var validVocabsQuery = _context.Vocabularies
+                .AsNoTracking()
+                .Where(vocabulary => distinctIds.Contains(vocabulary.VocabId));
+            if (request.TopicId.HasValue)
+            {
+                validVocabsQuery = validVocabsQuery
+                    .Where(vocabulary => vocabulary.TopicId == request.TopicId.Value);
+            }
+
+            var validVocabIds = await validVocabsQuery
+                .Select(vocabulary => vocabulary.VocabId)
+                .ToListAsync(cancellationToken);
+
+            if (validVocabIds.Count == 0)
+            {
+                throw new ArgumentException("None of the requested vocab ids are valid for this topic.", nameof(request));
+            }
+
+            // Preserve client-supplied order for valid ids.
+            var orderedVocabIds = distinctIds
+                .Where(id => validVocabIds.Contains(id))
+                .ToList();
+
+            var now = DateTime.UtcNow;
+            var session = new LearningSession
+            {
+                UserId = userId,
+                TopicId = request.TopicId,
+                Mode = request.Mode,
+                Status = LearningSessionStatuses.InProgress,
+                CurrentIndex = 0,
+                StartedAt = now,
+                UpdatedAt = now
+            };
+
+            for (var index = 0; index < orderedVocabIds.Count; index++)
+            {
+                session.Items.Add(new LearningSessionItem
+                {
+                    VocabId = orderedVocabIds[index],
+                    OrderIndex = index,
+                    IsAnswered = false
+                });
+            }
+
+            _context.LearningSessions.Add(session);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return await BuildSessionResponseAsync(session.SessionId, userId, cancellationToken)
+                ?? throw new InvalidOperationException("Failed to load freshly created session.");
+        }
+
+        public async Task<LearningSessionResponse?> GetActiveSessionAsync(
+            long userId,
+            string mode,
+            long? topicId,
+            CancellationToken cancellationToken)
+        {
+            if (!LearningSessionModes.IsValid(mode))
+            {
+                throw new ArgumentException("Invalid mode. Allowed: STUDY, REVIEW.", nameof(mode));
+            }
+
+            var query = _context.LearningSessions
+                .Where(session => session.UserId == userId
+                    && session.Mode == mode
+                    && session.Status == LearningSessionStatuses.InProgress);
+            if (topicId.HasValue)
+            {
+                query = query.Where(session => session.TopicId == topicId.Value);
+            }
+
+            var latest = await query
+                .OrderByDescending(session => session.UpdatedAt)
+                .Select(session => session.SessionId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (latest == 0)
+            {
+                return null;
+            }
+
+            return await BuildSessionResponseAsync(latest, userId, cancellationToken);
+        }
+
+        public async Task<LearningSessionResponse> SaveSessionAnswerAsync(
+            long userId,
+            long sessionId,
+            SaveLearningSessionAnswerRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            if (request.Quality is < 0 or > 5)
+            {
+                throw new ArgumentException("Quality must be between 0 and 5.", nameof(request));
+            }
+
+            var session = await _context.LearningSessions
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+            if (session == null)
+            {
+                throw new KeyNotFoundException($"Session {sessionId} not found.");
+            }
+            if (session.UserId != userId)
+            {
+                throw new UnauthorizedAccessException("Session does not belong to the current user.");
+            }
+            if (session.Status != LearningSessionStatuses.InProgress)
+            {
+                throw new InvalidOperationException($"Session {sessionId} is not in progress (status={session.Status}).");
+            }
+
+            var item = session.Items.FirstOrDefault(i => i.VocabId == request.VocabId);
+            if (item == null)
+            {
+                throw new KeyNotFoundException($"Vocab {request.VocabId} is not part of session {sessionId}.");
+            }
+
+            var now = DateTime.UtcNow;
+            item.Quality = request.Quality;
+            item.IsAnswered = true;
+            item.AnsweredAt = now;
+
+            var nextIndex = item.OrderIndex + 1;
+            if (request.CurrentIndex.HasValue)
+            {
+                nextIndex = Math.Max(nextIndex, request.CurrentIndex.Value);
+            }
+            session.CurrentIndex = Math.Max(session.CurrentIndex, Math.Max(0, nextIndex));
+            session.UpdatedAt = now;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return await BuildSessionResponseAsync(sessionId, userId, cancellationToken)
+                ?? throw new InvalidOperationException("Failed to reload session after save.");
+        }
+
+        public async Task<CompleteLearningSessionResponse> CompleteSessionAsync(
+            long userId,
+            long sessionId,
+            CancellationToken cancellationToken)
+        {
+            var session = await _context.LearningSessions
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+            if (session == null)
+            {
+                throw new KeyNotFoundException($"Session {sessionId} not found.");
+            }
+            if (session.UserId != userId)
+            {
+                throw new UnauthorizedAccessException("Session does not belong to the current user.");
+            }
+            if (session.Status != LearningSessionStatuses.InProgress)
+            {
+                throw new InvalidOperationException($"Session {sessionId} is not in progress (status={session.Status}).");
+            }
+
+            var answeredItems = session.Items
+                .Where(item => item.IsAnswered && item.Quality.HasValue)
+                .OrderBy(item => item.OrderIndex)
+                .ToList();
+            if (answeredItems.Count == 0)
+            {
+                throw new InvalidOperationException("Cannot complete a session with no answered items.");
+            }
+
+            var now = DateTime.UtcNow;
+            var vocabIds = answeredItems.Select(item => item.VocabId).ToList();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var existingProgresses = await _context.Progresses
+                    .Where(progress => progress.UserId == userId && vocabIds.Contains(progress.VocabId))
+                    .ToListAsync(cancellationToken);
+                var progressByVocabId = existingProgresses.ToDictionary(progress => progress.VocabId);
+
+                var existingUserVocabularies = await _context.UserVocabularies
+                    .Where(item => item.UserId == userId && vocabIds.Contains(item.VocabId))
+                    .ToListAsync(cancellationToken);
+                var userVocabByVocabId = existingUserVocabularies.ToDictionary(item => item.VocabId);
+
+                foreach (var item in answeredItems)
+                {
+                    var quality = Math.Clamp(item.Quality!.Value, 0, 5);
+
+                    if (!progressByVocabId.TryGetValue(item.VocabId, out var progress))
+                    {
+                        progress = new Progress { UserId = userId, VocabId = item.VocabId };
+                        _context.Progresses.Add(progress);
+                        progressByVocabId[item.VocabId] = progress;
+                    }
+
+                    var isFirstExposure = progress.Repetitions == 0;
+                    var plan = Sm2Calculator.Plan(
+                        ToSm2State(progress),
+                        quality,
+                        now,
+                        isFirstExposure,
+                        isRepeatedThisSession: false);
+
+                    ApplySm2Plan(progress, plan);
+
+                    if (!userVocabByVocabId.TryGetValue(item.VocabId, out var userVocabulary))
+                    {
+                        userVocabulary = new UserVocabulary
+                        {
+                            UserId = userId,
+                            VocabId = item.VocabId,
+                            Status = plan.Status,
+                            Note = string.Empty,
+                            FirstLearnedDate = now
+                        };
+                        _context.UserVocabularies.Add(userVocabulary);
+                        userVocabByVocabId[item.VocabId] = userVocabulary;
+                    }
+                    else
+                    {
+                        userVocabulary.Status = plan.Status;
+                        userVocabulary.FirstLearnedDate ??= now;
+                    }
+                }
+
+                session.Status = LearningSessionStatuses.Completed;
+                session.CompletedAt = now;
+                session.UpdatedAt = now;
+
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+
+            return new CompleteLearningSessionResponse
+            {
+                SessionId = session.SessionId,
+                Status = session.Status,
+                CompletedAt = session.CompletedAt ?? now,
+                CommittedItemCount = answeredItems.Count,
+                Progress = GetLearningProgressState(userId)
+            };
+        }
+
+        public async Task<bool> AbandonSessionAsync(
+            long userId,
+            long sessionId,
+            CancellationToken cancellationToken)
+        {
+            var session = await _context.LearningSessions
+                .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+            if (session == null)
+            {
+                throw new KeyNotFoundException($"Session {sessionId} not found.");
+            }
+            if (session.UserId != userId)
+            {
+                throw new UnauthorizedAccessException("Session does not belong to the current user.");
+            }
+            if (session.Status != LearningSessionStatuses.InProgress)
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow;
+            session.Status = LearningSessionStatuses.Abandoned;
+            session.AbandonedAt = now;
+            session.UpdatedAt = now;
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        private async Task<LearningSessionResponse?> BuildSessionResponseAsync(
+            long sessionId,
+            long userId,
+            CancellationToken cancellationToken)
+        {
+            var session = await _context.LearningSessions
+                .AsNoTracking()
+                .Where(s => s.SessionId == sessionId && s.UserId == userId)
+                .Select(s => new
+                {
+                    s.SessionId,
+                    s.UserId,
+                    s.TopicId,
+                    s.Mode,
+                    s.Status,
+                    s.CurrentIndex,
+                    s.StartedAt,
+                    s.UpdatedAt,
+                    s.CompletedAt,
+                    s.AbandonedAt
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (session == null) return null;
+
+            var items = await _context.LearningSessionItems
+                .AsNoTracking()
+                .Where(item => item.SessionId == sessionId)
+                .OrderBy(item => item.OrderIndex)
+                .Join(
+                    _context.Vocabularies.AsNoTracking(),
+                    item => item.VocabId,
+                    vocabulary => vocabulary.VocabId,
+                    (item, vocabulary) => new LearningSessionItemResponse
+                    {
+                        SessionItemId = item.SessionItemId,
+                        VocabId = item.VocabId,
+                        OrderIndex = item.OrderIndex,
+                        IsAnswered = item.IsAnswered,
+                        Quality = item.Quality,
+                        AnsweredAt = item.AnsweredAt,
+                        Word = vocabulary.Word,
+                        Ipa = vocabulary.Ipa,
+                        AudioUrl = vocabulary.AudioUrl,
+                        Level = vocabulary.Level,
+                        MeaningVi = vocabulary.MeaningVi
+                    })
+                .ToListAsync(cancellationToken);
+
+            return new LearningSessionResponse
+            {
+                SessionId = session.SessionId,
+                UserId = session.UserId,
+                TopicId = session.TopicId,
+                Mode = session.Mode,
+                Status = session.Status,
+                CurrentIndex = session.CurrentIndex,
+                StartedAt = session.StartedAt,
+                UpdatedAt = session.UpdatedAt,
+                CompletedAt = session.CompletedAt,
+                AbandonedAt = session.AbandonedAt,
+                Items = items
+            };
         }
     }
 }

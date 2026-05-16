@@ -196,6 +196,185 @@ namespace VocabLearning.Controllers
             }
         }
 
+        [HttpPost("/api/learning/sessions/start")]
+        public async Task<ActionResult<LearningSessionResponse>> StartLearningSessionApi(
+            [FromBody] StartLearningSessionRequest? request,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new { succeeded = false, message = "Not authenticated." });
+            }
+
+            if (request == null)
+            {
+                return BadRequest(new { succeeded = false, message = "Request body is required." });
+            }
+
+            try
+            {
+                var response = await _learningService.StartSessionAsync(currentUser.UserId, request, cancellationToken);
+                return Ok(response);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(new { succeeded = false, message = exception.Message });
+            }
+            catch (KeyNotFoundException exception)
+            {
+                return NotFound(new { succeeded = false, message = exception.Message });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to start learning session for user {UserId}.", currentUser.UserId);
+                return BadRequest(new { succeeded = false, message = "Could not start session." });
+            }
+        }
+
+        [HttpGet("/api/learning/sessions/active")]
+        public async Task<ActionResult<LearningSessionResponse>> GetActiveLearningSessionApi(
+            [FromQuery] string mode,
+            [FromQuery] long? topicId,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new { succeeded = false, message = "Not authenticated." });
+            }
+
+            try
+            {
+                var response = await _learningService.GetActiveSessionAsync(currentUser.UserId, mode, topicId, cancellationToken);
+                if (response == null)
+                {
+                    return NoContent();
+                }
+                return Ok(response);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(new { succeeded = false, message = exception.Message });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to load active learning session for user {UserId}.", currentUser.UserId);
+                return BadRequest(new { succeeded = false, message = "Could not load active session." });
+            }
+        }
+
+        [HttpPost("/api/learning/sessions/{sessionId:long}/answers")]
+        public async Task<ActionResult<LearningSessionResponse>> SaveLearningSessionAnswerApi(
+            long sessionId,
+            [FromBody] SaveLearningSessionAnswerRequest? request,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new { succeeded = false, message = "Not authenticated." });
+            }
+
+            if (request == null)
+            {
+                return BadRequest(new { succeeded = false, message = "Request body is required." });
+            }
+
+            try
+            {
+                var response = await _learningService.SaveSessionAnswerAsync(currentUser.UserId, sessionId, request, cancellationToken);
+                return Ok(response);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(new { succeeded = false, message = exception.Message });
+            }
+            catch (KeyNotFoundException exception)
+            {
+                return NotFound(new { succeeded = false, message = exception.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Conflict(new { succeeded = false, message = exception.Message });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to save session answer (session={SessionId}, user={UserId}).", sessionId, currentUser.UserId);
+                return BadRequest(new { succeeded = false, message = "Could not save session answer." });
+            }
+        }
+
+        [HttpPost("/api/learning/sessions/{sessionId:long}/complete")]
+        public async Task<ActionResult<CompleteLearningSessionResponse>> CompleteLearningSessionApi(
+            long sessionId,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new { succeeded = false, message = "Not authenticated." });
+            }
+
+            try
+            {
+                var response = await _learningService.CompleteSessionAsync(currentUser.UserId, sessionId, cancellationToken);
+                return Ok(response);
+            }
+            catch (KeyNotFoundException exception)
+            {
+                return NotFound(new { succeeded = false, message = exception.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Conflict(new { succeeded = false, message = exception.Message });
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to complete session (session={SessionId}, user={UserId}).", sessionId, currentUser.UserId);
+                return BadRequest(new { succeeded = false, message = "Could not complete session." });
+            }
+        }
+
+        [HttpPost("/api/learning/sessions/{sessionId:long}/abandon")]
+        public async Task<IActionResult> AbandonLearningSessionApi(
+            long sessionId,
+            CancellationToken cancellationToken = default)
+        {
+            var currentUser = await GetCurrentUserAsync(cancellationToken);
+            if (currentUser == null)
+            {
+                return Unauthorized(new { succeeded = false, message = "Not authenticated." });
+            }
+
+            try
+            {
+                var changed = await _learningService.AbandonSessionAsync(currentUser.UserId, sessionId, cancellationToken);
+                return Ok(new { succeeded = true, changed });
+            }
+            catch (KeyNotFoundException exception)
+            {
+                return NotFound(new { succeeded = false, message = exception.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to abandon session (session={SessionId}, user={UserId}).", sessionId, currentUser.UserId);
+                return BadRequest(new { succeeded = false, message = "Could not abandon session." });
+            }
+        }
+
         private Task<Users?> GetCurrentUserAsync(CancellationToken cancellationToken)
         {
             return _authenticationService.ResolveAuthenticatedUserAsync(User, cancellationToken);
