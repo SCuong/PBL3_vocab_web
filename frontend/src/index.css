@@ -1234,6 +1234,61 @@
         outline-offset: 1px;
     }
 
+    /* ─── Vocabulary-scoped lightweight primitives ──────────────────────
+       Used by Vocabulary list/detail. Grids render up to PAGE_SIZE=24
+       cards at a time, so each card must avoid backdrop-filter and
+       transition-all to keep scroll smooth. */
+    .vocab-card {
+        @apply bg-surface border border-primary/10 rounded-card p-6 cursor-pointer;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
+        transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    }
+    .vocab-card:hover {
+        @apply border-primary/40;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.08);
+        transform: translateY(-2px);
+    }
+    .vocab-input {
+        @apply w-full px-4 py-3 bg-surface border-2 border-primary/10 rounded-pill outline-none;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+    .vocab-input:focus {
+        @apply border-primary;
+        box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .vocab-empty {
+        @apply bg-surface border border-primary/10 rounded-card p-8 text-center text-text-muted;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    .vocab-defer {
+        content-visibility: auto;
+        contain-intrinsic-size: 480px;
+    }
+    .vocab-modal-overlay {
+        @apply fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-6;
+        background: rgba(15, 23, 42, 0.5);
+        opacity: 0;
+        transition: opacity 150ms ease;
+    }
+    .vocab-modal-overlay.is-open { opacity: 1; }
+    .vocab-modal-card {
+        @apply bg-surface rounded-card w-full max-w-3xl p-0 max-h-[90vh] overflow-hidden border border-primary/10;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 6px 16px rgba(15, 23, 42, 0.08);
+        transform: translateY(10px);
+        opacity: 0;
+        transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .vocab-modal-overlay.is-open .vocab-modal-card { transform: none; opacity: 1; }
+    .vocab-modal-header {
+        @apply px-6 md:px-8 pt-6 pb-5 border-b border-primary/10 flex items-start justify-between gap-4;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+    }
+    .vocab-modal-body {
+        @apply px-6 md:px-8 py-6 overflow-y-auto;
+        max-height: calc(90vh - 96px);
+    }
+
     /* ─── Dashboard-scoped lightweight primitives ───────────────────────
        Used by LearnerDashboard cards. Visually mirrors .glass-card but
        drops backdrop-filter and transition-all so the 9 cards stacked on

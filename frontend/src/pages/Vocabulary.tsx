@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Volume2, X, Sparkles, Loader2 } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { Badge, Button, PageTitle, typography } from '../components/ui';
@@ -38,10 +37,20 @@ const Vocabulary = () => {
     const [aiResponse, setAiResponse] = useState<string | null>(null);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
 
-    // Reset AI response when word changes
+    // Drives the .is-open class one frame after mount so the modal fade
+    // transitions from opacity:0 → 1 instead of snapping.
+    const [modalActive, setModalActive] = useState(false);
+
+    // Reset AI response when word changes; also retrigger the open animation.
     useEffect(() => {
         setAiResponse(null);
         setIsLoadingAi(false);
+        if (!selectedWord) {
+            setModalActive(false);
+            return;
+        }
+        const id = requestAnimationFrame(() => setModalActive(true));
+        return () => cancelAnimationFrame(id);
     }, [selectedWord]);
 
     const handleAskAi = async () => {
@@ -163,19 +172,21 @@ const Vocabulary = () => {
                 </div>
                 <div className="w-full md:w-[640px] grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="relative md:col-span-2">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" size={20} />
                         <input
                             type="text"
                             placeholder="Tìm kiếm từ vựng..."
-                            className="w-full pl-12 pr-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                            className="vocab-input pl-12 pr-4"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            aria-label="Tìm kiếm từ vựng"
                         />
                     </div>
                     <select
                         value={selectedCefr}
                         onChange={(e) => setSelectedCefr(e.target.value)}
-                        className="px-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                        className="vocab-input cursor-pointer"
+                        aria-label="Lọc theo cấp độ CEFR"
                     >
                         <option value="ALL">Tất cả cấp độ</option>
                         {CEFR_LEVELS.map(level => (
@@ -185,7 +196,8 @@ const Vocabulary = () => {
                     <select
                         value={selectedTopic}
                         onChange={(e) => setSelectedTopic(e.target.value)}
-                        className="px-4 py-3 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm md:col-span-3"
+                        className="vocab-input md:col-span-3 cursor-pointer"
+                        aria-label="Lọc theo chủ đề"
                     >
                         <option value="ALL">Tất cả chủ đề</option>
                         {topicOptions.map(topic => (
@@ -204,18 +216,18 @@ const Vocabulary = () => {
             )}
 
             {!isLoading && !errorMessage && items.length === 0 && (
-                <div className="glass-card p-8 text-center text-text-muted mb-6">
+                <div className="vocab-empty mb-6">
                     Không tìm thấy từ vựng phù hợp.
                 </div>
             )}
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 vocab-defer">
                 {items.map((v: any) => (
                     <div
                         key={v.id}
                         data-testid="vocab-card"
                         data-vocab-id={v.id}
-                        className="glass-card p-6 cursor-pointer group"
+                        className="vocab-card group"
                         onClick={() => onSelectWord(v)}
                     >
                         <div className="flex justify-between items-start mb-4">
@@ -227,6 +239,7 @@ const Vocabulary = () => {
                                     e.stopPropagation();
                                     playPronunciationAudio(v.audioUrl, v.word);
                                 }}
+                                aria-label={`Phát âm từ ${v.word}`}
                             >
                                 <Volume2 size={16} />
                             </Button>
@@ -292,7 +305,8 @@ const Vocabulary = () => {
                                     handleGoToPage();
                                 }
                             }}
-                            className="w-24 px-3 py-2 bg-surface/50 border-2 border-primary/10 rounded-pill outline-none focus:border-primary transition-all shadow-sm"
+                            className="vocab-input w-24 px-3 py-2"
+                            aria-label="Đến trang"
                         />
                         <Button variant="ghost" onClick={handleGoToPage}>
                             Đi
@@ -301,42 +315,37 @@ const Vocabulary = () => {
                 </div>
             )}
 
-            <AnimatePresence>
-                {selectedWord && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        data-testid="vocab-modal"
-                        className="fixed inset-0 z-[700] bg-black/50 p-4 md:p-6 flex items-center justify-center"
-                        onClick={onCloseWordDetail}
+            {selectedWord && (
+                <div
+                    data-testid="vocab-modal"
+                    className={`vocab-modal-overlay${modalActive ? ' is-open' : ''}`}
+                    onClick={onCloseWordDetail}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <div
+                        data-testid="vocab-modal-content"
+                        className="vocab-modal-card"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.96, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: 20 }}
-                            transition={{ duration: 0.2, ease: 'easeOut' }}
-                            data-testid="vocab-modal-content"
-                            className="glass-card bg-surface/90 w-full max-w-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex items-start justify-between gap-4 mb-6">
-                                <div>
-                                    <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
-                                    <h2 className={`${typography.sectionTitle} mb-1`}>{selectedWord.word}</h2>
-                                    <p className="text-text-muted font-mono">{selectedWord.transcription}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center"
-                                    onClick={onCloseWordDetail}
-                                    aria-label="Đóng chi tiết từ vựng"
-                                >
-                                    <X size={18} />
-                                </button>
+                        <div className="vocab-modal-header">
+                            <div className="min-w-0">
+                                <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
+                                <h2 className={`${typography.sectionTitle} mb-1 truncate`}>{selectedWord.word}</h2>
+                                <p className="text-text-muted font-mono text-sm">{selectedWord.transcription}</p>
                             </div>
+                            <button
+                                type="button"
+                                className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer shrink-0"
+                                onClick={onCloseWordDetail}
+                                aria-label="Đóng chi tiết từ vựng"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
 
-                            <div className="flex flex-wrap gap-3 mb-6">
+                        <div className="vocab-modal-body space-y-6">
+                            <div className="flex flex-wrap gap-3">
                                 <Button
                                     variant="primary"
                                     className="px-6"
@@ -359,17 +368,17 @@ const Vocabulary = () => {
                                     onClick={handleAskAi}
                                     disabled={isLoadingAi}
                                 >
-                                    {isLoadingAi ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />} 
+                                    {isLoadingAi ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                                     {isLoadingAi ? "Đang xử lý..." : "Hỏi AI ✨"}
                                 </Button>
                             </div>
 
-                            <div className="bg-surface/60 p-5 rounded-card border border-primary/10">
-                                <h3 className="text-lg font-bold text-primary mb-2">Ý nghĩa</h3>
+                            <div className="rounded-card border border-primary/10 bg-primary/[0.04] p-5">
+                                <h3 className="text-sm font-bold uppercase tracking-wide text-primary mb-2">Ý nghĩa</h3>
                                 <p className="text-lg mb-4">{selectedWord.meaning}</p>
                                 {selectedWord.example && (
                                     <>
-                                        <h3 className="text-lg font-bold text-purple mb-2">Ví dụ</h3>
+                                        <h3 className="text-sm font-bold uppercase tracking-wide text-purple mb-2">Ví dụ</h3>
                                         <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
                                         {selectedWord.translation && (
                                             <p className="text-sm text-text-muted mt-2 italic">"{selectedWord.translation}"</p>
@@ -379,26 +388,26 @@ const Vocabulary = () => {
 
                                 {(isLoadingAi || aiResponse) && (
                                     <div className="mt-6 pt-4 border-t border-primary/10">
-                                        <h3 className="text-base font-bold mb-3 flex items-center gap-2 text-cyan-600">
-                                            <Sparkles size={18} /> Giải thích từ AI 🤖
+                                        <h3 className="text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2 text-cyan-600">
+                                            <Sparkles size={16} /> Giải thích từ AI
                                         </h3>
                                         {isLoadingAi ? (
                                             <div className="flex justify-center p-4">
                                                 <Loader2 size={24} className="animate-spin text-cyan-500" />
                                             </div>
                                         ) : (
-                                            <div 
-                                                className="text-sm leading-relaxed prose prose-cyan max-w-none" 
-                                                dangerouslySetInnerHTML={{ __html: aiResponse || '' }} 
+                                            <div
+                                                className="text-sm leading-relaxed prose prose-cyan max-w-none"
+                                                dangerouslySetInnerHTML={{ __html: aiResponse || '' }}
                                             />
                                         )}
                                     </div>
                                 )}
                             </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
