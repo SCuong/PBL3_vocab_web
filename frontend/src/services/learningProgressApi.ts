@@ -23,6 +23,63 @@ export type ReviewOptionsResponse = {
 
 const normalizeWordIds = (wordIds: number[]) => wordIds.filter(id => Number.isFinite(id) && id > 0);
 
+const extractErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+    try {
+        const data = await response.clone().json();
+        if (data && typeof data.message === 'string' && data.message.trim().length > 0) {
+            return data.message;
+        }
+    } catch {
+        // Body not JSON — fall back to default message.
+    }
+    return fallback;
+};
+
+export type LearningSessionMode = 'STUDY' | 'REVIEW';
+export type LearningSessionStatus = 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
+
+export type LearningSessionItem = {
+    sessionItemId: number;
+    vocabId: number;
+    orderIndex: number;
+    isAnswered: boolean;
+    quality: number | null;
+    answeredAt: string | null;
+    word: string | null;
+    ipa: string | null;
+    audioUrl: string | null;
+    level: string | null;
+    meaningVi: string | null;
+};
+
+export type LearningSession = {
+    sessionId: number;
+    userId: number;
+    topicId: number | null;
+    mode: LearningSessionMode;
+    status: LearningSessionStatus;
+    currentIndex: number;
+    startedAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+    abandonedAt: string | null;
+    items: LearningSessionItem[];
+};
+
+export type CompleteLearningSessionResponse = {
+    sessionId: number;
+    status: LearningSessionStatus;
+    completedAt: string;
+    committedItemCount: number;
+    progress: LearningProgressState;
+};
+
+export type StartLearningSessionPayload = {
+    mode: LearningSessionMode;
+    topicId?: number | null;
+    vocabIds: number[];
+};
+
 export const learningProgressApi = {
     getState: async (): Promise<LearningProgressState> => {
         const response = await apiFetch('/api/learning/progress');
@@ -73,5 +130,63 @@ export const learningProgressApi = {
         }
 
         return (await response.json()) as LearningProgressState;
-    }
+    },
+
+    startLearningSession: async (payload: StartLearningSessionPayload): Promise<LearningSession> => {
+        const response = await apiFetch('/api/learning/sessions/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: payload.mode,
+                topicId: payload.topicId ?? null,
+                vocabIds: normalizeWordIds(payload.vocabIds),
+            }),
+        });
+        if (!response.ok) throw new Error(await extractErrorMessage(response, 'Không thể bắt đầu phiên học.'));
+        return (await response.json()) as LearningSession;
+    },
+
+    getActiveLearningSession: async (mode: LearningSessionMode, topicId?: number | null): Promise<LearningSession | null> => {
+        const params = new URLSearchParams({ mode });
+        if (topicId != null) params.set('topicId', String(topicId));
+        const response = await apiFetch(`/api/learning/sessions/active?${params.toString()}`);
+        if (response.status === 204) return null;
+        if (!response.ok) throw new Error('Failed to load active learning session.');
+        return (await response.json()) as LearningSession;
+    },
+
+    saveLearningSessionAnswer: async (
+        sessionId: number,
+        vocabId: number,
+        quality: number,
+        currentIndex?: number,
+    ): Promise<LearningSession> => {
+        const response = await apiFetch(`/api/learning/sessions/${sessionId}/answers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                vocabId,
+                quality,
+                currentIndex: currentIndex ?? null,
+            }),
+        });
+        if (!response.ok) throw new Error('Failed to save session answer.');
+        return (await response.json()) as LearningSession;
+    },
+
+    completeLearningSession: async (sessionId: number): Promise<CompleteLearningSessionResponse> => {
+        const response = await apiFetch(`/api/learning/sessions/${sessionId}/complete`, {
+            method: 'POST',
+        });
+        if (!response.ok) throw new Error(await extractErrorMessage(response, 'Không thể hoàn tất phiên học.'));
+        return (await response.json()) as CompleteLearningSessionResponse;
+    },
+
+    abandonLearningSession: async (sessionId: number): Promise<{ succeeded: boolean; changed: boolean }> => {
+        const response = await apiFetch(`/api/learning/sessions/${sessionId}/abandon`, {
+            method: 'POST',
+        });
+        if (!response.ok) throw new Error('Failed to abandon learning session.');
+        return (await response.json()) as { succeeded: boolean; changed: boolean };
+    },
 };
