@@ -1183,6 +1183,19 @@
         outline: 2px solid var(--accent-color);
         outline-offset: 1px;
     }
+
+    /* ─── Dashboard-scoped lightweight primitives ───────────────────────
+       Used by LearnerDashboard cards. Visually mirrors .glass-card but
+       drops backdrop-filter and transition-all so the 9 cards stacked on
+       one viewport do not stall the compositor on scroll. */
+    .dashboard-card {
+        @apply bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)];
+    }
+    .dashboard-card:hover { @apply border-primary/25; }
+    .dashboard-defer {
+        content-visibility: auto;
+        contain-intrinsic-size: 320px;
+    }
 }
 
 @layer utilities {
