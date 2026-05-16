@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 type StreakHeatmapProps = {
     history?: string[];
     startDate?: string | null;
@@ -34,7 +36,7 @@ const normalizeDateInput = (value: unknown) => {
     return toLocalIsoDate(parsed);
 };
 
-export const StreakHeatmap = ({ history = [], startDate, selectedDate, onSelectDate }: StreakHeatmapProps) => {
+const StreakHeatmapComponent = ({ history = [], startDate, selectedDate, onSelectDate }: StreakHeatmapProps) => {
     const historySet = new Set(history);
 
     const today = new Date();
@@ -65,15 +67,22 @@ export const StreakHeatmap = ({ history = [], startDate, selectedDate, onSelectD
 
     return (
         <div className="heatmap-grid flex flex-wrap gap-1">
-            {days.map(day => (
-                <button
-                    key={day}
-                    type="button"
-                    className={`w-3 h-3 rounded-sm transition-all cursor-pointer ${historySet.has(day) ? 'bg-cyan shadow-[0_0_8px_var(--shadow-color)]' : 'bg-purple/10 hover:bg-primary/25'} ${selectedDate === day ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface/40 scale-110' : ''}`}
-                    title={day}
-                    onClick={() => onSelectDate?.(day)}
-                />
-            ))}
+            {days.map(day => {
+                const classes = ['heatmap-cell'];
+                if (historySet.has(day)) classes.push('is-active');
+                if (selectedDate === day) classes.push('is-selected');
+                return (
+                    <button
+                        key={day}
+                        type="button"
+                        className={classes.join(' ')}
+                        title={day}
+                        onClick={() => onSelectDate?.(day)}
+                    />
+                );
+            })}
         </div>
     );
 };
+
+export const StreakHeatmap = memo(StreakHeatmapComponent);
