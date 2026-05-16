@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button, typography } from '../components/ui';
@@ -51,11 +50,7 @@ const MinitestResult = () => {
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-24">
-            <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="glass-card p-6 sm:p-10 lg:p-12 text-center shadow-2xl relative overflow-hidden"
-            >
+            <div className="learning-card p-6 sm:p-10 lg:p-12 text-center relative overflow-hidden minitest-result-enter">
                 <div className="mesh-orb w-64 h-64 bg-primary top-[-32px] right-[-32px] opacity-20" />
                 <div className="relative z-10">
                     <div className="text-[4rem] sm:text-[5rem] lg:text-[6rem] font-display font-extrabold bg-linear-to-r from-cyan via-purple to-pink bg-clip-text text-transparent mb-8 leading-none">
@@ -96,7 +91,7 @@ const MinitestResult = () => {
                         </Button>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

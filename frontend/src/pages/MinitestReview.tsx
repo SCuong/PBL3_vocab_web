@@ -22,7 +22,7 @@ const MinitestReview = () => {
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-24">
-            <div className="glass-card p-12 border-2 border-primary/10">
+            <div className="learning-card p-12">
                 <h2 className="text-3xl font-bold mb-8">Xem lại đáp án</h2>
                 {items.length === 0 ? (
                     <div className="text-text-muted">Chưa có dữ liệu để xem lại.</div>
