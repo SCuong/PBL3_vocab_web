@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Layers, Brain, Activity, ChevronRight, Play, Volume2 } from 'lucide-react';
 import { PATHS } from '../routes/paths';
@@ -138,12 +137,7 @@ const Home = () => {
             <section className="min-h-[calc(100vh-64px)] px-8 py-16 sm:py-20 lg:py-24 flex items-center">
                 <div className="max-w-[1200px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Text */}
-                    <motion.div
-                        initial={{ opacity: 0, x: -40 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="flex flex-col gap-6"
-                    >
+                    <div className="home-hero-slide-left flex flex-col gap-6">
                         <div className="inline-flex items-center gap-2 bg-primary-light text-primary text-sm font-semibold px-4 py-2 rounded-full border border-border w-fit">
                             <span className="text-sm">⭐</span>
                             Học thông minh – Nhớ lâu hơn
@@ -178,17 +172,12 @@ const Home = () => {
                                 Xem từ vựng
                             </button>
                         </div>
-                    </motion.div>
+                    </div>
 
                     {/* Right: Visual */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 40 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6, delay: 0.2 }}
-                        className="hidden lg:block"
-                    >
+                    <div className="home-hero-slide-right hidden lg:block">
                         <HeroVisual />
-                    </motion.div>
+                    </div>
                 </div>
             </section>
 
@@ -250,7 +239,7 @@ const Home = () => {
             </section>
 
             {/* ── HOW IT WORKS ── */}
-            <section className="px-8 py-16 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
+            <section className="home-defer px-8 py-16 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
                 <div className="max-w-[1200px] mx-auto">
                     <div className="text-center mb-12">
                         <h2 className={`${typography.sectionTitle} block w-full text-center`}>
@@ -279,15 +268,11 @@ const Home = () => {
             </section>
 
             {/* ── CTA BANNER ── */}
-            <section className="home-cta-section px-8 py-16 sm:py-20 lg:py-24">
+            <section className="home-cta-section home-defer px-8 py-16 sm:py-20 lg:py-24">
                 <div className="max-w-[680px] mx-auto px-8 text-center relative z-10">
-                    <motion.div
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                        className="text-[3rem] mb-4 block"
-                    >
+                    <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
                         📚
-                    </motion.div>
+                    </div>
                     <h2 className={`${typography.sectionTitle} text-text-on-accent mb-4`}>
                         Sẵn sàng bắt đầu chưa?
                     </h2>
@@ -297,13 +282,13 @@ const Home = () => {
                     <div className="flex justify-center items-center gap-4 flex-wrap">
                         <button
                             onClick={() => navigate(PATHS.register)}
-                            className="inline-flex items-center font-display font-bold text-base text-primary bg-surface rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-[0.97] hover:-translate-y-0.5 transition-all px-10 py-4"
+                            className="inline-flex items-center font-display font-bold text-base text-primary bg-surface rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-[0.97] hover:-translate-y-0.5 transition-[transform,filter] duration-200 px-10 py-4 cursor-pointer"
                         >
                             Tạo tài khoản miễn phí
                         </button>
                         <button
                             onClick={() => navigate(PATHS.vocabulary)}
-                            className="inline-flex items-center font-display font-bold text-sm text-text-on-accent border-2 border-text-on-accent/50 rounded-full hover:border-text-on-accent hover:bg-surface/15 transition-all px-8 py-4"
+                            className="inline-flex items-center font-display font-bold text-sm text-text-on-accent border-2 border-text-on-accent/50 rounded-full hover:border-text-on-accent hover:bg-surface/15 transition-colors duration-200 px-8 py-4 cursor-pointer"
                         >
                             Xem từ vựng trước
                         </button>
