@@ -203,7 +203,10 @@ builder.Services.AddAntiforgery(options =>
         : CookieSecurePolicy.SameAsRequest;
 });
 
-builder.Services.AddControllers(options =>
+// AddControllersWithViews (not AddControllers) registers the ViewFeatures
+// services that back AutoValidateAntiforgeryTokenAttribute. No Razor views are
+// served — this is purely to satisfy the antiforgery filter dependency.
+builder.Services.AddControllersWithViews(options =>
 {
     // Validate antiforgery on every unsafe HTTP method (POST/PUT/PATCH/DELETE).
     // Endpoints that legitimately cannot present a token (e.g. token-issuance
