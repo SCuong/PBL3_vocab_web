@@ -47,7 +47,7 @@ const VocabDetail = ({ word, onBack }: any) => {
     return (
         <div className="max-w-4xl mx-auto px-6 py-12">
             <Button variant="ghost" className="mb-8" onClick={onBack}><ArrowLeft size={18} /> Quay lại</Button>
-            <div className="glass-card p-6 sm:p-8 relative overflow-hidden">
+            <div className="bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)] p-6 sm:p-8 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-12 relative z-10">
                     <div className="text-center md:text-left flex-1">
                         <Badge variant="cyan" className="mb-4">{word.cefr}</Badge>
