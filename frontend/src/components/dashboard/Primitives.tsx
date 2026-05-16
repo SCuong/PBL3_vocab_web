@@ -24,32 +24,39 @@ const toneBg: Record<Tone, string> = {
     muted: 'bg-text-muted',
 };
 
+export type DashboardCardVariant = 'glass' | 'flat';
+
 export const DashboardCard = ({
     title,
     subtitle,
     action,
     children,
     className = '',
+    variant = 'glass',
 }: {
     title?: ReactNode;
     subtitle?: ReactNode;
     action?: ReactNode;
     children: ReactNode;
     className?: string;
-}) => (
-    <section className={`glass-card p-5 sm:p-6 ${className}`}>
-        {(title || subtitle || action) && (
-            <div className="mb-5 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                    {title && <h2 className={typography.cardTitle}>{title}</h2>}
-                    {subtitle && <p className={`mt-1 ${typography.cardDescription}`}>{subtitle}</p>}
+    variant?: DashboardCardVariant;
+}) => {
+    const base = variant === 'flat' ? 'dashboard-card' : 'glass-card';
+    return (
+        <section className={`${base} p-5 sm:p-6 ${className}`}>
+            {(title || subtitle || action) && (
+                <div className="mb-5 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                        {title && <h2 className={typography.cardTitle}>{title}</h2>}
+                        {subtitle && <p className={`mt-1 ${typography.cardDescription}`}>{subtitle}</p>}
+                    </div>
+                    {action && <div className="shrink-0">{action}</div>}
                 </div>
-                {action && <div className="shrink-0">{action}</div>}
-            </div>
-        )}
-        {children}
-    </section>
-);
+            )}
+            {children}
+        </section>
+    );
+};
 
 export const DashboardStat = ({
     icon,
@@ -57,14 +64,16 @@ export const DashboardStat = ({
     value,
     detail,
     tone = 'primary',
+    variant = 'glass',
 }: {
     icon: ReactNode;
     label: ReactNode;
     value: ReactNode;
     detail?: ReactNode;
     tone?: Tone;
+    variant?: DashboardCardVariant;
 }) => (
-    <DashboardCard className="min-h-[132px]">
+    <DashboardCard className="min-h-[132px]" variant={variant}>
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
                 <p className="text-xs font-display font-bold uppercase tracking-wide text-text-muted">{label}</p>

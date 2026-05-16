@@ -152,6 +152,7 @@ const LearnerDashboard = () => {
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardStat
+                    variant="flat"
                     icon={<Flame size={20} />}
                     label="Chuỗi ngày học"
                     value={`${Number(gameData?.streak ?? 0)} ngày`}
@@ -159,6 +160,7 @@ const LearnerDashboard = () => {
                     tone="warning"
                 />
                 <DashboardStat
+                    variant="flat"
                     icon={<Target size={20} />}
                     label="Mức độ thành thạo"
                     value={`${masteryPct}%`}
@@ -166,6 +168,7 @@ const LearnerDashboard = () => {
                     tone="success"
                 />
                 <DashboardStat
+                    variant="flat"
                     icon={<CalendarClock size={20} />}
                     label="Cần ôn tập"
                     value={reviewForecast.today}
@@ -173,6 +176,7 @@ const LearnerDashboard = () => {
                     tone="primary"
                 />
                 <DashboardStat
+                    variant="flat"
                     icon={<Sparkles size={20} />}
                     label="Cấp độ XP"
                     value={`Cấp ${level.level}`}
@@ -182,7 +186,7 @@ const LearnerDashboard = () => {
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
-                <DashboardCard title="Dự báo ôn tập" subtitle="Tổng quan hàng đợi SM-2 theo tiến trình hiện tại.">
+                <DashboardCard variant="flat" title="Dự báo ôn tập" subtitle="Tổng quan hàng đợi SM-2 theo tiến trình hiện tại.">
                     <div className="grid gap-4 md:grid-cols-3">
                         {[
                             ['Hôm nay', reviewForecast.today, 'primary'],
@@ -215,7 +219,7 @@ const LearnerDashboard = () => {
                     </div>
                 </DashboardCard>
 
-                <DashboardCard title="Tiếp tục nhanh" subtitle="Phiên học phù hợp nhất, mở bằng một lần bấm.">
+                <DashboardCard variant="flat" title="Tiếp tục nhanh" subtitle="Phiên học phù hợp nhất, mở bằng một lần bấm.">
                     {topicStats.nextTopic ? (
                         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                             <div className="flex items-start gap-3">
@@ -248,8 +252,8 @@ const LearnerDashboard = () => {
                 </DashboardCard>
             </div>
 
-            <div className="mt-6 grid gap-6 xl:grid-cols-3">
-                <DashboardCard title="XP và mức độ thành thạo" subtitle="Tiến độ cấp độ và phạm vi từ vựng đã nắm.">
+            <div className="mt-6 grid gap-6 xl:grid-cols-3 dashboard-defer">
+                <DashboardCard variant="flat" title="XP và mức độ thành thạo" subtitle="Tiến độ cấp độ và phạm vi từ vựng đã nắm.">
                     <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                         <div className="flex items-end justify-between gap-4">
                             <div>
@@ -287,7 +291,7 @@ const LearnerDashboard = () => {
                     </div>
                 </DashboardCard>
 
-                <DashboardCard title="Hoạt động học gần đây" subtitle="Các phiên học đã lưu gần nhất.">
+                <DashboardCard variant="flat" title="Hoạt động học gần đây" subtitle="Các phiên học đã lưu gần nhất.">
                     {timelineItems.length > 0 ? (
                         <Timeline items={timelineItems} />
                     ) : (
@@ -299,7 +303,7 @@ const LearnerDashboard = () => {
                     )}
                 </DashboardCard>
 
-                <DashboardCard title="Huy hiệu thành tích" subtitle="Các mốc sẽ mở khóa khi bạn học.">
+                <DashboardCard variant="flat" title="Huy hiệu thành tích" subtitle="Các mốc sẽ mở khóa khi bạn học.">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {achievements.map(achievement => (
                             <div
