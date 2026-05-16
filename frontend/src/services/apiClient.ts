@@ -1,7 +1,6 @@
 const ANTIFORGERY_PATH = '/api/auth/antiforgery';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const XSRF_COOKIE_NAME = 'XSRF-TOKEN';
-const XSRF_HEADER_NAME = 'X-XSRF-TOKEN';
+const DEFAULT_XSRF_HEADER_NAME = 'X-XSRF-TOKEN';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
@@ -18,24 +17,33 @@ export const buildApiUrl = (path: string) => {
     return `${API_BASE_URL}${normalizedPath}`;
 };
 
-function readCookie(name: string): string | null {
-    if (typeof document === 'undefined' || !document.cookie) return null;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
-    return match ? decodeURIComponent(match[1]) : null;
-}
-
+// ASP.NET antiforgery uses two distinct tokens: a cookie token (stored in the
+// XSRF-TOKEN cookie) and a request token returned in the response body. The
+// header must carry the request token, not the cookie value. We cache the
+// request token in memory and refresh it when the server rejects a request.
+let cachedRequestToken: string | null = null;
+let cachedHeaderName: string = DEFAULT_XSRF_HEADER_NAME;
 let antiforgeryPrimer: Promise<void> | null = null;
 
+async function fetchAntiforgeryToken(): Promise<void> {
+    try {
+        const res = await fetch(buildApiUrl(ANTIFORGERY_PATH), { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json() as { token?: string; headerName?: string };
+        if (data?.token) {
+            cachedRequestToken = data.token;
+            cachedHeaderName = data.headerName || DEFAULT_XSRF_HEADER_NAME;
+        }
+    } catch {
+        // Swallow: a missing antiforgery prime surfaces later as a 400 from the
+        // server, which apiFetch handles by retrying after a fresh prime.
+    }
+}
+
 export function primeAntiforgery(): Promise<void> {
-    if (readCookie(XSRF_COOKIE_NAME)) return Promise.resolve();
+    if (cachedRequestToken) return Promise.resolve();
     if (!antiforgeryPrimer) {
-        antiforgeryPrimer = fetch(buildApiUrl(ANTIFORGERY_PATH), {
-            credentials: 'include'
-        })
-            .then(() => undefined)
-            .catch(() => undefined)
-            .finally(() => { antiforgeryPrimer = null; });
+        antiforgeryPrimer = fetchAntiforgeryToken().finally(() => { antiforgeryPrimer = null; });
     }
     return antiforgeryPrimer;
 }
@@ -52,21 +60,42 @@ function mergeHeaders(base: HeadersInit | undefined, extra: Record<string, strin
     return { ...(base ?? {}), ...extra };
 }
 
-export const apiFetch = async (path: string, options: RequestInit = {}) => {
-    const method = (options.method ?? 'GET').toUpperCase();
+async function doFetch(path: string, options: RequestInit, method: string): Promise<Response> {
     let headers = options.headers;
-
-    if (MUTATING_METHODS.has(method)) {
-        await primeAntiforgery();
-        const token = readCookie(XSRF_COOKIE_NAME);
-        if (token) {
-            headers = mergeHeaders(headers, { [XSRF_HEADER_NAME]: token });
-        }
+    if (MUTATING_METHODS.has(method) && cachedRequestToken) {
+        headers = mergeHeaders(headers, { [cachedHeaderName]: cachedRequestToken });
     }
-
     return fetch(buildApiUrl(path), {
         ...options,
         headers,
         credentials: options.credentials ?? 'include'
     });
+}
+
+export const apiFetch = async (path: string, options: RequestInit = {}) => {
+    const method = (options.method ?? 'GET').toUpperCase();
+
+    if (MUTATING_METHODS.has(method)) {
+        await primeAntiforgery();
+    }
+
+    const response = await doFetch(path, options, method);
+
+    // Retry once on antiforgery rejection: token may have rotated after sign-in
+    // or been evicted server-side. Antiforgery failures surface as a 400 with
+    // a problem-details body; application-level 400s return plain JSON, so the
+    // content-type lets us distinguish without consuming the body.
+    if (
+        response.status === 400
+        && MUTATING_METHODS.has(method)
+        && response.headers.get('Content-Type')?.includes('application/problem+json')
+    ) {
+        cachedRequestToken = null;
+        await primeAntiforgery();
+        if (cachedRequestToken) {
+            return doFetch(path, options, method);
+        }
+    }
+
+    return response;
 };
