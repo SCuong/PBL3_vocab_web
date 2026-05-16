@@ -16,6 +16,7 @@ import { Minitest } from "./Minitest";
 import { SM2ReviewButtons } from "./SM2ReviewButtons";
 import { useAppContext } from "../../context/AppContext";
 import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
+import type { LearningSession } from "../../services/learningProgressApi";
 import { PATHS } from "../../routes/paths";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
@@ -77,7 +78,9 @@ const StudySession = () => {
 
   const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
 
-  // Restore from sessionStorage when page is refreshed (F5) and locationState is lost
+  // Restore from sessionStorage when page is refreshed (F5) and locationState is lost.
+  // STUDY mode: no resume — interrupted server-side LearningSession must restart from scratch
+  // (product rule). REVIEW mode keeps the legacy resume behavior.
   const [savedSession] = useState<{
     topicId: number; words: any[]; mode: string | null;
     tab: string; learnStep: number; selectedWordIds: number[]; currentIndex: number; ts: number;
@@ -88,6 +91,7 @@ const StudySession = () => {
       if (!raw) return null;
       const s = JSON.parse(raw);
       if (Date.now() - s.ts > 7_200_000) { sessionStorage.removeItem('ss_study_v1'); return null; }
+      if (s.mode !== 'review') { sessionStorage.removeItem('ss_study_v1'); return null; }
       return s;
     } catch { return null; }
   });
@@ -126,6 +130,9 @@ const StudySession = () => {
   const [sessionQueue, setSessionQueue] = useState<any[]>([]);
   const [sessionSubmittedIds, setSessionSubmittedIds] = useState<Set<number>>(new Set());
   const reviewOptionsRequestIdRef = useRef(0);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionEnsuring, setSessionEnsuring] = useState(false);
+  const sessionEnsureRequestIdRef = useRef(0);
 
   const words = useMemo(
     () =>
@@ -304,10 +311,12 @@ const StudySession = () => {
     setRecentIndices(prev => [currentIndex, ...prev.filter(i => i !== currentIndex)].slice(0, 6));
   }, [currentIndex, tab]);
 
-  // Persist session state so F5 refresh can resume from current position
+  // Persist session state so F5 refresh can resume from current position.
+  // STUDY mode is excluded — interrupted sessions must restart per product rule.
   const sessionMode = locationState?.mode ?? savedSession?.mode ?? null;
   useEffect(() => {
     if (!topicId || !studyWords || studyWords.length === 0 || tab !== 'learn' || learnStep < 2) return;
+    if (sessionMode !== 'review') return;
     try {
       sessionStorage.setItem('ss_study_v1', JSON.stringify({
         topicId, words: studyWords, mode: sessionMode,
@@ -315,6 +324,59 @@ const StudySession = () => {
       }));
     } catch {}
   }, [topicId, studyWords, sessionMode, tab, learnStep, selectedWordIds, currentIndex]);
+
+  // Ensure a server-side LearningSession exists once the learner enters step 2.
+  // STUDY mode only. Policy: always abandon any leftover IN_PROGRESS session and start a
+  // fresh one. No resume — interrupted sessions do not count toward official Progress.
+  useEffect(() => {
+    if (tab !== 'learn' || learnStep !== 2) return;
+    if (isReviewMode) return;
+    if (!topicId) return;
+    if (selectedWordIds.length === 0) return;
+    if (sessionId != null) return;
+    if (sessionEnsuring) return;
+
+    const requestId = ++sessionEnsureRequestIdRef.current;
+    setSessionEnsuring(true);
+    (async () => {
+      let resolvedSession: LearningSession | null = null;
+      try {
+        // Abandon any leftover IN_PROGRESS session for this user/topic/mode.
+        try {
+          const stale = await learningProgressApi.getActiveLearningSession('STUDY', topicId);
+          if (stale) {
+            try { await learningProgressApi.abandonLearningSession(stale.sessionId); } catch {}
+          }
+        } catch {}
+
+        // Deduplicate vocab ids so item count equals unique selected vocab count.
+        const uniqueVocabIds = Array.from(new Set(selectedWordIds));
+        resolvedSession = await learningProgressApi.startLearningSession({
+          mode: 'STUDY',
+          topicId,
+          vocabIds: uniqueVocabIds,
+        });
+      } catch (err) {
+        if (requestId === sessionEnsureRequestIdRef.current) {
+          const message = err instanceof Error ? err.message : 'Không thể bắt đầu phiên học.';
+          onAddToast(message, 'error');
+        }
+      }
+
+      if (requestId !== sessionEnsureRequestIdRef.current) return;
+      if (resolvedSession) {
+        setSessionId(resolvedSession.sessionId);
+      }
+      setSessionEnsuring(false);
+    })();
+  }, [tab, learnStep, isReviewMode, topicId, selectedWordIds, sessionId, sessionEnsuring, onAddToast]);
+
+  // Clear sessionId when leaving learn step 2.
+  useEffect(() => {
+    if (learnStep !== 2) {
+      setSessionId(null);
+    }
+  }, [learnStep]);
 
   // Initialize session queue when entering learnStep 2 (also handles F5 restore).
   useEffect(() => {
@@ -367,10 +429,25 @@ const StudySession = () => {
     // Phase C (review mode) uses backend scheduling only, never current queue reinsertion.
     const shouldReinsert = !isReviewMode && !isDueReviewWord && !isPhaseB && (quality === 0 || quality === 3);
 
+    // STUDY mode requires a server-side LearningSession — never fall back to legacy per-word
+    // commit, which would write Progress immediately and defeat the draft flow.
+    if (!isReviewMode && sessionId == null) {
+      onAddToast("Đang khởi tạo phiên học. Vui lòng thử lại sau giây lát.", "error");
+      return;
+    }
+
     setReviewSubmitting(true);
     try {
-      await learningProgressApi.submitSingleReview(normalizedWordId, topicId, quality, isPhaseB);
-      onAddToast("Đã lưu tiến trình học tập", "success");
+      // STUDY mode: save draft only, defer Progress commit until session completes.
+      // REVIEW mode still uses legacy per-word commit (review migration out of scope).
+      // Phase B repeat: same vocabId — backend updates the same LearningSessionItem row.
+      if (!isReviewMode) {
+        await learningProgressApi.saveLearningSessionAnswer(sessionId!, normalizedWordId, quality);
+        // STUDY draft saves are silent on success — avoid toast spam across many answers.
+      } else {
+        await learningProgressApi.submitSingleReview(normalizedWordId, topicId, quality, isPhaseB);
+        onAddToast("Đã lưu tiến trình học tập", "success");
+      }
 
       const updatedSubmittedIds = new Set([...sessionSubmittedIds, normalizedWordId]);
       setSessionSubmittedIds(updatedSubmittedIds);
@@ -398,6 +475,18 @@ const StudySession = () => {
         setCurrentIndex(index + 1);
         setIsFlipped(false);
       } else {
+        // Last attempt (Phase A or Phase B) — commit draft session before advancing.
+        // STUDY mode must NOT advance if completion fails: official Progress was not written.
+        if (!isReviewMode) {
+          try {
+            await learningProgressApi.completeLearningSession(sessionId!);
+            onAddToast("Đã hoàn tất phiên học.", "success");
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Không thể hoàn tất phiên học. Vui lòng thử lại.';
+            onAddToast(message, "error");
+            return;
+          }
+        }
         onLast();
       }
     } catch {
@@ -405,7 +494,7 @@ const StudySession = () => {
     } finally {
       setReviewSubmitting(false);
     }
-  }, [reviewSubmitting, topicId, onAddToast, sessionSubmittedIds, isReviewMode, reviewWordIdSet]);
+  }, [reviewSubmitting, topicId, onAddToast, sessionSubmittedIds, isReviewMode, reviewWordIdSet, sessionId]);
 
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
