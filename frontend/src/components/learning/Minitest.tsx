@@ -102,7 +102,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
 
   return (
     <div className="max-w-5xl mx-auto pb-24 relative">
-      <div className="sticky top-[80px] z-40 bg-surface/90 backdrop-blur-md p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
+      <div className="sticky top-[80px] z-40 bg-surface p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
         <div className="flex-1">
           <div className="flex justify-between text-xs font-bold text-text-muted mb-2 uppercase tracking-[0.2em]">
             <span>Tiến độ bài làm</span>
@@ -131,7 +131,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
           </header>
           <div className="grid gap-10">
             {fillQuestions.length === 0 && (
-              <div className="glass-card p-8 text-center text-text-secondary">
+              <div className="learning-card p-8 text-center text-text-secondary">
                 Bạn chưa có từ nào đã học trong chủ đề này để làm bài 1. Hãy học
                 và hoàn thành phần luyện tập trước.
               </div>
@@ -144,7 +144,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
               return (
                 <div
                   key={q.id}
-                  className={`glass-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50") : "bg-surface"}`}
+                  className={`learning-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50") : "bg-surface"}`}
                 >
                   <div className="flex justify-between items-start mb-6">
                     <span className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center font-bold text-primary">
@@ -236,7 +236,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
               <div className="flex-1 h-px bg-accent/20" />
             </header>
             {translationQuestions.length === 0 && (
-              <div className="glass-card p-8 text-center text-text-secondary">
+              <div className="learning-card p-8 text-center text-text-secondary">
                 Không có câu nào có bản dịch để làm bài tập này.
               </div>
             )}
@@ -253,7 +253,7 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
                 return (
                   <div
                     key={q.id}
-                    className={`glass-card p-10 border-2 transition-all ${
+                    className={`learning-card p-10 border-2 transition-all ${
                       isSubmitted
                         ? isCorrect
                           ? "border-green-500 bg-green-50"

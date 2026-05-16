@@ -562,7 +562,7 @@ const StudySession = () => {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 p-1 bg-surface/50 backdrop-blur-md rounded-pill border-2 border-primary/10">
+        <div className="flex gap-2 p-1 bg-surface rounded-pill border-2 border-primary/10">
           {(["flashcard", "learn", "minitest"] as const).map((t) => (
             <button
               key={t}
@@ -599,13 +599,13 @@ const StudySession = () => {
                   type="button"
                   disabled={currentIndex === 0}
                   onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface/60 backdrop-blur-sm hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
                 >
                   <ArrowLeft size={24} />
                 </button>
 
                 {/* CARD with search + flashcard */}
-                <div className="relative rounded-3xl border-2 border-primary/10 bg-surface/40 backdrop-blur-sm p-5 pb-6 flex-1">
+                <div className="relative rounded-3xl border-2 border-primary/10 bg-surface p-5 pb-6 flex-1">
 
                   {/* Search bar row — top of card */}
                   <div className="flex items-center justify-center gap-3 mb-6">
@@ -639,7 +639,7 @@ const StudySession = () => {
                         transition={{ duration: 0.5, ease: "easeInOut" }}
                         className="w-full h-full relative preserve-3d cursor-pointer"
                       >
-                        <div className="absolute inset-0 backface-hidden glass-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
+                        <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
                           <Badge variant="purple" className="mb-12 scale-125">
                             Thẻ từ vựng
                           </Badge>
@@ -671,7 +671,7 @@ const StudySession = () => {
                             </Button>
                           </div>
                         </div>
-                        <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
+                        <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
                           <Badge variant="pink" className="mb-12 scale-125">
                             Nghĩa
                           </Badge>
@@ -709,7 +709,7 @@ const StudySession = () => {
                   type="button"
                   disabled={currentIndex === words.length - 1}
                   onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface/60 backdrop-blur-sm hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
                 >
                   <ArrowRight size={24} />
                 </button>
@@ -734,7 +734,7 @@ const StudySession = () => {
               {showWordList && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
                   <div
-                    className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/40"
                     onClick={() => setShowWordList(false)}
                   />
                   <div className="relative w-full max-w-lg bg-surface rounded-3xl shadow-2xl border border-border overflow-hidden">
@@ -864,7 +864,7 @@ const StudySession = () => {
                     <button
                       type="button"
                       onClick={() => setLearnMode("smart")}
-                      className={`text-left glass-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "smart" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
+                      className={`text-left learning-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "smart" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
                     >
                       <div className="font-bold text-lg mb-1">⚡ Smart</div>
                       <p className="text-sm text-text-muted">
@@ -874,7 +874,7 @@ const StudySession = () => {
                     <button
                       type="button"
                       onClick={() => setLearnMode("custom")}
-                      className={`text-left glass-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "custom" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
+                      className={`text-left learning-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "custom" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
                     >
                       <div className="font-bold text-lg mb-1">🛠️ Tùy chỉnh</div>
                       <p className="text-sm text-text-muted">
@@ -932,7 +932,7 @@ const StudySession = () => {
                         </div>
                       </div>
                       {customNewWords.length === 0 ? (
-                        <div className="glass-card p-6 text-sm text-text-muted text-center">
+                        <div className="learning-card p-6 text-sm text-text-muted text-center">
                           Không còn từ mới trong chủ đề này.
                         </div>
                       ) : (
@@ -944,7 +944,7 @@ const StudySession = () => {
                                 <div
                                   key={w.id}
                                   onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
-                                  className={`glass-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
+                                  className={`learning-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
                                 >
                                   <div className="text-lg font-bold mb-0.5">{w.word}</div>
                                   <div className="text-xs text-text-muted font-mono">{w.transcription}</div>
@@ -985,7 +985,7 @@ const StudySession = () => {
                                   return (
                                     <div
                                       key={w.id}
-                                      className={`glass-card p-5 transition-all border-4 cursor-not-allowed ${isSel ? "border-primary bg-primary/10" : "border-transparent opacity-40"}`}
+                                      className={`learning-card p-5 transition-all border-4 cursor-not-allowed ${isSel ? "border-primary bg-primary/10" : "border-transparent opacity-40"}`}
                                     >
                                       <div className="flex items-center justify-between gap-2">
                                         <div className="text-xl font-bold">{w.word}</div>
@@ -1029,7 +1029,7 @@ const StudySession = () => {
                               )}
                             </>
                           ) : (
-                            <div className="glass-card p-6 text-sm text-text-muted text-center">
+                            <div className="learning-card p-6 text-sm text-text-muted text-center">
                               Hiện chưa có từ đến hạn ôn.
                             </div>
                           )}
@@ -1045,11 +1045,11 @@ const StudySession = () => {
                             </span>
                           </div>
                           {newWords.length === 0 ? (
-                            <div className="glass-card p-6 text-sm text-text-muted text-center">
+                            <div className="learning-card p-6 text-sm text-text-muted text-center">
                               Không còn từ mới trong chủ đề này.
                             </div>
                           ) : selectedWordIds.length === 0 ? (
-                            <div className="glass-card p-6 text-sm text-text-muted text-center">
+                            <div className="learning-card p-6 text-sm text-text-muted text-center">
                               Chọn gói học bên phải để bắt đầu.
                             </div>
                           ) : (
@@ -1058,7 +1058,7 @@ const StudySession = () => {
                                 {pagedSmartWords.map((w: any) => (
                                   <div
                                     key={w.id}
-                                    className="glass-card p-5 transition-all border-4 cursor-not-allowed border-success-color bg-success-color/10 opacity-70"
+                                    className="learning-card p-5 transition-all border-4 cursor-not-allowed border-success-color bg-success-color/10 opacity-70"
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="text-xl font-bold">{w.word}</div>
@@ -1105,7 +1105,7 @@ const StudySession = () => {
                       )}
                     </div>
 
-                    <aside className="glass-card p-5 sticky top-[96px] space-y-4">
+                    <aside className="learning-card p-5 sticky top-[96px] space-y-4">
                       <div className="text-sm text-text-muted">
                         {isReviewMode ? "Ôn tập" : learnMode === "smart" ? "Học từ mới" : "Tùy chỉnh"}
                       </div>
@@ -1206,7 +1206,7 @@ const StudySession = () => {
                     transition={{ duration: 0.5, ease: "easeInOut" }}
                     className="w-full h-full relative preserve-3d cursor-pointer"
                   >
-                    <div className="absolute inset-0 backface-hidden glass-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
+                    <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
                       <Badge variant="purple" className="mb-12 scale-125">
                         Thẻ từ vựng
                       </Badge>
@@ -1238,7 +1238,7 @@ const StudySession = () => {
                         </Button>
                       </div>
                     </div>
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 glass-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
                       <Badge variant="pink" className="mb-12 scale-125">
                         Nghĩa
                       </Badge>

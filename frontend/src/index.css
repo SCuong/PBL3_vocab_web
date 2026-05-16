@@ -1234,6 +1234,27 @@
         outline-offset: 1px;
     }
 
+    /* ─── Learning-scoped lightweight primitives ────────────────────────
+       Used by StudySession, Minitest, MatchingGame, LearningTopics, and the
+       minitest result/review screens. Mirrors .glass-card visually but drops
+       backdrop-filter and hover shadow growth so the many cards stacked on
+       a learning screen do not stall the compositor. */
+    .learning-card {
+        @apply bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)];
+    }
+    .learning-card:hover { @apply border-primary/25; }
+    .learning-defer {
+        content-visibility: auto;
+        contain-intrinsic-size: 360px;
+    }
+    @keyframes minitest-result-enter {
+        from { opacity: 0; transform: scale(0.94); }
+        to   { opacity: 1; transform: none; }
+    }
+    .minitest-result-enter {
+        animation: minitest-result-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
     /* ─── Vocabulary-scoped lightweight primitives ──────────────────────
        Used by Vocabulary list/detail. Grids render up to PAGE_SIZE=24
        cards at a time, so each card must avoid backdrop-filter and

@@ -196,7 +196,7 @@ export const MatchingGame = ({ words, type, onFinish }: MatchingGameProps) => {
 
   if (words.length === 0) {
     return (
-      <div className="glass-card p-8 text-center text-text-secondary">
+      <div className="learning-card p-8 text-center text-text-secondary">
         Không có từ để luyện tập.
       </div>
     );

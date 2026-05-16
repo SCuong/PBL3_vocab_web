@@ -47,7 +47,7 @@ const LearningTopics = () => {
     <div className="max-w-6xl mx-auto px-6 py-12 relative">
       {/* Guest Banner */}
       {isGuest && (
-        <div className="mb-12 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex items-center justify-between backdrop-blur-md border border-text-on-accent/20 shadow-xl animate-fade-in">
+        <div className="mb-12 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex items-center justify-between  border border-text-on-accent/20 shadow-xl animate-fade-in">
           <div className="flex items-center gap-4 text-text-on-accent">
             <div className="w-10 h-10 rounded-full bg-surface/20 flex items-center justify-center text-xl">
               ✨
@@ -78,7 +78,7 @@ const LearningTopics = () => {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="glass-card px-6 py-3 border-orange-500/20 bg-orange-500/5 flex items-center gap-3">
+            <div className="learning-card px-6 py-3 border-orange-500/20 bg-orange-500/5 flex items-center gap-3">
               <span className="text-2xl">🔥</span>
               <span className="font-bold text-orange-600">
                 {streakDays} ngày liên tiếp
@@ -125,7 +125,7 @@ const LearningTopics = () => {
           return (
             <div
               key={cat.id}
-              className={`glass-card overflow-hidden shadow-sm hover:shadow-md transition-all border-2 border-primary/5 ${isCategoryLocked ? "opacity-50" : ""}`}
+              className={`learning-card overflow-hidden shadow-sm hover:shadow-md transition-all border-2 border-primary/5 ${isCategoryLocked ? "opacity-50" : ""}`}
             >
               {/* Accordion Header */}
               <button
@@ -185,11 +185,11 @@ const LearningTopics = () => {
                         return (
                           <div
                             key={topic.id}
-                            className={`glass-card p-6 border group transition-all relative ${isTopicLocked ? "blur-[2px] opacity-70 pointer-events-none" : "hover:border-primary/40 hover:-translate-y-1"}`}
+                            className={`learning-card p-6 border group transition-all relative ${isTopicLocked ? "blur-[2px] opacity-70 pointer-events-none" : "hover:border-primary/40 hover:-translate-y-1"}`}
                           >
                             {/* Locking Overlay */}
                             {isTopicLocked && (
-                              <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/10 backdrop-blur-[1px] rounded-card">
+                              <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/10  rounded-card">
                                 <div className="w-10 h-10 rounded-full bg-surface/80 flex items-center justify-center shadow-lg border-2 border-primary/20 text-text-muted">
                                   🔒
                                 </div>
@@ -302,7 +302,7 @@ const LearningTopics = () => {
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            className="pointer-events-auto bg-surface/90 backdrop-blur-xl border-2 border-primary/40 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center gap-8 max-w-4xl w-full"
+            className="pointer-events-auto bg-surface/90  border-2 border-primary/40 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center gap-8 max-w-4xl w-full"
           >
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple flex items-center justify-center text-text-on-accent text-3xl shadow-lg ring-4 ring-primary/10">
