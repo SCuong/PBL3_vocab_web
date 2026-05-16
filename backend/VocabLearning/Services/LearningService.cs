@@ -557,109 +557,118 @@ namespace VocabLearning.Services
             long sessionId,
             CancellationToken cancellationToken)
         {
-            var session = await _context.LearningSessions
-                .Include(s => s.Items)
-                .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
-            if (session == null)
+            // Npgsql retry strategy is enabled (Program.cs EnableRetryOnFailure), so a
+            // user-initiated transaction must be executed via the execution strategy delegate
+            // so the whole unit is retried atomically. EF Core throws otherwise:
+            // "The configured execution strategy 'NpgsqlRetryingExecutionStrategy' does not
+            // support user-initiated transactions."
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                throw new KeyNotFoundException($"Session {sessionId} not found.");
-            }
-            if (session.UserId != userId)
-            {
-                throw new UnauthorizedAccessException("Session does not belong to the current user.");
-            }
-            if (session.Status != LearningSessionStatuses.InProgress)
-            {
-                throw new InvalidOperationException($"Session {sessionId} is not in progress (status={session.Status}).");
-            }
-
-            var answeredItems = session.Items
-                .Where(item => item.IsAnswered && item.Quality.HasValue)
-                .OrderBy(item => item.OrderIndex)
-                .ToList();
-            if (answeredItems.Count == 0)
-            {
-                throw new InvalidOperationException("Cannot complete a session with no answered items.");
-            }
-
-            var now = DateTime.UtcNow;
-            var vocabIds = answeredItems.Select(item => item.VocabId).ToList();
-
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                var existingProgresses = await _context.Progresses
-                    .Where(progress => progress.UserId == userId && vocabIds.Contains(progress.VocabId))
-                    .ToListAsync(cancellationToken);
-                var progressByVocabId = existingProgresses.ToDictionary(progress => progress.VocabId);
-
-                var existingUserVocabularies = await _context.UserVocabularies
-                    .Where(item => item.UserId == userId && vocabIds.Contains(item.VocabId))
-                    .ToListAsync(cancellationToken);
-                var userVocabByVocabId = existingUserVocabularies.ToDictionary(item => item.VocabId);
-
-                foreach (var item in answeredItems)
+                var session = await _context.LearningSessions
+                    .Include(s => s.Items)
+                    .FirstOrDefaultAsync(s => s.SessionId == sessionId, cancellationToken);
+                if (session == null)
                 {
-                    var quality = Math.Clamp(item.Quality!.Value, 0, 5);
-
-                    if (!progressByVocabId.TryGetValue(item.VocabId, out var progress))
-                    {
-                        progress = new Progress { UserId = userId, VocabId = item.VocabId };
-                        _context.Progresses.Add(progress);
-                        progressByVocabId[item.VocabId] = progress;
-                    }
-
-                    var isFirstExposure = progress.Repetitions == 0;
-                    var plan = Sm2Calculator.Plan(
-                        ToSm2State(progress),
-                        quality,
-                        now,
-                        isFirstExposure,
-                        isRepeatedThisSession: false);
-
-                    ApplySm2Plan(progress, plan);
-
-                    if (!userVocabByVocabId.TryGetValue(item.VocabId, out var userVocabulary))
-                    {
-                        userVocabulary = new UserVocabulary
-                        {
-                            UserId = userId,
-                            VocabId = item.VocabId,
-                            Status = plan.Status,
-                            Note = string.Empty,
-                            FirstLearnedDate = now
-                        };
-                        _context.UserVocabularies.Add(userVocabulary);
-                        userVocabByVocabId[item.VocabId] = userVocabulary;
-                    }
-                    else
-                    {
-                        userVocabulary.Status = plan.Status;
-                        userVocabulary.FirstLearnedDate ??= now;
-                    }
+                    throw new KeyNotFoundException($"Session {sessionId} not found.");
+                }
+                if (session.UserId != userId)
+                {
+                    throw new UnauthorizedAccessException("Session does not belong to the current user.");
+                }
+                if (session.Status != LearningSessionStatuses.InProgress)
+                {
+                    throw new InvalidOperationException($"Session {sessionId} is not in progress (status={session.Status}).");
                 }
 
-                session.Status = LearningSessionStatuses.Completed;
-                session.CompletedAt = now;
-                session.UpdatedAt = now;
+                var answeredItems = session.Items
+                    .Where(item => item.IsAnswered && item.Quality.HasValue)
+                    .OrderBy(item => item.OrderIndex)
+                    .ToList();
+                if (answeredItems.Count == 0)
+                {
+                    throw new InvalidOperationException("Cannot complete a session with no answered items.");
+                }
 
-                await _context.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
+                var now = DateTime.UtcNow;
+                var vocabIds = answeredItems.Select(item => item.VocabId).ToList();
 
-            return new CompleteLearningSessionResponse
-            {
-                SessionId = session.SessionId,
-                Status = session.Status,
-                CompletedAt = session.CompletedAt ?? now,
-                CommittedItemCount = answeredItems.Count,
-                Progress = GetLearningProgressState(userId)
-            };
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    var existingProgresses = await _context.Progresses
+                        .Where(progress => progress.UserId == userId && vocabIds.Contains(progress.VocabId))
+                        .ToListAsync(cancellationToken);
+                    var progressByVocabId = existingProgresses.ToDictionary(progress => progress.VocabId);
+
+                    var existingUserVocabularies = await _context.UserVocabularies
+                        .Where(item => item.UserId == userId && vocabIds.Contains(item.VocabId))
+                        .ToListAsync(cancellationToken);
+                    var userVocabByVocabId = existingUserVocabularies.ToDictionary(item => item.VocabId);
+
+                    foreach (var item in answeredItems)
+                    {
+                        var quality = Math.Clamp(item.Quality!.Value, 0, 5);
+
+                        if (!progressByVocabId.TryGetValue(item.VocabId, out var progress))
+                        {
+                            progress = new Progress { UserId = userId, VocabId = item.VocabId };
+                            _context.Progresses.Add(progress);
+                            progressByVocabId[item.VocabId] = progress;
+                        }
+
+                        var isFirstExposure = progress.Repetitions == 0;
+                        var plan = Sm2Calculator.Plan(
+                            ToSm2State(progress),
+                            quality,
+                            now,
+                            isFirstExposure,
+                            isRepeatedThisSession: false);
+
+                        ApplySm2Plan(progress, plan);
+
+                        if (!userVocabByVocabId.TryGetValue(item.VocabId, out var userVocabulary))
+                        {
+                            userVocabulary = new UserVocabulary
+                            {
+                                UserId = userId,
+                                VocabId = item.VocabId,
+                                Status = plan.Status,
+                                Note = string.Empty,
+                                FirstLearnedDate = now
+                            };
+                            _context.UserVocabularies.Add(userVocabulary);
+                            userVocabByVocabId[item.VocabId] = userVocabulary;
+                        }
+                        else
+                        {
+                            userVocabulary.Status = plan.Status;
+                            userVocabulary.FirstLearnedDate ??= now;
+                        }
+                    }
+
+                    session.Status = LearningSessionStatuses.Completed;
+                    session.CompletedAt = now;
+                    session.UpdatedAt = now;
+
+                    await _context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+
+                return new CompleteLearningSessionResponse
+                {
+                    SessionId = session.SessionId,
+                    Status = session.Status,
+                    CompletedAt = session.CompletedAt ?? now,
+                    CommittedItemCount = answeredItems.Count,
+                    Progress = GetLearningProgressState(userId)
+                };
+            });
         }
 
         public async Task<bool> AbandonSessionAsync(
