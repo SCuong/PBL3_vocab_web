@@ -24,6 +24,8 @@ namespace VocabLearning.Data
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
         public DbSet<EmailVerificationToken> EmailVerificationTokens { get; set; }
         public DbSet<StickyNote> StickyNotes { get; set; }
+        public DbSet<LearningSession> LearningSessions { get; set; }
+        public DbSet<LearningSessionItem> LearningSessionItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -408,6 +410,125 @@ namespace VocabLearning.Data
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(note => new { note.UserId, note.IsPinned, note.UpdatedAt });
+            });
+
+            modelBuilder.Entity<LearningSession>(entity =>
+            {
+                entity.ToTable("learning_session", t =>
+                {
+                    t.HasCheckConstraint(
+                        "ck_learning_session_status",
+                        "status IN ('IN_PROGRESS', 'COMPLETED', 'ABANDONED')");
+                    t.HasCheckConstraint(
+                        "ck_learning_session_mode",
+                        "mode IN ('STUDY', 'REVIEW')");
+                    t.HasCheckConstraint(
+                        "ck_learning_session_current_index",
+                        "current_index >= 0");
+                    t.HasCheckConstraint(
+                        "ck_learning_session_updated_at",
+                        "updated_at >= started_at");
+                });
+                entity.HasKey(session => session.SessionId);
+
+                entity.Property(session => session.SessionId)
+                    .HasColumnName("session_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(session => session.UserId).HasColumnName("user_id");
+                entity.Property(session => session.TopicId).HasColumnName("topic_id");
+
+                entity.Property(session => session.Mode)
+                    .HasColumnName("mode")
+                    .HasMaxLength(20);
+
+                entity.Property(session => session.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(20);
+
+                entity.Property(session => session.CurrentIndex)
+                    .HasColumnName("current_index")
+                    .HasDefaultValue(0);
+
+                entity.Property(session => session.StartedAt)
+                    .HasColumnName("started_at")
+                    .HasDefaultValueSql(currentTimestampSql);
+
+                entity.Property(session => session.UpdatedAt)
+                    .HasColumnName("updated_at")
+                    .HasDefaultValueSql(currentTimestampSql);
+
+                entity.Property(session => session.CompletedAt).HasColumnName("completed_at");
+                entity.Property(session => session.AbandonedAt).HasColumnName("abandoned_at");
+
+                entity.HasOne(session => session.User)
+                    .WithMany()
+                    .HasForeignKey(session => session.UserId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasOne(session => session.Topic)
+                    .WithMany()
+                    .HasForeignKey(session => session.TopicId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(session => new { session.UserId, session.Status })
+                    .HasDatabaseName("ix_learning_session_user_id_status");
+
+                entity.HasIndex(session => new { session.UserId, session.Status, session.UpdatedAt })
+                    .HasDatabaseName("ix_learning_session_user_id_status_updated_at");
+            });
+
+            modelBuilder.Entity<LearningSessionItem>(entity =>
+            {
+                entity.ToTable("learning_session_item", t =>
+                {
+                    t.HasCheckConstraint(
+                        "ck_learning_session_item_quality",
+                        "quality IS NULL OR (quality BETWEEN 0 AND 5)");
+                    t.HasCheckConstraint(
+                        "ck_learning_session_item_order_index",
+                        "order_index >= 0");
+                    t.HasCheckConstraint(
+                        "ck_learning_session_item_answered",
+                        "(is_answered = FALSE AND answered_at IS NULL AND quality IS NULL) OR is_answered = TRUE");
+                });
+                entity.HasKey(item => item.SessionItemId);
+
+                entity.Property(item => item.SessionItemId)
+                    .HasColumnName("session_item_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(item => item.SessionId).HasColumnName("session_id");
+                entity.Property(item => item.VocabId).HasColumnName("vocab_id");
+
+                entity.Property(item => item.OrderIndex).HasColumnName("order_index");
+                entity.Property(item => item.Quality).HasColumnName("quality");
+
+                entity.Property(item => item.IsAnswered)
+                    .HasColumnName("is_answered")
+                    .HasDefaultValue(false);
+
+                entity.Property(item => item.AnsweredAt).HasColumnName("answered_at");
+
+                entity.HasOne(item => item.Session)
+                    .WithMany(session => session.Items)
+                    .HasForeignKey(item => item.SessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Vocabulary)
+                    .WithMany()
+                    .HasForeignKey(item => item.VocabId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(item => new { item.SessionId, item.VocabId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_learning_session_item_session_vocab");
+
+                entity.HasIndex(item => new { item.SessionId, item.OrderIndex })
+                    .HasDatabaseName("ix_learning_session_item_session_order");
+
+                entity.HasIndex(item => item.VocabId)
+                    .HasDatabaseName("ix_learning_session_item_vocab_id");
             });
         }
     }
