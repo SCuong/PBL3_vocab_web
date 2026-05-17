@@ -3,7 +3,6 @@ import {
     BookOpen,
     Flame,
     Award,
-    Target,
     Clock,
     Pencil,
     Settings,
@@ -96,6 +95,7 @@ const Profile = () => {
     const [taglineDraft, setTaglineDraft] = useState<string>(DEFAULT_TAGLINE);
     const [vocabSearch, setVocabSearch] = useState('');
     const [vocabCefr, setVocabCefr] = useState<CefrFilter>('ALL');
+    const [isHistoryDetailOpen, setIsHistoryDetailOpen] = useState(false);
 
     useEffect(() => {
         if (!user?.userId) {
@@ -277,10 +277,6 @@ const Profile = () => {
         return formatDuration(totalSeconds);
     }, [studyHistoryDetails]);
 
-    // Accuracy not tracked in current gameData — show placeholder.
-    const accuracyLabel: string | null = null;
-    const totalTestsLabel: string | null = null;
-
     const levelInfo = useMemo(() => computeLevelInfo(Number(user.xp || 0)), [user.xp]);
 
     // Map vocabId -> first study date for the "THUỘC LÚC" notebook column.
@@ -329,14 +325,6 @@ const Profile = () => {
             accent: 'text-pink',
         },
         {
-            key: 'accuracy',
-            label: 'Chính xác',
-            value: accuracyLabel ?? '—',
-            subtext: totalTestsLabel ?? 'chưa có dữ liệu',
-            icon: <Target size={16} />,
-            accent: 'text-cyan',
-        },
-        {
             key: 'time',
             label: 'Thời gian',
             value: totalTimeLabel ?? '—',
@@ -359,6 +347,30 @@ const Profile = () => {
             return haystack.includes(query);
         });
     }, [learnedWords, vocabSearch, vocabCefr]);
+
+    // Build descending list of study-history detail entries for the "Xem chi tiết" inline view.
+    const historyDetailEntries = useMemo(() => {
+        const entries: { date: string; totalWords: number; totalXp: number; topicTitles: string[] }[] = [];
+        for (const date of studyHistoryDates) {
+            const day = (studyHistoryDetails as any)[date];
+            if (!day) continue;
+            entries.push({
+                date,
+                totalWords: Number(day.totalWords ?? 0),
+                totalXp: Number(day.totalXp ?? 0),
+                topicTitles: Array.isArray(day.topicTitles) ? day.topicTitles.filter(Boolean) : [],
+            });
+        }
+        return entries.sort((a, b) => b.date.localeCompare(a.date));
+    }, [studyHistoryDates, studyHistoryDetails]);
+
+    const formatHistoryDateLong = (iso: string) => {
+        const parsed = new Date(`${iso}T00:00:00`);
+        if (Number.isNaN(parsed.getTime())) return iso;
+        return parsed.toLocaleDateString('vi-VN', {
+            weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+        });
+    };
 
     const openTaglineEditor = () => {
         setTaglineDraft(tagline);
@@ -433,7 +445,7 @@ const Profile = () => {
                     </div>
 
                     {/* ── Inline stats row with vertical dividers ─────────── */}
-                    <div className="mt-7 pt-6 border-t border-[#EFE4FA] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 md:divide-x divide-[#EFE4FA] gap-y-5">
+                    <div className="mt-7 pt-6 border-t border-[#EFE4FA] grid grid-cols-2 md:grid-cols-4 md:divide-x divide-[#EFE4FA] gap-y-5">
                         {stats.map((s) => (
                             <div key={s.key} className="flex flex-col items-start text-left px-4 md:px-5">
                                 <div className={`flex items-center gap-1.5 ${s.accent}`}>
@@ -461,7 +473,13 @@ const Profile = () => {
                     <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
                         <div className="flex items-center justify-between gap-3 mb-2">
                             <h2 className="text-lg font-bold text-text-primary">Lịch sử học tập</h2>
-                            <span className="text-xs text-text-muted">{studyHistoryDates.length} ngày</span>
+                            <button
+                                type="button"
+                                onClick={() => setIsHistoryDetailOpen((prev) => !prev)}
+                                className="text-xs font-bold text-primary hover:underline cursor-pointer active:opacity-70 transition-opacity"
+                            >
+                                {isHistoryDetailOpen ? 'Ẩn chi tiết' : 'Xem chi tiết'}
+                            </button>
                         </div>
                         <p className="text-xs text-text-muted mb-5">
                             Mỗi ô là một ngày — bấm để xem chi tiết.
@@ -472,6 +490,51 @@ const Profile = () => {
                             selectedDate={selectedStudyDate}
                             onSelectDate={setSelectedStudyDate}
                         />
+
+                        {isHistoryDetailOpen && (
+                            <div className="mt-5 border-t border-[#EFE4FA] pt-5">
+                                <div className="flex items-center justify-between gap-3 mb-3">
+                                    <h3 className="text-sm font-bold text-text-primary">Chi tiết lịch sử học tập</h3>
+                                    <span className="text-[11px] text-text-muted">
+                                        {historyDetailEntries.length > 0 ? `${historyDetailEntries.length} ngày` : ''}
+                                    </span>
+                                </div>
+                                {historyDetailEntries.length === 0 ? (
+                                    <p className="text-sm text-text-muted">Chưa có lịch sử học tập chi tiết.</p>
+                                ) : (
+                                    <ul className="space-y-3 max-h-72 overflow-auto pr-1">
+                                        {historyDetailEntries.map((entry) => (
+                                            <li
+                                                key={entry.date}
+                                                className="rounded-2xl border border-[#EFE4FA] bg-[#F7F0FF]/40 px-4 py-3"
+                                            >
+                                                <div className="text-sm font-bold text-text-primary capitalize">
+                                                    {formatHistoryDateLong(entry.date)}
+                                                </div>
+                                                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
+                                                    <span>
+                                                        <span className="text-text-muted">Đã thuộc:</span>{' '}
+                                                        <span className="font-bold text-text-primary">{entry.totalWords}</span>
+                                                    </span>
+                                                    <span>
+                                                        <span className="text-text-muted">XP:</span>{' '}
+                                                        <span className="font-bold text-primary">+{entry.totalXp}</span>
+                                                    </span>
+                                                    {entry.topicTitles.length > 0 && (
+                                                        <span>
+                                                            <span className="text-text-muted">Chủ đề:</span>{' '}
+                                                            <span className="font-bold text-text-primary">
+                                                                {entry.topicTitles.join(', ')}
+                                                            </span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
                     </section>
 
                     {/* Quick notes */}
