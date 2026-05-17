@@ -578,7 +578,7 @@ const Profile = () => {
                             <p className="text-sm text-text-muted">Bạn chưa có ghi chú nào.</p>
                         ) : (
                             <div className="max-h-[22rem] overflow-y-auto pr-1">
-                                <div className="grid sm:grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-3">
                                     {sortedStickyNotes.map((note) => (
                                         <div
                                             key={note.stickyNoteId}
