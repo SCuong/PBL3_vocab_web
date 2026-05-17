@@ -21,7 +21,9 @@ export const AuthNavbar = () => {
                         VocabLearning
                     </span>
                 </button>
-                <ThemeToggle className="absolute right-4 top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="fixed top-6 right-8 z-[60] max-sm:top-4 max-sm:right-4">
+                <ThemeToggle />
             </div>
         </nav>
     );
