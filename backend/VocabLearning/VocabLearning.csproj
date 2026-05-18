@@ -22,8 +22,4 @@
     <Folder Include="ViewModels\Meaning\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include=".github\copilot-instructions.md" />
-  </ItemGroup>
-
 </Project>
