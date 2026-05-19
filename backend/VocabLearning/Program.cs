@@ -388,6 +388,15 @@ app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks
     Predicate = registration => registration.Tags.Contains("ready")
 });
 
+app.MapGet("/", (IHostEnvironment env) => Results.Ok(new
+{
+    name = "VocabLearning API",
+    status = "running",
+    environment = env.EnvironmentName,
+    swagger = "/swagger",
+    health = "/health"
+}));
+
 app.MapControllers();
 
 app.Run();
