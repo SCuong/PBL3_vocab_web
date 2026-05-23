@@ -38,6 +38,7 @@ namespace VocabLearning.Tests.Controllers
                 configuration,
                 NullLogger<PasswordResetEmailService>.Instance);
             var environment = Mock.Of<IWebHostEnvironment>();
+            var scopeFactory = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
             _controller = new AccountController(
                 _authService,
@@ -46,7 +47,8 @@ namespace VocabLearning.Tests.Controllers
                 passwordResetEmailService,
                 configuration,
                 environment,
-                NullLogger<AccountController>.Instance);
+                NullLogger<AccountController>.Instance,
+                scopeFactory);
 
             // Set up HttpContext with a mock IAuthenticationService so SignInAsync works
             var authServiceMock = new Mock<IAuthenticationService>();
