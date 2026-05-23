@@ -20,6 +20,12 @@ namespace VocabLearning.Configuration
             ["SMTP_ENABLESSL"] = "Smtp__EnableSsl",
             ["SMTP_SSL"] = "Smtp__EnableSsl",
             ["SMTP_TIMEOUT_SECONDS"] = "Smtp__TimeoutSeconds",
+            ["RESEND_API_KEY"] = "Resend__ApiKey",
+            ["RESEND_FROM_EMAIL"] = "Resend__FromEmail",
+            ["RESEND_FROM_NAME"] = "Resend__FromName",
+            ["EMAIL_FROM_EMAIL"] = "Email__FromEmail",
+            ["EMAIL_FROM_NAME"] = "Email__FromName",
+            ["EMAIL_TIMEOUT_SECONDS"] = "Email__TimeoutSeconds",
             ["GEMINI_API_KEY"] = "Gemini__ApiKey"
         };
 

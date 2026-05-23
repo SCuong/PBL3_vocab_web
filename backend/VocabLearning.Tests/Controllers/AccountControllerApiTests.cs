@@ -36,7 +36,8 @@ namespace VocabLearning.Tests.Controllers
                 NullLogger<GoogleIdTokenVerifier>.Instance);
             var passwordResetEmailService = new PasswordResetEmailService(
                 configuration,
-                NullLogger<PasswordResetEmailService>.Instance);
+                NullLogger<PasswordResetEmailService>.Instance,
+                Mock.Of<IHttpClientFactory>());
             var environment = Mock.Of<IWebHostEnvironment>();
             var scopeFactory = new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
