@@ -188,7 +188,7 @@ namespace VocabLearning.Controllers
                 "Register: verification issued for {Email} in {ElapsedMs}ms (backgroundSend={Background}).",
                 result.User.Email,
                 emailStopwatch.ElapsedMilliseconds,
-                !ShouldExposeVerificationLinkFallback());
+                ShouldSendVerificationEmailInBackground() && !ShouldExposeVerificationLinkFallback());
             if (!deliveryResult.Succeeded)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new AuthApiResponse
@@ -331,6 +331,10 @@ namespace VocabLearning.Controllers
                     Message = "If this learner account needs verification, a new email has been sent."
                 });
             }
+
+            logger.LogInformation(
+                "Email verification token created for {Email}.",
+                tokenResult.Email);
 
             var deliveryResult = await SendEmailVerificationAsync(
                 tokenResult.Email,
@@ -607,12 +611,20 @@ namespace VocabLearning.Controllers
 
             if (!tokenResult.ShouldSendEmail)
             {
+                logger.LogInformation(
+                    "Email verification token not created for {Email}; account is not eligible for verification email.",
+                    user.Email);
+
                 return new EmailVerificationDeliveryResult
                 {
                     Succeeded = true,
                     Message = "Account created. Please verify your email before logging in."
                 };
             }
+
+            logger.LogInformation(
+                "Email verification token created for {Email}.",
+                tokenResult.Email);
 
             return await SendEmailVerificationAsync(
                 tokenResult.Email,
@@ -630,12 +642,14 @@ namespace VocabLearning.Controllers
             var verificationLink = BuildEmailVerificationLink(token);
             var inboxUrl = BuildInboxUrl(email);
 
-            // Demo/dev with the link fallback enabled: send synchronously so a failure can
-            // surface the verification link in the response.
-            if (ShouldExposeVerificationLinkFallback())
+            if (!ShouldSendVerificationEmailInBackground() || ShouldExposeVerificationLinkFallback())
             {
                 try
                 {
+                    logger.LogInformation(
+                        "Verification email send started for {Email} (background=false).",
+                        email);
+
                     await passwordResetEmailService.SendEmailVerificationEmailAsync(
                         email,
                         username,
@@ -650,24 +664,52 @@ namespace VocabLearning.Controllers
                         InboxUrl = inboxUrl
                     };
                 }
+                catch (TimeoutException ex)
+                {
+                    logger.LogError(ex, "Verification email timed out for {Email}.", email);
+
+                    if (ShouldExposeVerificationLinkFallback())
+                    {
+                        return new EmailVerificationDeliveryResult
+                        {
+                            Succeeded = true,
+                            Message = "Account created. Email service is not configured, so use the verification link below.",
+                            UsedFallbackLink = true,
+                            VerificationLink = verificationLink,
+                            InboxUrl = inboxUrl
+                        };
+                    }
+
+                    return new EmailVerificationDeliveryResult
+                    {
+                        Succeeded = false,
+                        Message = "Verification email service is temporarily unavailable. Please try again later."
+                    };
+                }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to send verification email to {Email}.", email);
 
+                    if (ShouldExposeVerificationLinkFallback())
+                    {
+                        return new EmailVerificationDeliveryResult
+                        {
+                            Succeeded = true,
+                            Message = "Account created. Email service is not configured, so use the verification link below.",
+                            UsedFallbackLink = true,
+                            VerificationLink = verificationLink,
+                            InboxUrl = inboxUrl
+                        };
+                    }
+
                     return new EmailVerificationDeliveryResult
                     {
-                        Succeeded = true,
-                        Message = "Account created. Email service is not configured, so use the verification link below.",
-                        UsedFallbackLink = true,
-                        VerificationLink = verificationLink,
-                        InboxUrl = inboxUrl
+                        Succeeded = false,
+                        Message = "Verification email service is temporarily unavailable. Please try again later."
                     };
                 }
             }
 
-            // Production: the verification token is already persisted, so don't block the HTTP
-            // response on the SMTP round-trip (connect + TLS + auth + send). Send in the
-            // background; if it fails the learner can use "resend verification".
             QueueVerificationEmail(email, username, verificationLink);
 
             return new EmailVerificationDeliveryResult
@@ -687,17 +729,53 @@ namespace VocabLearning.Controllers
         // be the production-grade upgrade.
         private void QueueVerificationEmail(string email, string username, string verificationLink)
         {
+            logger.LogInformation(
+                "Background verification email queued for {Email}.",
+                email);
+
             _ = Task.Run(async () =>
             {
-                using var scope = scopeFactory.CreateScope();
-                var emailService = scope.ServiceProvider.GetRequiredService<IPasswordResetEmailService>();
                 var stopwatch = Stopwatch.StartNew();
                 try
                 {
+                    logger.LogInformation(
+                        "Background verification email task started for {Email}.",
+                        email);
+
+                    using var scope = scopeFactory.CreateScope();
+                    logger.LogInformation(
+                        "Background verification email scope created for {Email}.",
+                        email);
+
+                    var emailService = scope.ServiceProvider.GetRequiredService<IPasswordResetEmailService>();
+                    logger.LogInformation(
+                        "Background verification email service resolved for {Email}.",
+                        email);
+
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    logger.LogInformation(
+                        "Background verification email send started for {Email}.",
+                        email);
+
                     await emailService.SendEmailVerificationEmailAsync(email, username, verificationLink, cts.Token);
                     logger.LogInformation(
                         "Background verification email sent to {Email} in {ElapsedMs}ms.",
+                        email,
+                        stopwatch.ElapsedMilliseconds);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "Background verification email timed out for {Email} after {ElapsedMs}ms.",
+                        email,
+                        stopwatch.ElapsedMilliseconds);
+                }
+                catch (TimeoutException ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "Background verification email timed out for {Email} after {ElapsedMs}ms.",
                         email,
                         stopwatch.ElapsedMilliseconds);
                 }
@@ -710,6 +788,12 @@ namespace VocabLearning.Controllers
                         stopwatch.ElapsedMilliseconds);
                 }
             });
+        }
+
+        private bool ShouldSendVerificationEmailInBackground()
+        {
+            var configuredValue = configuration["EmailVerification:SendInBackground"];
+            return bool.TryParse(configuredValue, out var enabled) && enabled;
         }
 
         private string BuildEmailVerificationLink(string token)

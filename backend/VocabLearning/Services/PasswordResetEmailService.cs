@@ -95,9 +95,12 @@ namespace VocabLearning.Services
                     $"SMTP configuration is incomplete. Missing settings: {string.Join(", ", missingConfigurations)}.");
             }
 
-            var enableSsl = !string.IsNullOrWhiteSpace(enableSslText)
-                && bool.TryParse(enableSslText, out var parsedEnableSsl)
-                && parsedEnableSsl;
+            var parsedEnableSsl = false;
+            var enableSslConfigured = !string.IsNullOrWhiteSpace(enableSslText)
+                && bool.TryParse(enableSslText, out parsedEnableSsl);
+            var enableSsl = enableSslConfigured
+                ? parsedEnableSsl
+                : parsedPort == 587;
 
             using var message = new MailMessage
             {
@@ -127,10 +130,50 @@ namespace VocabLearning.Services
                 Timeout = timeoutSeconds * 1000
             };
 
-            // Log SMTP shape (host presence/port/ssl) — never credentials.
             logger.LogInformation(
-                "{Action} email send starting (hostConfigured={HostConfigured}, port={Port}, ssl={Ssl}, timeoutSec={TimeoutSeconds}) to {Email}.",
-                logAction, !string.IsNullOrWhiteSpace(host), parsedPort, enableSsl, timeoutSeconds, toEmail);
+                "{Action} SMTP config checked (hostConfigured={HostConfigured}, port={Port}, ssl={Ssl}, usernameConfigured={UsernameConfigured}, fromEmailConfigured={FromEmailConfigured}, passwordConfigured={PasswordConfigured}, timeoutSec={TimeoutSeconds}) to {Email}.",
+                logAction,
+                !string.IsNullOrWhiteSpace(host),
+                parsedPort,
+                enableSsl,
+                !string.IsNullOrWhiteSpace(user),
+                !string.IsNullOrWhiteSpace(fromEmail),
+                !string.IsNullOrWhiteSpace(password),
+                timeoutSeconds,
+                toEmail);
+
+            if (!enableSslConfigured && parsedPort == 587)
+            {
+                logger.LogWarning(
+                    "{Action} SMTP EnableSsl was not configured; defaulting to true for port 587.",
+                    logAction);
+            }
+
+            if (parsedPort == 587 && !enableSsl)
+            {
+                logger.LogWarning(
+                    "{Action} SMTP config uses port 587 with ssl=false. Gmail requires port 587 with ssl=true.",
+                    logAction);
+            }
+
+            if (IsGmailSmtpHost(host!) && (parsedPort != 587 || !enableSsl))
+            {
+                logger.LogWarning(
+                    "{Action} Gmail SMTP config should use port 587 with ssl=true.",
+                    logAction);
+            }
+
+            if (!string.Equals(fromEmail, user, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning(
+                    "{Action} SMTP FromEmail differs from Username. Gmail may reject send unless the sender address is allowed.",
+                    logAction);
+            }
+
+            logger.LogInformation(
+                "{Action} SMTP send started to {Email}.",
+                logAction,
+                toEmail);
 
             var stopwatch = Stopwatch.StartNew();
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
@@ -148,6 +191,12 @@ namespace VocabLearning.Services
             logger.LogInformation(
                 "{Action} email sent successfully to {Email} in {ElapsedMs}ms.",
                 logAction, toEmail, stopwatch.ElapsedMilliseconds);
+        }
+
+        private static bool IsGmailSmtpHost(string host)
+        {
+            return host.Equals("smtp.gmail.com", StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith(".gmail.com", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildPasswordResetHtmlBody(string username, string resetLink)
