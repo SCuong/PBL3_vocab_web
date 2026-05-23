@@ -85,6 +85,7 @@ builder.Services.AddScoped<IAdminDataService>(sp => sp.GetRequiredService<AdminD
 builder.Services.AddScoped<LearningService>();
 builder.Services.AddScoped<ILearningService>(sp => sp.GetRequiredService<LearningService>());
 builder.Services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
+builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 builder.Services.AddScoped<PasswordResetEmailService>();
 builder.Services.AddScoped<IPasswordResetEmailService>(sp => sp.GetRequiredService<PasswordResetEmailService>());
 builder.Services.AddScoped<StickyNoteService>();
