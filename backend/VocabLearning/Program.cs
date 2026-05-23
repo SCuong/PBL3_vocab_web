@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -290,6 +291,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null)));
 
+// Persist DataProtection keys to PostgreSQL so cookie/antiforgery keys survive
+// container restarts and redeploys (Render filesystem is ephemeral). Stable
+// application name keeps the key purpose constant across instances.
+builder.Services.AddDataProtection()
+    .SetApplicationName("VocabLearning")
+    .PersistKeysToDbContext<AppDbContext>();
+
 var app = builder.Build();
 
 // Swagger UI is restricted to Development to avoid exposing API surface in production.
@@ -348,6 +356,31 @@ var avatarDirectory = avatarDirectoryCandidates
     .Select(path => Path.GetFullPath(path!))
     .FirstOrDefault(Directory.Exists);
 
+// No existing candidate (fresh container / new host). Create the preferred path so
+// avatar uploads have a home. Use the configured path when set, else a folder under
+// the content root. Never crash startup if creation fails — just skip serving.
+if (string.IsNullOrWhiteSpace(avatarDirectory))
+{
+    var preferredAvatarPath = Path.GetFullPath(
+        !string.IsNullOrWhiteSpace(configuredAvatarPath)
+            ? configuredAvatarPath
+            : Path.Combine(app.Environment.ContentRootPath, "avatars"));
+
+    try
+    {
+        Directory.CreateDirectory(preferredAvatarPath);
+        avatarDirectory = preferredAvatarPath;
+        app.Logger.LogInformation("Avatar directory ready at {AvatarDirectory}.", avatarDirectory);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(
+            ex,
+            "Could not create avatar directory at {AvatarDirectory}. Static avatar files will not be served.",
+            preferredAvatarPath);
+    }
+}
+
 if (!string.IsNullOrWhiteSpace(avatarDirectory))
 {
     app.UseStaticFiles(new StaticFileOptions
@@ -355,10 +388,6 @@ if (!string.IsNullOrWhiteSpace(avatarDirectory))
         FileProvider = new PhysicalFileProvider(avatarDirectory),
         RequestPath = "/avatars"
     });
-}
-else
-{
-    app.Logger.LogWarning("Avatar directory not found. Static avatar files will not be served.");
 }
 
 app.UseRouting();
