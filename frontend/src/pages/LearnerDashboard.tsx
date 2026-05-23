@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Award,
@@ -24,6 +24,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
 import { vocabularyApi } from '../services/vocabularyApi';
+import { dashboardApi, type LearnerDashboard as LearnerDashboardData } from '../services/dashboardApi';
 import { mapLearningVocabularyToUiModel } from '../utils/vocabularyMapper';
 
 const getLevel = (xp: number) => {
@@ -44,6 +45,20 @@ const LearnerDashboard = () => {
         addToast,
     } = useAppContext();
     const [continuing, setContinuing] = useState(false);
+    const [dashboard, setDashboard] = useState<LearnerDashboardData | null>(null);
+    const [dashboardError, setDashboardError] = useState(false);
+
+    // Real analytics (streak, XP, recent activity, due reviews, mastery) come from
+    // the backend dashboard endpoint, not local game data. Local values are only a
+    // fallback while loading or if the request fails.
+    useEffect(() => {
+        let cancelled = false;
+        setDashboardError(false);
+        dashboardApi.getLearnerDashboard()
+            .then((data) => { if (!cancelled) setDashboard(data); })
+            .catch(() => { if (!cancelled) setDashboardError(true); });
+        return () => { cancelled = true; };
+    }, []);
 
     const topicStats = useMemo(() => {
         const topics = learningTopicGroups.flatMap((group: any) => group.topics ?? []);
@@ -69,8 +84,20 @@ const LearnerDashboard = () => {
         [gameData?.studyHistory],
     );
 
-    const timelineItems = useMemo(() => (
-        Object.values(gameData?.studyHistoryDetails ?? {})
+    const timelineItems = useMemo(() => {
+        if (dashboard && dashboard.recentActivity.length > 0) {
+            return dashboard.recentActivity.slice(0, 5).map((activity) => ({
+                id: String(activity.sessionId ?? activity.date),
+                title: `Đã học ${activity.wordsStudied || 0} từ`,
+                meta: new Date(activity.date).toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                }),
+                detail: activity.topicName?.trim() ? activity.topicName : 'Đã ghi nhận phiên học',
+            }));
+        }
+        return Object.values(gameData?.studyHistoryDetails ?? {})
             .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date)))
             .slice(0, 5)
             .map((day: any) => ({
@@ -84,31 +111,82 @@ const LearnerDashboard = () => {
                 detail: Array.isArray(day.topicTitles) && day.topicTitles.length > 0
                     ? day.topicTitles.join(', ')
                     : 'Đã ghi nhận phiên học',
-            }))
-    ), [gameData?.studyHistoryDetails]);
+            }));
+    }, [dashboard, gameData?.studyHistoryDetails]);
+
+    const xp = dashboard?.xp.totalXp ?? Number(gameData?.xp ?? 0);
+    const level = dashboard
+        ? {
+            level: dashboard.xp.level,
+            currentLevelXp: dashboard.xp.currentLevelXp,
+            nextLevelXp: dashboard.xp.nextLevelXp,
+        }
+        : getLevel(xp);
+    const streak = dashboard?.streak ?? Number(gameData?.streak ?? 0);
+
+    const stats = useMemo(() => {
+        if (dashboard) {
+            const mastery = dashboard.masteryProgress;
+            return {
+                total: mastery.totalWords,
+                learned: mastery.learnedWords,
+                mastered: mastery.masteredWords,
+                review: mastery.reviewWords,
+                fresh: Math.max(0, mastery.totalWords - mastery.learnedWords),
+            };
+        }
+        return {
+            total: topicStats.totals.total,
+            learned: topicStats.totals.learned,
+            mastered: topicStats.totals.learned,
+            review: topicStats.totals.review,
+            fresh: topicStats.totals.fresh,
+        };
+    }, [dashboard, topicStats.totals]);
 
     const achievements = useMemo(() => {
-        const streak = Number(gameData?.streak ?? 0);
-        const xp = Number(gameData?.xp ?? 0);
+        if (dashboard && dashboard.badges.length > 0) {
+            const iconForBadge = (key: string) => {
+                switch (key) {
+                    case 'first-session': return <Play size={16} />;
+                    case 'week-streak': return <Flame size={16} />;
+                    case 'hundred-words': return <BookOpen size={16} />;
+                    case 'mastery': return <Award size={16} />;
+                    case 'xp-1000': return <Trophy size={16} />;
+                    default: return <ShieldCheck size={16} />;
+                }
+            };
+            return dashboard.badges.map((badge) => ({
+                label: badge.label,
+                unlocked: badge.unlocked,
+                icon: iconForBadge(badge.key),
+            }));
+        }
+        const localStreak = Number(gameData?.streak ?? 0);
+        const localXp = Number(gameData?.xp ?? 0);
         const learned = learnedWordIds.length || Number(gameData?.learnedWords ?? 0);
         return [
             { label: 'Phiên học đầu tiên', unlocked: historyDates.length > 0, icon: <Play size={16} /> },
-            { label: 'Chuỗi 7 ngày', unlocked: streak >= 7, icon: <Flame size={16} /> },
+            { label: 'Chuỗi 7 ngày', unlocked: localStreak >= 7, icon: <Flame size={16} /> },
             { label: '100 từ vựng', unlocked: learned >= 100, icon: <BookOpen size={16} /> },
-            { label: '1,000 XP', unlocked: xp >= 1000, icon: <Trophy size={16} /> },
+            { label: '1,000 XP', unlocked: localXp >= 1000, icon: <Trophy size={16} /> },
         ];
-    }, [gameData?.learnedWords, gameData?.streak, gameData?.xp, historyDates.length, learnedWordIds.length]);
+    }, [dashboard, gameData?.learnedWords, gameData?.streak, gameData?.xp, historyDates.length, learnedWordIds.length]);
 
-    const xp = Number(gameData?.xp ?? 0);
-    const level = getLevel(xp);
-    const masteryPct = topicStats.totals.total > 0
-        ? Math.round((topicStats.totals.learned / topicStats.totals.total) * 100)
+    const masteryPct = stats.total > 0
+        ? Math.round((stats.learned / stats.total) * 100)
         : 0;
-    const reviewForecast = {
-        today: totalReviewCount,
-        tomorrow: Math.max(0, Math.round(totalReviewCount * 0.35)),
-        week: Math.max(totalReviewCount, Math.round(totalReviewCount * 2.4)),
-    };
+    const reviewForecast = dashboard
+        ? {
+            today: dashboard.reviewForecast.dueToday,
+            tomorrow: dashboard.reviewForecast.dueTomorrow,
+            week: dashboard.reviewForecast.dueThisWeek,
+        }
+        : {
+            today: totalReviewCount,
+            tomorrow: Math.max(0, Math.round(totalReviewCount * 0.35)),
+            week: Math.max(totalReviewCount, Math.round(totalReviewCount * 2.4)),
+        };
 
     const handleContinue = async () => {
         if (!topicStats.nextTopic?.id) {
@@ -150,13 +228,19 @@ const LearnerDashboard = () => {
                 )}
             />
 
+            {dashboardError && (
+                <div className="mb-6 rounded-2xl border border-warning-color/30 bg-warning-color/10 p-4 text-sm text-text-primary">
+                    Không tải được số liệu bảng điều khiển từ máy chủ. Đang hiển thị dữ liệu cục bộ tạm thời.
+                </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardStat
                     variant="flat"
                     icon={<Flame size={20} />}
                     label="Chuỗi ngày học"
-                    value={`${Number(gameData?.streak ?? 0)} ngày`}
-                    detail={gameData?.lastStudyDate ? `Hoạt động gần nhất ${gameData.lastStudyDate}` : 'Bắt đầu hôm nay để tạo chuỗi'}
+                    value={`${streak} ngày`}
+                    detail={streak > 0 ? 'Chuỗi học hiện tại' : 'Bắt đầu hôm nay để tạo chuỗi'}
                     tone="warning"
                 />
                 <DashboardStat
@@ -164,7 +248,7 @@ const LearnerDashboard = () => {
                     icon={<Target size={20} />}
                     label="Mức độ thành thạo"
                     value={`${masteryPct}%`}
-                    detail={`${topicStats.totals.learned} / ${topicStats.totals.total} từ đã thành thạo`}
+                    detail={`${stats.learned} / ${stats.total} từ đã học`}
                     tone="success"
                 />
                 <DashboardStat
@@ -271,21 +355,21 @@ const LearnerDashboard = () => {
                     <div className="mt-5">
                         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                             <span className="font-display font-bold text-text-primary">Phạm vi thành thạo</span>
-                            <span className="text-text-muted">{topicStats.totals.learned}/{topicStats.totals.total}</span>
+                            <span className="text-text-muted">{stats.learned}/{stats.total}</span>
                         </div>
-                        <ProgressBar value={topicStats.totals.learned} max={topicStats.totals.total} tone="success" label={`${masteryPct}% đã thành thạo`} />
+                        <ProgressBar value={stats.learned} max={stats.total} tone="success" label={`${masteryPct}% đã học`} />
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                         <div className="rounded-xl bg-surface p-3">
-                            <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.fresh}</p>
+                            <p className="text-lg font-display font-bold text-text-primary">{stats.fresh}</p>
                             <p className="text-[11px] text-text-muted">Từ mới</p>
                         </div>
                         <div className="rounded-xl bg-surface p-3">
-                            <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.review}</p>
+                            <p className="text-lg font-display font-bold text-text-primary">{stats.review}</p>
                             <p className="text-[11px] text-text-muted">Ôn tập</p>
                         </div>
                         <div className="rounded-xl bg-surface p-3">
-                            <p className="text-lg font-display font-bold text-text-primary">{topicStats.totals.learned}</p>
+                            <p className="text-lg font-display font-bold text-text-primary">{stats.mastered}</p>
                             <p className="text-[11px] text-text-muted">Thành thạo</p>
                         </div>
                     </div>
