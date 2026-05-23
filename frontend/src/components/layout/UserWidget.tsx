@@ -3,6 +3,7 @@ import { Award, Flame, LogOut, Shield, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { loadProfilePreferences } from '../../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../../utils/avatarPresets';
+import { useAppContext } from '../../context/AppContext';
 import { PATHS } from '../../routes/paths';
 
 type UserWidgetProps = {
@@ -14,11 +15,15 @@ type UserWidgetProps = {
 
 export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidgetProps) => {
     const navigate = useNavigate();
+    const { learnerAnalytics } = useAppContext();
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+    // Prefer backend analytics (same source as dashboard/profile); fall back to local game data.
+    const streakValue = learnerAnalytics?.streak ?? Number(gameData?.streak ?? 0);
+    const xpValue = learnerAnalytics?.xp.totalXp ?? Number(gameData?.xp ?? 0);
 
     useEffect(() => {
         if (!user?.userId) {
@@ -53,13 +58,13 @@ export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidg
                 title="Streak"
                 onClick={onStreakClick}
             >
-                <Flame size={18} fill="currentColor" className={gameData.streak > 0 ? 'flame-pulse' : ''} />
-                <span>{gameData.streak}</span>
+                <Flame size={18} fill="currentColor" className={streakValue > 0 ? 'flame-pulse' : ''} />
+                <span>{streakValue}</span>
             </div>
             <div className="w-px h-4 bg-primary/20" />
             <div className="flex items-center gap-1.5 text-primary font-bold" title="XP">
                 <Award size={18} />
-                <span>{gameData.xp}</span>
+                <span>{xpValue}</span>
             </div>
             <div className="w-px h-4 bg-primary/20" />
 

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { authApi, type AuthenticatedUser } from '../services/authApi';
 import { learningProgressApi, type LearningProgressState } from '../services/learningProgressApi';
 import { vocabularyApi, type VocabularyTopicItem } from '../services/vocabularyApi';
+import { dashboardApi, type LearnerDashboard } from '../services/dashboardApi';
 import { EMPTY_CURRENT_USER_GAME_DATA } from '../constants/appConstants';
 import { buildLearningTopicGroups } from '../utils/learningTopicGroups';
 import { loadCurrentUserGameData, saveCurrentUserGameData } from '../utils/gameDataStorage';
@@ -33,6 +34,7 @@ interface AppContextValue {
     topicFilters: VocabularyTopicItem[];
     learnedWordIds: number[];
     totalReviewCount: number;
+    learnerAnalytics: LearnerDashboard | null;
     handleWordsLearned: (topicId: number, wordIds: number[]) => Promise<void>;
     handleRecordStudyHistory: (sessionInput: StudySessionRecordInput) => void;
     showStreakModal: boolean;
@@ -53,6 +55,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [showStreakModal, setShowStreakModal] = useState(false);
     const [learningProgressState, setLearningProgressState] = useState<LearningProgressState | null>(null);
     const [topicFilters, setTopicFilters] = useState<VocabularyTopicItem[]>([]);
+    const [learnerAnalytics, setLearnerAnalytics] = useState<LearnerDashboard | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { toasts, addToast, removeToast } = useToasts();
     const { gameData, setGameData, xpFloats, addXP, triggerStreakCheck } = useGameProgress(addToast);
@@ -147,6 +150,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         void refreshLearningProgress();
     }, [refreshLearningProgress]);
 
+    // Shared learner analytics (streak, XP, mastery, etc.) — single app-wide fetch
+    // so the navbar and any consumer use the same backend source as the dashboard.
+    useEffect(() => {
+        if (!currentUser?.userId) {
+            setLearnerAnalytics(null);
+            return;
+        }
+        let disposed = false;
+        dashboardApi.getLearnerDashboard()
+            .then((data) => { if (!disposed) setLearnerAnalytics(data); })
+            .catch(() => { if (!disposed) setLearnerAnalytics(null); });
+        return () => { disposed = true; };
+    }, [currentUser?.userId]);
+
     const learningTopicGroups = useMemo(
         () => buildLearningTopicGroups(topicFilters, learningProgressState),
         [topicFilters, learningProgressState],
@@ -180,6 +197,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addXP, triggerStreakCheck, xpFloats,
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
+        learnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal, setShowStreakModal,
         isLoading,
@@ -190,6 +208,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addXP, triggerStreakCheck, xpFloats,
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
+        learnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal,
         isLoading,
