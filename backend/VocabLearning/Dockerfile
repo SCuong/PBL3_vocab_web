@@ -27,6 +27,10 @@ WORKDIR /app
 
 COPY --from=build --chown=app:app /app/publish ./
 
+# Base image sets ASPNETCORE_HTTP_PORTS=8080; clear it so it does not conflict with
+# ASPNETCORE_URLS. ASPNETCORE_URLS below is the local/compose default; the hosting
+# platform (e.g. Render) overrides it with its own port at runtime.
+ENV ASPNETCORE_HTTP_PORTS=
 ENV ASPNETCORE_URLS=http://+:5152
 ENV ASPNETCORE_ENVIRONMENT=Production
 

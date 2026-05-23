@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using VocabLearning.Models;
 
 namespace VocabLearning.Data
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : DbContext, IDataProtectionKeyContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options)
@@ -26,6 +27,9 @@ namespace VocabLearning.Data
         public DbSet<StickyNote> StickyNotes { get; set; }
         public DbSet<LearningSession> LearningSessions { get; set; }
         public DbSet<LearningSessionItem> LearningSessionItems { get; set; }
+
+        // Backs ASP.NET Core DataProtection key persistence (IDataProtectionKeyContext).
+        public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
