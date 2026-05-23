@@ -10,7 +10,6 @@ import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search } from "lucide-rea
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button } from "../ui";
 import { playPronunciationAudio } from "../../utils/audio";
-import { mockData } from "../../mocks/mockData";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
 import { SM2ReviewButtons } from "./SM2ReviewButtons";
@@ -134,12 +133,11 @@ const StudySession = () => {
   const [sessionEnsuring, setSessionEnsuring] = useState(false);
   const sessionEnsureRequestIdRef = useRef(0);
 
+  // Study words come only from route/session state (real backend vocabulary).
+  // No mock fallback — an empty list yields the empty/error state below.
   const words = useMemo(
-    () =>
-      studyWords && studyWords.length > 0
-        ? studyWords
-        : mockData.vocabulary.filter((v) => v.topicId === topicId),
-    [studyWords, topicId],
+    () => (studyWords && studyWords.length > 0 ? studyWords : []),
+    [studyWords],
   );
   const currentTopicGroup = useMemo(
     () =>
@@ -152,13 +150,10 @@ const StudySession = () => {
     () => currentTopicGroup?.topics?.find((topic: any) => topic.id === topicId),
     [currentTopicGroup, topicId],
   );
-  const topic = mockData.topics.find((t) => t.id === topicId);
-  const category = mockData.categories.find((c) => c.id === topic?.catId);
-  const breadcrumbCategoryTitle =
-    currentTopicGroup?.title ?? category?.title ?? "Chủ đề";
-  const breadcrumbTopicTitle = currentTopic?.title ?? topic?.title ?? "Bài học";
-  const topicTitle = currentTopic?.title ?? topic?.title ?? "Học từ vựng";
-  const topicStats = currentTopic?.stats ?? topic?.stats;
+  const breadcrumbCategoryTitle = currentTopicGroup?.title ?? "Chủ đề";
+  const breadcrumbTopicTitle = currentTopic?.title ?? "Bài học";
+  const topicTitle = currentTopic?.title ?? "Học từ vựng";
+  const topicStats = currentTopic?.stats;
 
   const topicProgress = useMemo(
     () => learningProgressState?.topics?.find((t: any) => t.topicId === topicId),
@@ -592,8 +587,11 @@ const StudySession = () => {
 
   if (words.length === 0)
     return (
-      <div className="p-12 text-center text-text-muted">
-        Không tìm thấy từ vựng cho chủ đề này.
+      <div className="max-w-md mx-auto p-12 text-center">
+        <p className="text-text-muted mb-6">Không tìm thấy từ vựng cho chủ đề này.</p>
+        <Button variant="primary" onClick={() => navigate(PATHS.learning)}>
+          Quay lại danh sách chủ đề
+        </Button>
       </div>
     );
 
