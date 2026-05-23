@@ -14,11 +14,13 @@ RUN dotnet publish VocabLearning.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 # curl: required by HEALTHCHECK; app: unprivileged runtime user.
+# Group/user creation is idempotent: the .NET runtime image may already ship an
+# "app" user/group, so only create when missing.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 10001 app \
-    && useradd --system --uid 10001 --gid app --home /app --shell /usr/sbin/nologin app \
+    && (getent group app >/dev/null || groupadd --system --gid 10001 app) \
+    && (id -u app >/dev/null 2>&1 || useradd --system --uid 10001 --gid app --home /app --shell /usr/sbin/nologin app) \
     && install -d -o app -g app /app /app/avatars
 
 WORKDIR /app
