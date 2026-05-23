@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Mail;
 
@@ -108,19 +109,45 @@ namespace VocabLearning.Services
 
             message.To.Add(toEmail);
 
+            var timeoutSeconds = 30;
+            var timeoutText = configuration["Smtp:TimeoutSeconds"];
+            if (!string.IsNullOrWhiteSpace(timeoutText)
+                && int.TryParse(timeoutText, out var parsedTimeout)
+                && parsedTimeout > 0)
+            {
+                timeoutSeconds = parsedTimeout;
+            }
+
             using var smtpClient = new SmtpClient(host, parsedPort)
             {
                 EnableSsl = enableSsl,
                 DeliveryMethod = SmtpDeliveryMethod.Network,
                 UseDefaultCredentials = false,
-                Credentials = new NetworkCredential(user, password)
+                Credentials = new NetworkCredential(user, password),
+                Timeout = timeoutSeconds * 1000
             };
 
-            cancellationToken.ThrowIfCancellationRequested();
-            await smtpClient.SendMailAsync(message);
-            cancellationToken.ThrowIfCancellationRequested();
+            // Log SMTP shape (host presence/port/ssl) — never credentials.
+            logger.LogInformation(
+                "{Action} email send starting (hostConfigured={HostConfigured}, port={Port}, ssl={Ssl}, timeoutSec={TimeoutSeconds}) to {Email}.",
+                logAction, !string.IsNullOrWhiteSpace(host), parsedPort, enableSsl, timeoutSeconds, toEmail);
 
-            logger.LogInformation("{Action} email sent successfully to {Email}.", logAction, toEmail);
+            var stopwatch = Stopwatch.StartNew();
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            try
+            {
+                await smtpClient.SendMailAsync(message, linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                logger.LogError("{Action} email timed out after {TimeoutSeconds}s to {Email}.", logAction, timeoutSeconds, toEmail);
+                throw new TimeoutException($"SMTP send timed out after {timeoutSeconds}s.");
+            }
+
+            logger.LogInformation(
+                "{Action} email sent successfully to {Email} in {ElapsedMs}ms.",
+                logAction, toEmail, stopwatch.ElapsedMilliseconds);
         }
 
         private static string BuildPasswordResetHtmlBody(string username, string resetLink)
