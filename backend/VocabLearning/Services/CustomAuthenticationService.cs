@@ -211,7 +211,7 @@ namespace VocabLearning.Services
             {
                 Username = generatedUsername,
                 Email = normalizedEmail,
-                PasswordHash = string.Empty,
+                PasswordHash = null,
                 GoogleSubject = cleanGoogleSubject,
                 Role = UserRoles.Learner,
                 Status = UserStatuses.Active,
@@ -1093,7 +1093,7 @@ namespace VocabLearning.Services
                     Role = user.Role,
                     Status = user.Status,
                     HasGoogleLogin = user.GoogleSubject != null && user.GoogleSubject != string.Empty,
-                    HasLocalPassword = user.PasswordHash != string.Empty,
+                    HasLocalPassword = user.PasswordHash != null && user.PasswordHash != string.Empty,
                     IsEmailVerified = user.IsEmailVerified,
                     CreatedAt = user.CreatedAt
                 });

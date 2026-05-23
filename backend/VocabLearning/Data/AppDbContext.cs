@@ -54,7 +54,8 @@ namespace VocabLearning.Data
 
                 entity.Property(user => user.PasswordHash)
                     .HasColumnName("password_hash")
-                    .HasMaxLength(255);
+                    .HasMaxLength(255)
+                    .IsRequired(false);
 
                 entity.Property(user => user.GoogleSubject)
                     .HasColumnName("google_subject")
