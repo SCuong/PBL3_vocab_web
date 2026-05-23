@@ -25,6 +25,7 @@ import ChangePasswordModal from '../components/profile/ChangePasswordModal';
 import { type AuthenticatedUser } from '../services/authApi';
 import { stickyNotesApi, type StickyNoteItem } from '../services/stickyNotesApi';
 import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyApi';
+import { dashboardApi, type LearnerDashboard as LearnerDashboardData } from '../services/dashboardApi';
 import { loadProfilePreferences } from '../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../utils/avatarPresets';
 import { useAppContext } from '../context/AppContext';
@@ -96,6 +97,21 @@ const Profile = () => {
     const [vocabSearch, setVocabSearch] = useState('');
     const [vocabCefr, setVocabCefr] = useState<CefrFilter>('ALL');
     const [isHistoryDetailOpen, setIsHistoryDetailOpen] = useState(false);
+    const [dashboard, setDashboard] = useState<LearnerDashboardData | null>(null);
+
+    // Streak / XP / learning history come from backend analytics (same source as
+    // the Dashboard), not local game data. Local values remain a fallback.
+    useEffect(() => {
+        if (!currentUser?.userId) {
+            setDashboard(null);
+            return;
+        }
+        let cancelled = false;
+        dashboardApi.getLearnerDashboard()
+            .then((data) => { if (!cancelled) setDashboard(data); })
+            .catch(() => { if (!cancelled) setDashboard(null); });
+        return () => { cancelled = true; };
+    }, [currentUser?.userId]);
 
     useEffect(() => {
         if (!user?.userId) {
@@ -210,11 +226,22 @@ const Profile = () => {
         [user?.studyHistoryDetails]
     );
 
+    const backendActivityDates = useMemo(() => {
+        if (!dashboard) return null;
+        return dashboard.heatmap
+            .filter((day) => day.wordsStudied > 0)
+            .map((day) => day.date.slice(0, 10))
+            .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day));
+    }, [dashboard]);
+
     const studyHistoryDates = useMemo(() => {
+        if (backendActivityDates && backendActivityDates.length > 0) {
+            return Array.from(new Set(backendActivityDates)).sort((a, b) => a.localeCompare(b));
+        }
         const detailDates = Object.keys(studyHistoryDetails)
             .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day));
         return Array.from(new Set([...studyHistory, ...detailDates])).sort((a, b) => a.localeCompare(b));
-    }, [studyHistory, studyHistoryDetails]);
+    }, [backendActivityDates, studyHistory, studyHistoryDetails]);
 
     useEffect(() => {
         if (studyHistoryDates.length === 0) {
@@ -277,7 +304,20 @@ const Profile = () => {
         return formatDuration(totalSeconds);
     }, [studyHistoryDetails]);
 
-    const levelInfo = useMemo(() => computeLevelInfo(Number(user.xp || 0)), [user.xp]);
+    // Prefer backend analytics for streak / XP / learned count; fall back to local.
+    const streakValue = dashboard?.streak ?? Number(user.streak || 0);
+    const xpValue = dashboard?.xp.totalXp ?? Number(user.xp || 0);
+    const learnedCount = dashboard?.masteryProgress.learnedWords ?? (user.learnedWords || 0);
+    const levelInfo = useMemo(() => {
+        if (dashboard) {
+            return {
+                level: dashboard.xp.level,
+                currentXp: dashboard.xp.currentLevelXp,
+                nextLevelXp: dashboard.xp.nextLevelXp,
+            };
+        }
+        return computeLevelInfo(Number(user.xp || 0));
+    }, [dashboard, user.xp]);
 
     // Map vocabId -> first study date for the "THUỘC LÚC" notebook column.
     const learnedAtMap = useMemo(() => {
@@ -303,7 +343,7 @@ const Profile = () => {
         {
             key: 'mastered',
             label: 'Đã thuộc',
-            value: (user.learnedWords || 0).toLocaleString('vi-VN'),
+            value: learnedCount.toLocaleString('vi-VN'),
             subtext: 'từ vựng',
             icon: <BookOpen size={16} />,
             accent: 'text-primary',
@@ -311,7 +351,7 @@ const Profile = () => {
         {
             key: 'streak',
             label: 'Chuỗi',
-            value: (user.streak || 0).toLocaleString('vi-VN'),
+            value: streakValue.toLocaleString('vi-VN'),
             subtext: 'ngày',
             icon: <Flame size={16} />,
             accent: 'text-orange-500',
@@ -319,7 +359,7 @@ const Profile = () => {
         {
             key: 'xp',
             label: 'XP tổng',
-            value: (user.xp || 0).toLocaleString('vi-VN'),
+            value: xpValue.toLocaleString('vi-VN'),
             subtext: `cấp ${levelInfo.level} · ${levelInfo.currentXp.toLocaleString('vi-VN')}/${levelInfo.nextLevelXp.toLocaleString('vi-VN')}`,
             icon: <Award size={16} />,
             accent: 'text-pink',
@@ -350,6 +390,35 @@ const Profile = () => {
 
     // Build descending list of study-history detail entries for the "Xem chi tiết" inline view.
     const historyDetailEntries = useMemo(() => {
+        if (dashboard) {
+            const byDate = new Map<string, { totalWords: number; totalXp: number; topics: Set<string> }>();
+            // recentActivity carries topic names + per-session words.
+            for (const activity of dashboard.recentActivity) {
+                const date = activity.date.slice(0, 10);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+                const current = byDate.get(date) ?? { totalWords: 0, totalXp: 0, topics: new Set<string>() };
+                current.totalWords += activity.wordsStudied;
+                current.totalXp += activity.wordsStudied * 10; // XP rule: 10 per word
+                if (activity.topicName?.trim()) current.topics.add(activity.topicName);
+                byDate.set(date, current);
+            }
+            // Fill any heatmap day not covered by the (capped) recentActivity list.
+            for (const day of dashboard.heatmap) {
+                if (day.wordsStudied <= 0) continue;
+                const date = day.date.slice(0, 10);
+                if (!byDate.has(date)) {
+                    byDate.set(date, { totalWords: day.wordsStudied, totalXp: day.wordsStudied * 10, topics: new Set<string>() });
+                }
+            }
+            return Array.from(byDate.entries())
+                .map(([date, value]) => ({
+                    date,
+                    totalWords: value.totalWords,
+                    totalXp: value.totalXp,
+                    topicTitles: Array.from(value.topics),
+                }))
+                .sort((a, b) => b.date.localeCompare(a.date));
+        }
         const entries: { date: string; totalWords: number; totalXp: number; topicTitles: string[] }[] = [];
         for (const date of studyHistoryDates) {
             const day = (studyHistoryDetails as any)[date];
@@ -362,7 +431,7 @@ const Profile = () => {
             });
         }
         return entries.sort((a, b) => b.date.localeCompare(a.date));
-    }, [studyHistoryDates, studyHistoryDetails]);
+    }, [dashboard, studyHistoryDates, studyHistoryDetails]);
 
     const formatHistoryDateLong = (iso: string) => {
         const parsed = new Date(`${iso}T00:00:00`);
@@ -612,7 +681,7 @@ const Profile = () => {
                                 </h2>
                                 <div className="flex items-center gap-2 mt-1.5">
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
-                                        {(user.learnedWords || 0).toLocaleString('vi-VN')} từ đã thuộc
+                                        {learnedCount.toLocaleString('vi-VN')} từ đã thuộc
                                     </span>
                                 </div>
                             </div>
