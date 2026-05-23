@@ -651,7 +651,54 @@ namespace VocabLearning.Services
                     session.CompletedAt = now;
                     session.UpdatedAt = now;
 
+                    // Record learner activity so dashboard/leaderboard analytics (streak, XP,
+                    // recent activity) reflect this completed session. learning_log.session_id is a
+                    // required FK to exercise_session, and exercise_session.topic_id is NOT NULL, so
+                    // only log when the session has a topic. The session-status guard above makes
+                    // this idempotent: a session completes once, so no duplicate logs on retry.
+                    var totalAnswered = answeredItems.Count;
+                    var correctAnswered = answeredItems.Count(item => (item.Quality ?? 0) >= 3);
+                    var activityScore = totalAnswered > 0
+                        ? (float)Math.Round(correctAnswered * 100.0 / totalAnswered)
+                        : 0f;
+                    var isReviewMode = session.Mode == LearningSessionModes.Review;
+
+                    ExerciseSession? activitySession = null;
+                    if (session.TopicId.HasValue)
+                    {
+                        activitySession = new ExerciseSession
+                        {
+                            UserId = userId,
+                            TopicId = session.TopicId.Value,
+                            SessionType = isReviewMode ? "REVIEW" : "PRACTICE",
+                            StartedAt = session.StartedAt,
+                            FinishedAt = now,
+                            TotalQuestions = totalAnswered,
+                            CorrectCount = correctAnswered,
+                            Score = activityScore,
+                        };
+                        _context.ExerciseSessions.Add(activitySession);
+                    }
+
                     await _context.SaveChangesAsync(cancellationToken);
+
+                    if (activitySession != null)
+                    {
+                        // exercise_session.SessionId is now populated by the insert above.
+                        _context.LearningLogs.Add(new LearningLog
+                        {
+                            UserId = userId,
+                            SessionId = activitySession.SessionId,
+                            Date = now,
+                            ActivityType = isReviewMode
+                                ? LearningActivityTypes.Review
+                                : LearningActivityTypes.Learn,
+                            WordsStudied = totalAnswered,
+                            Score = activityScore,
+                        });
+                        await _context.SaveChangesAsync(cancellationToken);
+                    }
+
                     await transaction.CommitAsync(cancellationToken);
                 }
                 catch
