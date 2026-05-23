@@ -38,7 +38,8 @@ namespace VocabLearning.Tests.Controllers
 
             var emailService = new Mock<PasswordResetEmailService>(
                 Mock.Of<IConfiguration>(),
-                Mock.Of<ILogger<PasswordResetEmailService>>());
+                Mock.Of<ILogger<PasswordResetEmailService>>(),
+                Mock.Of<IHttpClientFactory>());
 
             var logger = Mock.Of<ILogger<PasswordResetController>>();
 
