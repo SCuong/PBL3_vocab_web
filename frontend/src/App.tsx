@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
@@ -38,6 +38,10 @@ const AppShell = () => {
     } = useAppContext();
 
     const isAuthPage = AUTH_PATHS.includes(location.pathname);
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [location.pathname]);
 
     return (
         <div className="min-h-screen bg-bg-light text-text-primary">
@@ -141,7 +145,7 @@ const AppShell = () => {
                                 🎁
                             </div>
                             <div>
-                                <h4 className="font-bold text-xl mb-1 text-text-primary">
+                                <h4 className="signup-banner-title font-bold text-xl mb-1 text-text-primary">
                                     Đăng ký để lưu tiến độ!
                                 </h4>
                                 <p className="text-sm text-text-muted">
@@ -151,7 +155,7 @@ const AppShell = () => {
                         </div>
                         <Button
                             variant="primary"
-                            className="px-8"
+                            className="signup-banner-button px-8"
                             onClick={() => navigate(PATHS.register)}
                         >
                             Tham gia Ngay <ChevronRight size={18} />

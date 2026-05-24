@@ -1,32 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Brain, Activity, ChevronRight, Play, Volume2 } from 'lucide-react';
+import { Layers, Brain, Activity, ChevronRight, Play, Volume2, Star } from 'lucide-react';
 import { PATHS } from '../routes/paths';
 import { typography } from '../components/ui';
-
-/* ── Chibi Mascot (SVG) ─────────────────────────────────────────────── */
-const ChibiMascot = () => (
-    <div className="chibi-wrap" aria-hidden="true">
-        <svg viewBox="0 0 200 200" className="chibi-svg">
-            <circle cx="100" cy="100" r="70" fill="var(--surface)" stroke="var(--accent-secondary)" strokeWidth="4" />
-            <circle cx="75" cy="90" r="8" fill="var(--text-primary)" />
-            <circle cx="125" cy="90" r="8" fill="var(--text-primary)" />
-            <circle cx="78" cy="87" r="3" fill="var(--surface)" />
-            <circle cx="128" cy="87" r="3" fill="var(--surface)" />
-            <circle cx="60" cy="115" r="8" fill="var(--accent-secondary)" opacity="0.6" />
-            <circle cx="140" cy="115" r="8" fill="var(--accent-secondary)" opacity="0.6" />
-            <path d="M 85 130 Q 100 145 115 130" fill="none" stroke="var(--text-primary)" strokeWidth="4" strokeLinecap="round" />
-            <path d="M 50 60 L 100 30 L 150 60 L 100 90 Z" fill="var(--accent-secondary)" stroke="var(--text-primary)" strokeWidth="3" />
-            <rect x="95" y="15" width="10" height="20" fill="var(--text-primary)" />
-            <circle cx="160" cy="75" r="6" fill="var(--accent-cyan)" />
-            <path d="M 150 60 Q 160 65 160 75" fill="none" stroke="var(--text-primary)" strokeWidth="2" />
-            <rect x="75" y="145" width="50" height="35" rx="5" fill="var(--accent-secondary)" stroke="var(--text-primary)" strokeWidth="3" />
-            <line x1="85" y1="155" x2="115" y2="155" stroke="var(--surface)" strokeWidth="2" strokeLinecap="round" />
-            <line x1="85" y1="165" x2="115" y2="165" stroke="var(--surface)" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <div className="chibi-shadow" />
-    </div>
-);
+import { useAppContext } from '../context/AppContext';
 
 /* ── Hero Visual (flashcard + floating cards) ───────────────────────── */
 const HeroVisual = () => (
@@ -74,13 +51,8 @@ const HeroVisual = () => (
             <div className="text-xs text-text-muted">7 đã hoàn thành</div>
         </div>
 
-        {/* Chibi mascot */}
-        <ChibiMascot />
-
-        {/* Decorative orbs */}
-        <div className="home-orb w-48 h-48 bg-primary top-[-20px] right-[30%]" />
-        <div className="home-orb w-36 h-36 bg-accent bottom-10 right-[40%] opacity-25" />
-        <div className="home-orb w-24 h-24 bg-cyan top-1/2 right-[5%] opacity-30" />
+        {/* Soft ambient glow behind card */}
+        <div className="home-hero-glow" aria-hidden="true" />
     </div>
 );
 
@@ -129,6 +101,7 @@ function useFadeIn() {
 /* ── Main Home Component ────────────────────────────────────────────── */
 const Home = () => {
     const navigate = useNavigate();
+    const { currentUser } = useAppContext();
     const fadeRef = useFadeIn();
 
     return (
@@ -138,14 +111,14 @@ const Home = () => {
                 <div className="max-w-[1200px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Text */}
                     <div className="home-hero-slide-left flex flex-col gap-6">
-                        <div className="inline-flex items-center gap-2 bg-primary-light text-primary text-sm font-semibold px-4 py-2 rounded-full border border-border w-fit">
-                            <span className="text-sm">⭐</span>
+                        <div className="inline-flex items-center gap-3 bg-primary-light/80 text-primary text-sm sm:text-base font-semibold px-5 py-2.5 rounded-full border border-primary/15 w-fit shadow-[0_1px_2px_var(--shadow-color)]">
+                            <Star size={18} fill="currentColor" strokeWidth={1.75} className="text-[#F5B82E] shrink-0" />
                             Học thông minh – Nhớ lâu hơn
                         </div>
 
-                        <h1 className={typography.heroTitle}>
+                        <h1 className={`${typography.heroTitle} home-hero-title`}>
                             Học từ vựng<br />tiếng Anh
-                            <span className="block bg-clip-text text-transparent bg-linear-to-br from-primary via-accent to-cyan">
+                            <span className="block bg-clip-text text-transparent bg-linear-to-r from-primary to-cyan">
                                 dễ dàng &amp; hiệu quả
                             </span>
                         </h1>
@@ -182,18 +155,18 @@ const Home = () => {
             </section>
 
             {/* ── FEATURES STRIP ── */}
-            <section className="bg-surface border-t border-b border-border py-8 px-8 flex justify-center" aria-label="Tính năng nổi bật">
-                <div className="w-full max-w-[1100px] flex items-center justify-center">
+            <section className="home-feature-strip border-t border-b border-primary/10 py-14 px-8 flex justify-center" aria-label="Tính năng nổi bật">
+                <div className="w-full max-w-[1280px] grid grid-cols-1 md:grid-cols-3 items-stretch">
                     {features.map((feat, i) => (
                         <div key={i} className="flex items-center">
-                            {i > 0 && <div className="w-px h-11 bg-border mx-0" />}
-                            <div className="home-fade-in flex-1 flex items-center justify-center gap-4 px-8 py-2 text-left" style={{ transitionDelay: `${i * 60}ms` }}>
+                            {i > 0 && <div className="hidden md:block w-px h-16 bg-primary/15 mx-0" />}
+                            <div className="home-fade-in flex-1 flex items-center gap-5 px-7 lg:px-12 py-4 text-left" style={{ transitionDelay: `${i * 60}ms` }}>
                                 <div className={`home-feature-icon ${feat.tone}`}>
                                     {feat.icon}
                                 </div>
                                 <div>
-                                    <div className="font-bold text-sm text-text-primary">{feat.title}</div>
-                                    <div className="text-xs text-text-muted mt-0.5">{feat.desc}</div>
+                                    <div className="font-display font-extrabold text-lg lg:text-xl leading-tight text-text-primary">{feat.title}</div>
+                                    <div className="text-[0.9375rem] lg:text-base text-text-secondary mt-1 leading-relaxed">{feat.desc}</div>
                                 </div>
                             </div>
                         </div>
@@ -267,34 +240,35 @@ const Home = () => {
                 </div>
             </section>
 
-            {/* ── CTA BANNER ── */}
-            <section className="home-cta-section home-defer px-8 py-16 sm:py-20 lg:py-24">
-                <div className="max-w-[680px] mx-auto px-8 text-center relative z-10">
-                    <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
-                        📚
+            {!currentUser && (
+                <section className="home-cta-section home-defer px-8 py-16 sm:py-20 lg:py-24">
+                    <div className="max-w-[680px] mx-auto px-8 text-center relative z-10">
+                        <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
+                            📚
+                        </div>
+                        <h2 className={`${typography.sectionTitle} text-text-primary mb-4`}>
+                            Sẵn sàng bắt đầu chưa?
+                        </h2>
+                        <p className="text-base sm:text-lg text-text-secondary mb-8 leading-relaxed">
+                            Đăng ký miễn phí và khám phá toàn bộ kho từ vựng ngay hôm nay.
+                        </p>
+                        <div className="flex justify-center items-center gap-4 flex-wrap">
+                            <button
+                                onClick={() => navigate(PATHS.register)}
+                                className="inline-flex items-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 transition-[transform,filter] duration-200 px-10 py-4 cursor-pointer"
+                            >
+                                Tạo tài khoản miễn phí
+                            </button>
+                            <button
+                                onClick={() => navigate(PATHS.vocabulary)}
+                                className="inline-flex items-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light transition-colors duration-200 px-8 py-4 cursor-pointer"
+                            >
+                                Xem từ vựng trước
+                            </button>
+                        </div>
                     </div>
-                    <h2 className={`${typography.sectionTitle} text-text-on-accent mb-4`}>
-                        Sẵn sàng bắt đầu chưa?
-                    </h2>
-                    <p className="text-base sm:text-lg text-text-on-accent/85 mb-8 leading-relaxed">
-                        Đăng ký miễn phí và khám phá toàn bộ kho từ vựng ngay hôm nay.
-                    </p>
-                    <div className="flex justify-center items-center gap-4 flex-wrap">
-                        <button
-                            onClick={() => navigate(PATHS.register)}
-                            className="inline-flex items-center font-display font-bold text-base text-primary bg-surface rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-[0.97] hover:-translate-y-0.5 transition-[transform,filter] duration-200 px-10 py-4 cursor-pointer"
-                        >
-                            Tạo tài khoản miễn phí
-                        </button>
-                        <button
-                            onClick={() => navigate(PATHS.vocabulary)}
-                            className="inline-flex items-center font-display font-bold text-sm text-text-on-accent border-2 border-text-on-accent/50 rounded-full hover:border-text-on-accent hover:bg-surface/15 transition-colors duration-200 px-8 py-4 cursor-pointer"
-                        >
-                            Xem từ vựng trước
-                        </button>
-                    </div>
-                </div>
-            </section>
+                </section>
+            )}
         </div>
     );
 };
