@@ -1,5 +1,4 @@
-@import url('https://api.fontshare.com/v2/css?f[]=chillax@400,500,600,700&f[]=plus-jakarta-sans@400,500,600,700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Coiny&family=Nunito:wght@700;800;900&family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Mono&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -67,7 +66,8 @@
 }
 
 @theme {
-    --font-display: "Chillax", "Plus Jakarta Sans", "Fredoka", "Be Vietnam Pro", sans-serif;
+    --font-decorative: "Coiny", "Nunito", "Be Vietnam Pro", sans-serif;
+    --font-display: "Nunito", "Fredoka", "Be Vietnam Pro", sans-serif;
     --font-sans: "Plus Jakarta Sans", "Quicksand", "Be Vietnam Pro", sans-serif;
     --font-mono: "Space Mono", monospace;
     --color-primary: var(--accent-color);
@@ -935,7 +935,7 @@
     }
     .hv-card-spine {
         height: 6px;
-        background: linear-gradient(90deg, var(--accent-color), var(--accent-secondary), var(--accent-cyan));
+        background: linear-gradient(90deg, var(--accent-color), var(--accent-cyan));
     }
     .hv-card-body {
         padding: 2rem;
@@ -981,37 +981,6 @@
         50% { transform: rotate(3deg) translateY(-8px); }
     }
 
-    /* ── Chibi mascot ── */
-    .chibi-wrap {
-        position: absolute;
-        bottom: -20px;
-        right: -20px;
-        width: 140px;
-        height: 140px;
-        z-index: 4;
-        animation: chibi-float 3s ease-in-out infinite;
-    }
-    .chibi-svg {
-        width: 100%;
-        height: 100%;
-        filter: drop-shadow(0 8px 24px var(--shadow-color));
-    }
-    .chibi-shadow {
-        position: absolute;
-        bottom: -8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 70%;
-        height: 10px;
-        background: color-mix(in srgb, var(--accent-color) 12%, transparent);
-        border-radius: 50%;
-        filter: blur(6px);
-    }
-    @keyframes chibi-float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-15px); }
-    }
-
     /* ── Review bar ── */
     .hv-review-bar-wrap {
         width: 100%;
@@ -1027,13 +996,21 @@
         border-radius: 9999px;
     }
 
-    /* ── Orbs ── */
-    .home-orb {
+    /* ── Hero ambient glow ── */
+    .home-hero-glow {
         position: absolute;
-        border-radius: 9999px;
-        filter: blur(40px);
+        inset: 8% 4% 8% 14%;
+        z-index: 0;
         pointer-events: none;
-        opacity: 0.35;
+        border-radius: 9999px;
+        background: radial-gradient(
+            60% 60% at 60% 40%,
+            color-mix(in srgb, var(--accent-color) 20%, transparent) 0%,
+            color-mix(in srgb, var(--accent-cyan) 12%, transparent) 45%,
+            transparent 75%
+        );
+        filter: blur(52px);
+        opacity: 0.7;
     }
 
     /* ── Topic card ── */
@@ -1072,7 +1049,19 @@
 
     /* ── CTA Section ── */
     .home-cta-section {
-        background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-secondary) 65%, var(--accent-cyan) 100%);
+        background:
+            radial-gradient(
+                circle at 50% 0%,
+                color-mix(in srgb, var(--accent-secondary) 16%, transparent) 0%,
+                transparent 42%
+            ),
+            linear-gradient(
+                180deg,
+                color-mix(in srgb, var(--surface) 72%, var(--bg-primary)) 0%,
+                color-mix(in srgb, var(--accent-soft) 78%, var(--surface)) 100%
+            );
+        border-top: 1px solid color-mix(in srgb, var(--accent-color) 10%, transparent);
+        border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 10%, transparent);
         position: relative;
         overflow: hidden;
     }
@@ -1080,18 +1069,39 @@
         content: '';
         position: absolute;
         inset: 0;
-        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239333ea' fill-opacity='0.045'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/svg%3E");
     }
 
     /* ── Features strip ── */
+    .home-feature-strip {
+        background:
+            radial-gradient(
+                circle at 50% -20%,
+                color-mix(in srgb, var(--accent-color) 10%, transparent) 0%,
+                transparent 44%
+            ),
+            linear-gradient(
+                180deg,
+                color-mix(in srgb, var(--surface) 86%, var(--accent-soft)) 0%,
+                color-mix(in srgb, var(--accent-soft) 62%, var(--surface)) 100%
+            );
+    }
+
     .home-feature-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 1rem;
+        width: 64px;
+        height: 64px;
+        border-radius: 1.25rem;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        box-shadow: 0 10px 28px color-mix(in srgb, var(--accent-color) 12%, transparent);
+    }
+
+    .home-feature-icon svg {
+        width: 30px;
+        height: 30px;
+        stroke-width: 2.25;
     }
 
     /* ── Fade-in animation ── */
@@ -1163,7 +1173,6 @@
     @media (max-width: 768px) {
         .hv-main-card { width: 240px; }
         .hv-float { display: none; }
-        .chibi-wrap { width: 100px; height: 100px; }
     }
 
     /* ─── Profile-scoped lightweight primitives ─────────────────────────
@@ -1325,6 +1334,43 @@
 }
 
 @layer utilities {
+    h1.home-hero-title {
+        font-family: var(--font-decorative);
+        font-size: clamp(3rem, 4.8vw, 4rem);
+        font-weight: 400;
+        line-height: 1.08;
+        letter-spacing: 0;
+    }
+
+    h1.home-hero-title > span {
+        font-family: inherit;
+        font-weight: inherit;
+        padding-block: 0.04em 0.12em;
+    }
+
+    @media (min-width: 768px) {
+        h1.home-hero-title > span {
+            white-space: nowrap;
+            width: max-content;
+            max-width: calc(100vw - 2rem);
+        }
+    }
+
+    .signup-banner-title,
+    .signup-banner-button {
+        font-family: var(--font-decorative);
+        font-weight: 400;
+        letter-spacing: 0;
+    }
+
+    .signup-banner-title {
+        line-height: 1.18;
+    }
+
+    .signup-banner-button {
+        white-space: nowrap;
+    }
+
     .perspective-1000 {
         perspective: 1000px;
     }
