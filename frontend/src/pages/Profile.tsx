@@ -7,8 +7,6 @@ import {
     Pencil,
     Settings,
     StickyNote,
-    UserPlus,
-    Users,
     KeyRound,
     MailCheck,
     Trash2,
@@ -66,7 +64,6 @@ const Profile = () => {
         gameData,
         learnedWordIds,
         handleLogout,
-        setShowStreakModal,
         addToast: onAddToast,
         handleUserUpdated: onUserUpdated,
     } = useAppContext();
@@ -79,7 +76,6 @@ const Profile = () => {
     };
 
     const onLogout = async () => { await handleLogout(); navigate(PATHS.home); };
-    const onOpenStreak = () => setShowStreakModal(true);
 
     const [isEditing, setIsEditing] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
@@ -458,11 +454,11 @@ const Profile = () => {
     };
 
     return (
-        <div className="min-h-screen w-full" style={{ backgroundColor: '#F7F0FF' }}>
+        <div className="min-h-screen w-full bg-bg-light text-text-primary">
             <div className="max-w-6xl mx-auto px-6 py-10 space-y-6">
 
                 {/* ── Profile header card ─────────────────────────────── */}
-                <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-6 sm:p-8">
+                <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-6 sm:p-8">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                         <div className="flex items-start gap-5 sm:gap-6 min-w-0">
                             <div className="relative shrink-0">
@@ -470,14 +466,14 @@ const Profile = () => {
                                     <img
                                         src={avatarUrl}
                                         alt="Avatar"
-                                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-[#E5D9F2] shadow-sm"
+                                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-border shadow-sm"
                                     />
                                 ) : (
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl sm:text-4xl font-display font-bold text-text-on-accent border-4 border-[#E5D9F2] shadow-sm">
+                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl sm:text-4xl font-display font-bold text-text-on-accent border-4 border-border shadow-sm">
                                         {initials}
                                     </div>
                                 )}
-                                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary border-2 border-surface flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
                                     ✦
                                 </span>
                             </div>
@@ -506,7 +502,7 @@ const Profile = () => {
                                 onClick={openTaglineEditor}
                                 title="Chỉnh sửa giới thiệu"
                                 aria-label="Chỉnh sửa giới thiệu"
-                                className="w-11 h-11 rounded-full border border-[#E5D9F2] bg-white hover:bg-[#F7F0FF] flex items-center justify-center text-text-muted hover:text-primary transition-colors cursor-pointer active:scale-95"
+                                className="w-11 h-11 rounded-full border border-border bg-surface hover:bg-surface-hover flex items-center justify-center text-text-muted hover:text-primary transition-colors cursor-pointer active:scale-95"
                             >
                                 <Settings size={18} />
                             </button>
@@ -514,7 +510,7 @@ const Profile = () => {
                     </div>
 
                     {/* ── Inline stats row with vertical dividers ─────────── */}
-                    <div className="mt-7 pt-6 border-t border-[#EFE4FA] grid grid-cols-2 md:grid-cols-4 md:divide-x divide-[#EFE4FA] gap-y-5">
+                    <div className="mt-7 pt-6 border-t border-border grid grid-cols-2 md:grid-cols-4 md:divide-x divide-border gap-y-5">
                         {stats.map((s) => (
                             <div key={s.key} className="flex flex-col items-start text-left px-4 md:px-5">
                                 <div className={`flex items-center gap-1.5 ${s.accent}`}>
@@ -539,7 +535,7 @@ const Profile = () => {
                 {/* ── 2-column grid: Study history + Quick notes ──────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Study history */}
-                    <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
                         <div className="flex items-center justify-between gap-3 mb-2">
                             <h2 className="text-lg font-bold text-text-primary">Lịch sử học tập</h2>
                             <button
@@ -561,7 +557,7 @@ const Profile = () => {
                         />
 
                         {isHistoryDetailOpen && (
-                            <div className="mt-5 border-t border-[#EFE4FA] pt-5">
+                            <div className="mt-5 border-t border-border pt-5">
                                 <div className="flex items-center justify-between gap-3 mb-3">
                                     <h3 className="text-sm font-bold text-text-primary">Chi tiết lịch sử học tập</h3>
                                     <span className="text-[11px] text-text-muted">
@@ -575,7 +571,7 @@ const Profile = () => {
                                         {historyDetailEntries.map((entry) => (
                                             <li
                                                 key={entry.date}
-                                                className="rounded-2xl border border-[#EFE4FA] bg-[#F7F0FF]/40 px-4 py-3"
+                                                className="rounded-2xl border border-border bg-surface-hover px-4 py-3"
                                             >
                                                 <div className="text-sm font-bold text-text-primary capitalize">
                                                     {formatHistoryDateLong(entry.date)}
@@ -607,7 +603,7 @@ const Profile = () => {
                     </section>
 
                     {/* Quick notes */}
-                    <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
                         <div className="flex items-start justify-between gap-3 mb-5">
                             <div>
                                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -673,7 +669,7 @@ const Profile = () => {
                 {/* ── 2-column grid: Learned words + Security ─────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Vocabulary notebook (formerly Learned words) */}
-                    <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div className="min-w-0">
                                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -710,13 +706,13 @@ const Profile = () => {
                                             value={vocabSearch}
                                             onChange={(e) => setVocabSearch(e.target.value)}
                                             placeholder="Tìm trong sổ..."
-                                            className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E5D9F2] rounded-full outline-none focus:border-primary/50 transition-colors"
+                                            className="w-full pl-9 pr-3 py-2 text-sm bg-surface border border-border text-text-primary placeholder:text-text-muted rounded-full outline-none focus:border-primary/50 transition-colors"
                                         />
                                     </div>
                                     <select
                                         value={vocabCefr}
                                         onChange={(e) => setVocabCefr(e.target.value as CefrFilter)}
-                                        className="px-4 py-2 text-sm bg-white border border-[#E5D9F2] rounded-full outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                                        className="px-4 py-2 text-sm bg-surface border border-border text-text-primary rounded-full outline-none focus:border-primary/50 transition-colors cursor-pointer"
                                     >
                                         {CEFR_OPTIONS.map((opt) => (
                                             <option key={opt} value={opt}>
@@ -725,10 +721,10 @@ const Profile = () => {
                                         ))}
                                     </select>
                                 </div>
-                                <div className="border border-[#EFE4FA] rounded-2xl overflow-hidden">
+                                <div className="border border-border rounded-2xl overflow-hidden">
                                     <div className="max-h-80 overflow-auto">
                                         <table className="w-full text-sm">
-                                            <thead className="bg-[#F7F0FF]/70 text-text-muted text-[10px] uppercase tracking-wider sticky top-0">
+                                            <thead className="bg-surface-hover text-text-muted text-[10px] uppercase tracking-wider sticky top-0 z-10">
                                                 <tr>
                                                     <th className="text-left px-4 py-2.5 font-bold">Từ</th>
                                                     <th className="text-left px-3 py-2.5 font-bold">IPA</th>
@@ -737,7 +733,7 @@ const Profile = () => {
                                                     <th className="text-left px-4 py-2.5 font-bold">Thuộc lúc</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-[#EFE4FA]">
+                                            <tbody className="divide-y divide-border">
                                                 {notebookRows.length === 0 ? (
                                                     <tr>
                                                         <td colSpan={5} className="px-4 py-6 text-center text-text-muted">
@@ -748,7 +744,7 @@ const Profile = () => {
                                                     notebookRows.map((item) => {
                                                         const learnedAt = learnedAtMap.get(item.id);
                                                         return (
-                                                            <tr key={item.id} className="hover:bg-[#F7F0FF]/60 transition-colors">
+                                                            <tr key={item.id} className="hover:bg-surface-hover transition-colors">
                                                                 <td className="px-4 py-2.5 font-bold text-text-primary">{item.word}</td>
                                                                 <td className="px-3 py-2.5 text-text-muted font-mono text-xs">{item.ipa || '—'}</td>
                                                                 <td className="px-3 py-2.5 text-text-secondary">{item.meaning || '—'}</td>
@@ -773,7 +769,7 @@ const Profile = () => {
                     </section>
 
                     {/* Security */}
-                    <section className="bg-white border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
                         <h2 className="text-lg font-bold text-text-primary mb-1">Bảo mật</h2>
                         <p className="text-xs text-text-muted mb-5">
                             Quản lý mật khẩu, email và tài khoản của bạn.
@@ -783,7 +779,7 @@ const Profile = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsChangePasswordOpen(true)}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-[#EFE4FA] hover:border-primary/40 hover:bg-[#F7F0FF]/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-primary/40 hover:bg-surface-hover transition-colors text-left cursor-pointer active:scale-[0.99]"
                             >
                                 <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                                     <KeyRound size={18} />
@@ -806,7 +802,7 @@ const Profile = () => {
                                         navigate(PATHS.verifyEmail);
                                     }
                                 }}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-[#EFE4FA] hover:border-primary/40 hover:bg-[#F7F0FF]/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-primary/40 hover:bg-surface-hover transition-colors text-left cursor-pointer active:scale-[0.99]"
                             >
                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isEmailVerified ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'}`}>
                                     <MailCheck size={18} />
@@ -828,7 +824,7 @@ const Profile = () => {
                             <button
                                 type="button"
                                 onClick={onLogout}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-[#EFE4FA] hover:border-primary/40 hover:bg-[#F7F0FF]/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-primary/40 hover:bg-surface-hover transition-colors text-left cursor-pointer active:scale-[0.99]"
                             >
                                 <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                                     <LogOut size={18} />
@@ -845,7 +841,7 @@ const Profile = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsDeleteAccountModalOpen(true)}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-red-100 hover:border-red-300 hover:bg-red-50/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-red-300 hover:bg-red-50/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
                             >
                                 <div className="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center shrink-0">
                                     <Trash2 size={18} />
@@ -862,29 +858,6 @@ const Profile = () => {
                     </section>
                 </div>
 
-                {/* ── Streak group full-width ─────────────────────────── */}
-                <section className="bg-linear-to-r from-[#F7F0FF] via-white to-[#F7F0FF] border border-[#E5D9F2] shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-6 sm:p-7">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                                <Users size={22} />
-                            </div>
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-bold text-text-primary">Nhóm Streak</h2>
-                                <p className="text-sm text-text-muted mt-1">
-                                    Mời thêm bạn bè để cùng nhau nhận Group Bonus XP và duy trì streak mỗi ngày.
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            variant="primary"
-                            className="px-5 py-2.5 shrink-0"
-                            onClick={onOpenStreak}
-                        >
-                            <UserPlus size={18} /> Mời bạn tham gia
-                        </Button>
-                    </div>
-                </section>
             </div>
 
             {isTaglineModalOpen && (
@@ -893,8 +866,8 @@ const Profile = () => {
                         className="absolute inset-0 bg-black/40"
                         onClick={() => setIsTaglineModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-[#E5D9F2] overflow-hidden">
-                        <div className="px-6 py-4 border-b border-[#EFE4FA]">
+                    <div className="relative w-full max-w-md bg-surface rounded-3xl shadow-2xl border border-border overflow-hidden">
+                        <div className="px-6 py-4 border-b border-border">
                             <h3 className="font-bold text-text-primary">Chỉnh sửa giới thiệu</h3>
                             <p className="text-xs text-text-muted mt-1">
                                 Dòng giới thiệu hiển thị dưới email của bạn.
@@ -906,13 +879,13 @@ const Profile = () => {
                                 onChange={(e) => setTaglineDraft(e.target.value.slice(0, 160))}
                                 rows={3}
                                 placeholder={DEFAULT_TAGLINE}
-                                className="w-full px-4 py-3 text-sm bg-white border border-[#E5D9F2] rounded-2xl outline-none focus:border-primary/50 transition-colors resize-none"
+                                className="w-full px-4 py-3 text-sm bg-surface border border-border text-text-primary placeholder:text-text-muted rounded-2xl outline-none focus:border-primary/50 transition-colors resize-none"
                             />
                             <div className="text-[11px] text-text-muted text-right">
                                 {taglineDraft.length} / 160
                             </div>
                         </div>
-                        <div className="px-6 py-4 border-t border-[#EFE4FA] flex items-center justify-end gap-2">
+                        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-2">
                             <Button variant="ghost" onClick={() => setIsTaglineModalOpen(false)}>
                                 Hủy
                             </Button>
