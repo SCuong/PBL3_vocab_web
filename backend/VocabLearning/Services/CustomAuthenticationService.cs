@@ -381,7 +381,7 @@ namespace VocabLearning.Services
             return await CreateEmailVerificationTokenAsync(user.UserId, cancellationToken);
         }
 
-        public async Task<(bool Succeeded, string? ErrorMessage)> VerifyEmailAsync(
+        public async Task<(bool Succeeded, string? ErrorMessage, string? Email)> VerifyEmailAsync(
             string token,
             string? consumedByIp,
             CancellationToken cancellationToken = default)
@@ -389,7 +389,7 @@ namespace VocabLearning.Services
             var cleanToken = token.Trim();
             if (string.IsNullOrWhiteSpace(cleanToken))
             {
-                return (false, "Verification token is required.");
+                return (false, "Verification token is required.", null);
             }
 
             var now = DateTime.UtcNow;
@@ -406,7 +406,7 @@ namespace VocabLearning.Services
                 || !IsLearner(verificationToken.User)
                 || !IsUserActive(verificationToken.User))
             {
-                return (false, "Verification token is invalid or expired.");
+                return (false, "Verification token is invalid or expired.", null);
             }
 
             verificationToken.User.IsEmailVerified = true;
@@ -422,7 +422,7 @@ namespace VocabLearning.Services
                 verificationToken.EmailVerificationTokenId);
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            return (true, null);
+            return (true, null, verificationToken.User.Email);
         }
 
         public async Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordWithTokenAsync(

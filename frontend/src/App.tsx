@@ -15,9 +15,9 @@ import { StudySession } from './components/learning/StudySession';
 import { StreakModal } from './components/learning/streak';
 import { Button, Toast } from './components/ui';
 import { Logo } from './assets/Logo';
-import { AdminDashboard, Auth, Home, LearnerDashboard, Leaderboard, MinitestResult, MinitestReview, Profile, VerifyEmail, Vocabulary } from './pages';
+import { AdminDashboard, Auth, Home, LearnerDashboard, Leaderboard, MinitestResult, MinitestReview, Profile, VerifyEmail, VerifyEmailSent, Vocabulary } from './pages';
 
-const AUTH_PATHS: string[] = [PATHS.login, PATHS.register, PATHS.verifyEmail];
+const AUTH_PATHS: string[] = [PATHS.login, PATHS.register, PATHS.verifyEmail, PATHS.verifyEmailSent];
 
 const AppShell = () => {
     const location = useLocation();
@@ -101,6 +101,10 @@ const AppShell = () => {
                             <Route
                                 path={PATHS.verifyEmail}
                                 element={<PublicOnlyRoute><VerifyEmail /></PublicOnlyRoute>}
+                            />
+                            <Route
+                                path={PATHS.verifyEmailSent}
+                                element={<PublicOnlyRoute><VerifyEmailSent /></PublicOnlyRoute>}
                             />
                             <Route
                                 path={PATHS.dashboard}
