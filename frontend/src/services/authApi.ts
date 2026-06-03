@@ -21,6 +21,7 @@ export type AuthApiResponse = {
     resetLink?: string;
     verificationLink?: string;
     inboxUrl?: string;
+    email?: string;
 };
 
 export type ForgotPasswordResult = {
@@ -105,7 +106,10 @@ export const authApi = {
             throw new Error(data.message || 'Xác minh email thất bại.');
         }
 
-        return data.message || 'Email verified successfully. You can now log in.';
+        return {
+            message: data.message || 'Email verified successfully. You can now log in.',
+            email: data.email
+        };
     },
 
     resendVerification: async (payload: { email: string }) => {
