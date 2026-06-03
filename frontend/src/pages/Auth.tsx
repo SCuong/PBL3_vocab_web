@@ -346,10 +346,16 @@ const Auth = () => {
                     password,
                     confirmPassword
                 });
+                setPassword('');
+                setConfirmPassword('');
+                setShowPassword(false);
+                setShowConfirmPassword(false);
                 const message = result.message || 'Account created. Please verify your email before logging in.';
-                setSuccessMessage(message);
-                setVerificationLink(result.verificationLink || '');
                 addToast(message, 'success');
+                navigate(PATHS.verifyEmailSent, {
+                    replace: true,
+                    state: { email: cleanEmail }
+                });
             }
         } catch (error: any) {
             const message = error?.message || 'Không thể kết nối tới hệ thống xác thực.';
