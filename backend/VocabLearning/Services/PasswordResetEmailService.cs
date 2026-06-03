@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Mail;
+using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 
@@ -36,6 +37,7 @@ namespace VocabLearning.Services
                 toEmail,
                 "Dat lai mat khau VocabLearning",
                 BuildPasswordResetHtmlBody(username, resetLink),
+                null,
                 "Password reset",
                 cancellationToken);
         }
@@ -48,8 +50,9 @@ namespace VocabLearning.Services
         {
             await SendEmailAsync(
                 toEmail,
-                "Xac minh email VocabLearning",
-                BuildEmailVerificationHtmlBody(username, verificationLink),
+                "Xác minh email VocabLearning",
+                BuildEmailVerificationHtmlBody(username, toEmail, verificationLink),
+                BuildEmailVerificationTextBody(username, toEmail, verificationLink),
                 "Email verification",
                 cancellationToken);
         }
@@ -60,17 +63,18 @@ namespace VocabLearning.Services
             string toEmail,
             string subject,
             string htmlBody,
+            string? textBody,
             string logAction,
             CancellationToken cancellationToken)
         {
             var resendApiKey = configuration["Resend:ApiKey"];
             if (!string.IsNullOrWhiteSpace(resendApiKey))
             {
-                await SendViaResendAsync(resendApiKey, toEmail, subject, htmlBody, logAction, cancellationToken);
+                await SendViaResendAsync(resendApiKey, toEmail, subject, htmlBody, textBody, logAction, cancellationToken);
                 return;
             }
 
-            await SendViaSmtpAsync(toEmail, subject, htmlBody, logAction, cancellationToken);
+            await SendViaSmtpAsync(toEmail, subject, htmlBody, textBody, logAction, cancellationToken);
         }
 
         private async Task SendViaResendAsync(
@@ -78,6 +82,7 @@ namespace VocabLearning.Services
             string toEmail,
             string subject,
             string htmlBody,
+            string? textBody,
             string logAction,
             CancellationToken cancellationToken)
         {
@@ -108,13 +113,19 @@ namespace VocabLearning.Services
 
             // Resend "from" format: "Display Name <sender@your-verified-domain>".
             var fromHeader = $"{fromName} <{fromEmail}>";
-            var payload = new
+            var payload = new Dictionary<string, object>
             {
-                from = fromHeader,
-                to = new[] { toEmail },
-                subject,
-                html = htmlBody,
+                ["from"] = fromHeader,
+                ["to"] = new[] { toEmail },
+                ["subject"] = subject,
+                ["html"] = htmlBody
             };
+
+            if (!string.IsNullOrWhiteSpace(textBody))
+            {
+                payload["text"] = textBody;
+            }
+
             var json = JsonSerializer.Serialize(payload);
 
             using var request = new HttpRequestMessage(HttpMethod.Post, ResendEndpoint);
@@ -151,6 +162,7 @@ namespace VocabLearning.Services
             string toEmail,
             string subject,
             string htmlBody,
+            string? textBody,
             string logAction,
             CancellationToken cancellationToken)
         {
@@ -208,11 +220,25 @@ namespace VocabLearning.Services
             {
                 From = new MailAddress(fromEmail!, string.IsNullOrWhiteSpace(fromName) ? "VocabLearning" : fromName),
                 Subject = subject,
+                SubjectEncoding = Encoding.UTF8,
+                BodyEncoding = Encoding.UTF8,
                 IsBodyHtml = true,
                 Body = htmlBody
             };
 
             message.To.Add(toEmail);
+
+            if (!string.IsNullOrWhiteSpace(textBody))
+            {
+                message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                    textBody,
+                    Encoding.UTF8,
+                    MediaTypeNames.Text.Plain));
+                message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+                    htmlBody,
+                    Encoding.UTF8,
+                    MediaTypeNames.Text.Html));
+            }
 
             var timeoutSeconds = ResolveTimeoutSeconds();
 
@@ -307,16 +333,96 @@ namespace VocabLearning.Services
 <p>Neu ban khong yeu cau thao tac nay, ban co the bo qua email.</p>";
         }
 
-        private static string BuildEmailVerificationHtmlBody(string username, string verificationLink)
+        private static string BuildEmailVerificationHtmlBody(string username, string email, string verificationLink)
         {
-            var displayName = string.IsNullOrWhiteSpace(username) ? "ban" : WebUtility.HtmlEncode(username);
+            var displayName = string.IsNullOrWhiteSpace(username) ? "bạn" : WebUtility.HtmlEncode(username);
+            var safeEmail = string.IsNullOrWhiteSpace(email) ? string.Empty : WebUtility.HtmlEncode(email.Trim());
             var safeLink = WebUtility.HtmlEncode(verificationLink);
 
-            return $@"<p>Chao {displayName},</p>
-<p>Cam on ban da dang ky VocabLearning.</p>
-<p>Hay nhan vao lien ket duoi day de xac minh email. Lien ket nay co hieu luc trong 24 gio va chi dung duoc mot lan:</p>
-<p><a href=""{safeLink}"">Xac minh email</a></p>
-<p>Neu ban khong tao tai khoan nay, hay bo qua email.</p>";
+            return $@"<!doctype html>
+<html lang=""vi"">
+<head>
+  <meta charset=""utf-8"">
+  <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+  <title>Xác minh email VocabLearning</title>
+</head>
+<body style=""margin:0;padding:0;background:#f5f7fb;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;color:#172033;"">
+  <table role=""presentation"" width=""100%"" cellspacing=""0"" cellpadding=""0"" border=""0"" style=""background:#f5f7fb;margin:0;padding:32px 16px;"">
+    <tr>
+      <td align=""center"">
+        <table role=""presentation"" width=""100%"" cellspacing=""0"" cellpadding=""0"" border=""0"" style=""width:100%;max-width:600px;background:#ffffff;border:1px solid #e6eaf2;border-radius:20px;overflow:hidden;box-shadow:0 18px 44px rgba(23,32,51,0.08);"">
+          <tr>
+            <td style=""padding:32px 36px 20px 36px;"">
+              <table role=""presentation"" cellspacing=""0"" cellpadding=""0"" border=""0"" width=""100%"">
+                <tr>
+                  <td style=""vertical-align:middle;"">
+                    <span style=""display:inline-block;width:38px;height:38px;line-height:38px;text-align:center;border-radius:12px;background:#4f46e5;color:#ffffff;font-size:15px;font-weight:700;letter-spacing:0.2px;"">VL</span>
+                    <span style=""display:inline-block;margin-left:10px;color:#172033;font-size:18px;font-weight:700;vertical-align:middle;"">VocabLearning</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:4px 36px 0 36px;"">
+              <h1 style=""margin:0;color:#172033;font-size:28px;line-height:1.25;font-weight:700;"">Xác minh email VocabLearning</h1>
+              <p style=""margin:18px 0 0 0;color:#4b587c;font-size:16px;line-height:1.65;"">Chào {displayName},</p>
+              {(string.IsNullOrWhiteSpace(safeEmail) ? string.Empty : $@"<p style=""margin:8px 0 0 0;color:#4b587c;font-size:14px;line-height:1.5;"">Email đăng ký: <strong style=""color:#172033;"">{safeEmail}</strong></p>")}
+              <p style=""margin:18px 0 0 0;color:#4b587c;font-size:16px;line-height:1.65;"">Cảm ơn bạn đã đăng ký VocabLearning. Hãy nhấn nút bên dưới để xác minh email.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align=""center"" style=""padding:28px 36px 20px 36px;"">
+              <a href=""{safeLink}"" style=""display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:999px;padding:14px 28px;font-size:16px;font-weight:700;line-height:1;"">Xác minh email</a>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:0 36px 28px 36px;"">
+              <p style=""margin:0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu nút không hoạt động, hãy sao chép và mở liên kết này trong trình duyệt:</p>
+              <p style=""margin:10px 0 0 0;color:#4f46e5;font-size:13px;line-height:1.6;word-break:break-all;""><a href=""{safeLink}"" style=""color:#4f46e5;text-decoration:underline;"">{safeLink}</a></p>
+              <div style=""margin:24px 0 0 0;padding:14px 16px;border-radius:14px;background:#f8fafc;border:1px solid #e6eaf2;"">
+                <p style=""margin:0;color:#4b587c;font-size:14px;line-height:1.55;"">Liên kết này có hiệu lực trong 24 giờ và chỉ dùng được một lần.</p>
+              </div>
+              <p style=""margin:18px 0 0 0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:22px 36px;background:#f8fafc;border-top:1px solid #e6eaf2;text-align:center;"">
+              <p style=""margin:0;color:#8a94ad;font-size:12px;line-height:1.5;"">VocabLearning / PBL3 Project</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>";
+        }
+
+        private static string BuildEmailVerificationTextBody(string username, string email, string verificationLink)
+        {
+            var displayName = string.IsNullOrWhiteSpace(username) ? "bạn" : username.Trim();
+            var cleanEmail = string.IsNullOrWhiteSpace(email) ? string.Empty : email.Trim();
+
+            var emailLine = string.IsNullOrWhiteSpace(cleanEmail)
+                ? string.Empty
+                : $"{Environment.NewLine}Email đăng ký: {cleanEmail}{Environment.NewLine}";
+
+            return $@"VL VocabLearning
+
+Xác minh email VocabLearning
+
+Chào {displayName},{emailLine}
+Cảm ơn bạn đã đăng ký VocabLearning. Hãy nhấn liên kết bên dưới để xác minh email.
+
+Xác minh email:
+{verificationLink}
+
+Liên kết này có hiệu lực trong 24 giờ và chỉ dùng được một lần.
+
+Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.
+
+VocabLearning / PBL3 Project";
         }
     }
 }

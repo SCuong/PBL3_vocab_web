@@ -173,6 +173,8 @@ const Auth = () => {
 
     useEffect(() => {
         const mode = (searchParams.get('mode') || '').toLowerCase();
+        const verified = searchParams.get('verified') === '1';
+        const verifiedEmail = searchParams.get('email')?.trim() ?? '';
 
         if (mode === 'reset') {
             setIsLogin(true);
@@ -182,6 +184,23 @@ const Auth = () => {
             resetForgotPasswordState();
             setForgotEmail(searchParams.get('email') || '');
             setResetToken(searchParams.get('token') || '');
+            return;
+        }
+
+        if (verified) {
+            setIsLogin(true);
+            setFlipState('idle');
+            setIsForgotPasswordMode(false);
+            setIsResetPasswordMode(false);
+            resetForgotPasswordState();
+            setUsernameOrEmail(verifiedEmail);
+            setPassword('');
+            setConfirmPassword('');
+            setShowPassword(false);
+            setShowConfirmPassword(false);
+            setErrorMessage('');
+            setSuccessMessage('Email đã được xác minh. Vui lòng đăng nhập.');
+            setVerificationLink('');
         }
     }, [searchParams]);
 
@@ -346,10 +365,16 @@ const Auth = () => {
                     password,
                     confirmPassword
                 });
+                setPassword('');
+                setConfirmPassword('');
+                setShowPassword(false);
+                setShowConfirmPassword(false);
                 const message = result.message || 'Account created. Please verify your email before logging in.';
-                setSuccessMessage(message);
-                setVerificationLink(result.verificationLink || '');
                 addToast(message, 'success');
+                navigate(PATHS.verifyEmailSent, {
+                    replace: true,
+                    state: { email: cleanEmail }
+                });
             }
         } catch (error: any) {
             const message = error?.message || 'Không thể kết nối tới hệ thống xác thực.';

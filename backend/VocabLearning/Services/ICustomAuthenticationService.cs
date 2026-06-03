@@ -38,7 +38,7 @@ namespace VocabLearning.Services
         Task<(bool ShouldSendEmail, string Email, string Username, string Token)> CreateEmailVerificationTokenForEmailAsync(
             string email, CancellationToken cancellationToken = default);
 
-        Task<(bool Succeeded, string? ErrorMessage)> VerifyEmailAsync(
+        Task<(bool Succeeded, string? ErrorMessage, string? Email)> VerifyEmailAsync(
             string token, string? consumedByIp,
             CancellationToken cancellationToken = default);
 

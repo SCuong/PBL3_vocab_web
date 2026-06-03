@@ -299,7 +299,8 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Email verified successfully. You can now log in."
+                Message = "Email verified successfully. You can now log in.",
+                Email = result.Email
             });
         }
 
