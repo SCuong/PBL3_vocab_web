@@ -356,7 +356,7 @@ namespace VocabLearning.Services
               <table role=""presentation"" cellspacing=""0"" cellpadding=""0"" border=""0"" width=""100%"">
                 <tr>
                   <td style=""vertical-align:middle;"">
-                    <span style=""display:inline-block;width:38px;height:38px;line-height:38px;text-align:center;border-radius:12px;background:#4f46e5;color:#ffffff;font-size:15px;font-weight:700;letter-spacing:0.2px;"">VL</span>
+                    <span style=""display:inline-block;color:#5b4bff;background:linear-gradient(135deg,#19c6ff 0%,#8b3dff 52%,#ff4fd8 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:26px;font-weight:900;line-height:1;letter-spacing:-1.5px;vertical-align:middle;"">VL</span>
                     <span style=""display:inline-block;margin-left:10px;color:#172033;font-size:18px;font-weight:700;vertical-align:middle;"">VocabLearning</span>
                   </td>
                 </tr>
@@ -378,9 +378,7 @@ namespace VocabLearning.Services
           </tr>
           <tr>
             <td style=""padding:0 36px 28px 36px;"">
-              <p style=""margin:0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu nút không hoạt động, hãy sao chép và mở liên kết này trong trình duyệt:</p>
-              <p style=""margin:10px 0 0 0;color:#4f46e5;font-size:13px;line-height:1.6;word-break:break-all;""><a href=""{safeLink}"" style=""color:#4f46e5;text-decoration:underline;"">{safeLink}</a></p>
-              <div style=""margin:24px 0 0 0;padding:14px 16px;border-radius:14px;background:#f8fafc;border:1px solid #e6eaf2;"">
+              <div style=""margin:0;padding:14px 16px;border-radius:14px;background:#f8fafc;border:1px solid #e6eaf2;"">
                 <p style=""margin:0;color:#4b587c;font-size:14px;line-height:1.55;"">Liên kết này có hiệu lực trong 24 giờ và chỉ dùng được một lần.</p>
               </div>
               <p style=""margin:18px 0 0 0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.</p>
