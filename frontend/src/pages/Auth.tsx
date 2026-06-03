@@ -173,6 +173,8 @@ const Auth = () => {
 
     useEffect(() => {
         const mode = (searchParams.get('mode') || '').toLowerCase();
+        const verified = searchParams.get('verified') === '1';
+        const verifiedEmail = searchParams.get('email')?.trim() ?? '';
 
         if (mode === 'reset') {
             setIsLogin(true);
@@ -182,6 +184,23 @@ const Auth = () => {
             resetForgotPasswordState();
             setForgotEmail(searchParams.get('email') || '');
             setResetToken(searchParams.get('token') || '');
+            return;
+        }
+
+        if (verified) {
+            setIsLogin(true);
+            setFlipState('idle');
+            setIsForgotPasswordMode(false);
+            setIsResetPasswordMode(false);
+            resetForgotPasswordState();
+            setUsernameOrEmail(verifiedEmail);
+            setPassword('');
+            setConfirmPassword('');
+            setShowPassword(false);
+            setShowConfirmPassword(false);
+            setErrorMessage('');
+            setSuccessMessage('Email đã được xác minh. Vui lòng đăng nhập.');
+            setVerificationLink('');
         }
     }, [searchParams]);
 

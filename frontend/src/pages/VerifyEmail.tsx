@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, typography } from '../components/ui';
 import { authApi } from '../services/authApi';
 import { PATHS } from '../routes/paths';
 
 const VerifyEmail = () => {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('Đang xác minh email...');
@@ -19,10 +20,14 @@ const VerifyEmail = () => {
 
         let isCancelled = false;
         authApi.verifyEmail({ token })
-            .then((resultMessage) => {
+            .then((result) => {
                 if (isCancelled) return;
-                setStatus('success');
-                setMessage(resultMessage);
+                const loginParams = new URLSearchParams({ verified: '1' });
+                if (result.email) {
+                    loginParams.set('email', result.email);
+                }
+
+                navigate(`${PATHS.login}?${loginParams.toString()}`, { replace: true });
             })
             .catch((error: any) => {
                 if (isCancelled) return;
@@ -33,7 +38,7 @@ const VerifyEmail = () => {
         return () => {
             isCancelled = true;
         };
-    }, [searchParams]);
+    }, [navigate, searchParams]);
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-8">

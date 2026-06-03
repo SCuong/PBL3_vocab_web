@@ -110,5 +110,7 @@ namespace VocabLearning.ViewModels.Account
         public string? VerificationLink { get; set; }
 
         public string? InboxUrl { get; set; }
+
+        public string? Email { get; set; }
     }
 }
