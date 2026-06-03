@@ -49,6 +49,7 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 30;
 const EMAIL_VERIFICATION_REQUIRED_MESSAGE = 'Please verify your email before logging in.';
+const REGISTER_EMAIL_FORMAT_MESSAGE = 'Email không đúng định dạng.';
 const ALLOWED_EMAIL_TLDS = new Set([
     'com', 'net', 'org', 'edu', 'gov', 'vn', 'com.vn', 'edu.vn', 'gov.vn', 'net.vn',
     'info', 'io', 'co', 'dev', 'app', 'me', 'biz'
@@ -118,6 +119,7 @@ const Auth = () => {
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [verificationLink, setVerificationLink] = useState('');
+    const [registerEmailTouched, setRegisterEmailTouched] = useState(false);
     const googleLoginButtonRef = useRef<HTMLDivElement>(null);
     const googleRegisterButtonRef = useRef<HTMLDivElement>(null);
     // 'idle' | 'active' | 'close' — mirrors the sample's container class
@@ -131,6 +133,12 @@ const Auth = () => {
         setForgotPasswordResetLink('');
         setForgotPasswordUsedFallback(false);
     };
+
+    const registerEmailError = registerEmailTouched
+        && email.trim().length > 0
+        && !isValidSignupEmail(email)
+        ? REGISTER_EMAIL_FORMAT_MESSAGE
+        : '';
 
     const handleGoogleCredential = useCallback(async (response: GoogleCredentialResponse) => {
         if (isGoogleSubmitting) return;
@@ -169,6 +177,7 @@ const Auth = () => {
         setErrorMessage('');
         setSuccessMessage('');
         setVerificationLink('');
+        setRegisterEmailTouched(false);
     }, [initialMode]);
 
     useEffect(() => {
@@ -342,13 +351,14 @@ const Auth = () => {
             } else {
                 const cleanName = normalizeDisplayName(name);
                 const cleanEmail = normalizeSignupEmail(email);
+                setRegisterEmailTouched(true);
 
                 if (!isValidDisplayName(cleanName)) {
                     setErrorMessage(`Tên hiển thị phải từ ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} ký tự.`);
                     return;
                 }
                 if (!isValidSignupEmail(cleanEmail)) {
-                    setErrorMessage('Email không đúng định dạng.');
+                    setErrorMessage(cleanEmail ? '' : REGISTER_EMAIL_FORMAT_MESSAGE);
                     return;
                 }
                 if (!isPasswordValid) {
@@ -369,6 +379,7 @@ const Auth = () => {
                 setConfirmPassword('');
                 setShowPassword(false);
                 setShowConfirmPassword(false);
+                setRegisterEmailTouched(false);
                 const message = result.message || 'Account created. Please verify your email before logging in.';
                 addToast(message, 'success');
                 navigate(PATHS.verifyEmailSent, {
@@ -416,6 +427,7 @@ const Auth = () => {
         setErrorMessage('');
         setSuccessMessage('');
         setVerificationLink('');
+        setRegisterEmailTouched(false);
     };
 
     const switchToLogin = () => {
@@ -424,6 +436,7 @@ const Auth = () => {
         setErrorMessage('');
         setSuccessMessage('');
         setVerificationLink('');
+        setRegisterEmailTouched(false);
         setConfirmPassword('');
         setShowConfirmPassword(false);
     };
@@ -583,18 +596,18 @@ const Auth = () => {
     //   class on container: '' | 'active' | 'close'
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
+        <div className="min-h-[calc(100dvh-65px)] flex items-center justify-center px-4 py-4 relative overflow-hidden">
             {/* Background orbs */}
             <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
             <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" style={{ animationDelay: '0.5s' }} />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-secondary/15 rounded-full blur-[80px] -z-10" />
 
             {/* Root flip container */}
-            <div className={`auth-flip-root ${flipState}`}>
+            <div className={`auth-flip-root ${flipState} lg:!min-h-[690px]`}>
 
                 {/* ── Login panel (LEFT) ─────────────────────────────────── */}
-                <div className="auth-panel auth-panel-login" data-testid="login-panel">
-                    <div className="auth-panel-content">
+                <div className="auth-panel auth-panel-login !overflow-visible" data-testid="login-panel">
+                    <div className="auth-panel-content !px-8 !py-6">
                         <div className="text-center mb-6">
                             <h2 className="text-3xl font-bold text-text-primary">Đăng nhập</h2>
                             <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
@@ -629,7 +642,7 @@ const Auth = () => {
 
                             {errorMessage && isLogin && (
                                 <div className="space-y-2">
-                                    <div className="auth-error">{errorMessage}</div>
+                                    <div className="auth-error !p-2.5 !text-xs leading-snug break-words">{errorMessage}</div>
                                     {errorMessage === EMAIL_VERIFICATION_REQUIRED_MESSAGE && (
                                         <button
                                             type="button"
@@ -642,7 +655,7 @@ const Auth = () => {
                                     )}
                                 </div>
                             )}
-                            {successMessage && isLogin && <div className="auth-success">{successMessage}</div>}
+                            {successMessage && isLogin && <div className="auth-success !p-2.5 !text-xs leading-snug break-words">{successMessage}</div>}
                             {verificationLink && isLogin && (
                                 <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
                                     Mở liên kết xác minh
@@ -679,8 +692,8 @@ const Auth = () => {
                 </div>
 
                 {/* ── Register panel (RIGHT) ─────────────────────────────── */}
-                <div className="auth-panel auth-panel-register" data-testid="register-panel">
-                    <div className="auth-panel-content">
+                <div className="auth-panel auth-panel-register !overflow-visible" data-testid="register-panel">
+                    <div className="auth-panel-content !px-8 !py-6">
                         <div className="text-center mb-3">
                             <h2 className="text-3xl font-bold text-text-primary">Đăng ký</h2>
                             <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
@@ -692,9 +705,29 @@ const Auth = () => {
                             <input type="text" placeholder="Tên hiển thị"
                                 className="auth-input"
                                 value={name} onChange={(e) => setName(e.target.value)} />
-                            <input type="email" placeholder="Email"
-                                className="auth-input"
-                                value={email} onChange={(e) => setEmail(e.target.value)} />
+                            <div className="w-full">
+                                <input
+                                    id="register-email"
+                                    type="email"
+                                    placeholder="Email"
+                                    className="auth-input"
+                                    value={email}
+                                    aria-invalid={Boolean(registerEmailError)}
+                                    aria-describedby={registerEmailError ? 'register-email-error' : undefined}
+                                    onBlur={() => setRegisterEmailTouched(true)}
+                                    onChange={(e) => {
+                                        setEmail(e.target.value);
+                                        if (errorMessage === REGISTER_EMAIL_FORMAT_MESSAGE) {
+                                            setErrorMessage('');
+                                        }
+                                    }}
+                                />
+                                {registerEmailError && (
+                                    <p id="register-email-error" className="mt-1.5 px-1 text-xs font-medium leading-snug text-red-500">
+                                        {registerEmailError}
+                                    </p>
+                                )}
+                            </div>
                             <div className="relative">
                                 <input type={showPassword ? 'text' : 'password'} placeholder="Mật khẩu"
                                     className="auth-input pr-12"
@@ -718,8 +751,8 @@ const Auth = () => {
 
                             {renderPasswordPolicyChecklist(passwordPolicy)}
 
-                            {errorMessage && !isLogin && <div className="auth-error">{errorMessage}</div>}
-                            {successMessage && !isLogin && <div className="auth-success">{successMessage}</div>}
+                            {errorMessage && !isLogin && <div className="auth-error !p-2.5 !text-xs leading-snug break-words">{errorMessage}</div>}
+                            {successMessage && !isLogin && <div className="auth-success !p-2.5 !text-xs leading-snug break-words">{successMessage}</div>}
                             {verificationLink && !isLogin && (
                                 <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
                                     Mở liên kết xác minh
