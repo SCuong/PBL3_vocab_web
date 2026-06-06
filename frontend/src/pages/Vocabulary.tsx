@@ -245,7 +245,12 @@ const Vocabulary = () => {
                             </Button>
                         </div>
                         <h3 className="text-2xl mb-1 group-hover:text-primary transition-colors">{v.word}</h3>
-                        <p className="text-text-muted font-mono text-sm mb-4">{v.transcription}</p>
+                        <p
+                            className="text-text-muted text-sm mb-4"
+                            style={{ fontFamily: '"Segoe UI", "Noto Sans", Arial, sans-serif' }}
+                        >
+                            {v.transcription}
+                        </p>
                         <p className="text-text-secondary line-clamp-2">{v.meaning}</p>
                     </div>
                 ))}
@@ -332,7 +337,12 @@ const Vocabulary = () => {
                             <div className="min-w-0">
                                 <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
                                 <h2 className={`${typography.sectionTitle} mb-1 truncate`}>{selectedWord.word}</h2>
-                                <p className="text-text-muted font-mono text-sm">{selectedWord.transcription}</p>
+                                <p
+                                    className="text-text-muted text-sm"
+                                    style={{ fontFamily: '"Segoe UI", "Noto Sans", Arial, sans-serif' }}
+                                >
+                                    {selectedWord.transcription}
+                                </p>
                             </div>
                             <button
                                 type="button"
