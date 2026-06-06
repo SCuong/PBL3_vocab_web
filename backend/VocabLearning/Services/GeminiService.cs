@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using VocabLearning.ViewModels.AI;
 
 namespace VocabLearning.Services
 {
@@ -11,6 +9,11 @@ namespace VocabLearning.Services
     {
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
         private const string Model = "gemini-2.5-flash";
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
 
         private readonly string _apiKey;
         private readonly HttpClient _httpClient;
@@ -22,97 +25,130 @@ namespace VocabLearning.Services
             _logger = logger;
             _apiKey = configuration["Gemini:ApiKey"] ?? string.Empty;
 
-            if (string.IsNullOrEmpty(_apiKey))
-                throw new InvalidOperationException("Gemini:ApiKey not configured. Set Gemini__ApiKey= in .env file.");
-
-            var prefix = _apiKey.Length >= 8 ? _apiKey[..8] + "..." : "(too short — check key)";
-            _logger.LogInformation("GeminiService initialized. KeyLoaded=true, Prefix={Prefix}, KeyLength={Len}",
-                prefix, _apiKey.Length);
-
+            _logger.LogInformation("GeminiService initialized. KeyConfigured={Configured}",
+                !string.IsNullOrWhiteSpace(_apiKey));
         }
 
-        public async Task<string> ExplainVocabularyAsync(string word, string? context = null)
+        public async Task<VocabularyExplanationViewModel> ExplainVocabularyAsync(
+            string word,
+            string? context = null)
         {
-            var maskedEndpoint = $"{BaseUrl}/{Model}:generateContent?key=***";
+            if (string.IsNullOrWhiteSpace(_apiKey))
+            {
+                _logger.LogWarning("Gemini API key is not configured. Returning learner fallback.");
+                return CreateFallback(word, context);
+            }
+
             var endpoint = $"{BaseUrl}/{Model}:generateContent?key={_apiKey}";
-
-            string prompt = $@"Bạn là một giáo viên tiếng Anh tận tâm. Hãy giải thích từ vựng '{word}' bằng tiếng Việt một cách dễ hiểu.
-{(string.IsNullOrWhiteSpace(context) ? "" : $"Ngữ cảnh sử dụng của từ này có thể liên quan đến: {context}. ")}
-Vui lòng định dạng phản hồi bằng HTML cơ bản (chỉ dùng <b>, <i>, <ul>, <li>, <br>) với cấu trúc sau:
-1. <b>Nghĩa chính:</b> (Giải nghĩa)
-2. <b>Sắc thái sử dụng:</b> (Cách dùng trong ngữ cảnh nào, trang trọng hay thân mật)
-3. <b>Ví dụ:</b>
-   <ul>
-     <li>(Ví dụ tiếng Anh 1) - <i>(Nghĩa tiếng Việt 1)</i></li>
-     <li>(Ví dụ tiếng Anh 2) - <i>(Nghĩa tiếng Việt 2)</i></li>
-   </ul>
-4. <b>Mẹo ghi nhớ:</b> (Một cách nhớ vui hoặc dễ nhớ)";
-
+            var prompt = BuildPrompt(word, context);
             var requestBody = new
             {
                 contents = new[]
                 {
                     new { parts = new[] { new { text = prompt } } }
+                },
+                generationConfig = new
+                {
+                    responseMimeType = "application/json",
+                    temperature = 0.3
                 }
             };
 
-            var json = JsonSerializer.Serialize(requestBody);
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var content = new StringContent(
+                JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json");
 
-            var sw = Stopwatch.StartNew();
-            _logger.LogInformation("Gemini request starting. Endpoint={Endpoint}", maskedEndpoint);
+            var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation("Gemini vocabulary explanation request starting. Word={Word}", word);
 
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                var response = await _httpClient.PostAsync(endpoint, content, cts.Token);
-                sw.Stop();
-
-                _logger.LogInformation("Gemini response received in {Elapsed}ms. Status={Status}",
-                    sw.ElapsedMilliseconds, response.StatusCode);
-
+                using var response = await _httpClient.PostAsync(endpoint, content, cts.Token);
                 var responseBody = await response.Content.ReadAsStringAsync();
+                stopwatch.Stop();
+
+                _logger.LogInformation(
+                    "Gemini response received in {Elapsed}ms. Status={Status}",
+                    stopwatch.ElapsedMilliseconds,
+                    response.StatusCode);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Gemini API error. Status={Status}, Body={Body}",
-                        response.StatusCode, responseBody);
-                    return $"<div class='alert alert-danger'>Gemini API lỗi {(int)response.StatusCode}: {ExtractErrorMessage(responseBody)}</div>";
+                    _logger.LogError("Gemini API returned status {Status}. Word={Word}",
+                        response.StatusCode, word);
+                    return CreateFallback(word, context);
                 }
 
-                return ExtractText(responseBody);
-            }
-            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
-            {
-                sw.Stop();
-                _logger.LogError("Gemini API: HttpClient hard timeout after {Elapsed}ms. Word={Word}",
-                    sw.ElapsedMilliseconds, word);
-                return "<div class='alert alert-warning'>Gemini API timeout. Kiểm tra kết nối mạng tới googleapis.com.</div>";
+                var explanation = ExtractExplanation(responseBody);
+                if (explanation is null)
+                {
+                    _logger.LogWarning("Gemini response could not be parsed as structured learner content. Word={Word}",
+                        word);
+                    return CreateFallback(word, context);
+                }
+
+                return explanation;
             }
             catch (OperationCanceledException)
             {
-                sw.Stop();
-                _logger.LogError("Gemini API: cancelled after {Elapsed}ms (30s CTS). Word={Word}",
-                    sw.ElapsedMilliseconds, word);
-                return "<div class='alert alert-warning'>Gemini API không phản hồi sau 30 giây. Kiểm tra kết nối mạng hoặc thử lại.</div>";
+                stopwatch.Stop();
+                _logger.LogError("Gemini API timed out after {Elapsed}ms. Word={Word}",
+                    stopwatch.ElapsedMilliseconds, word);
+                return CreateFallback(word, context);
             }
             catch (HttpRequestException ex)
             {
-                sw.Stop();
-                _logger.LogError(ex, "Gemini API: network/DNS error after {Elapsed}ms. StatusCode={Status}. Detail={Detail}",
-                    sw.ElapsedMilliseconds, ex.StatusCode, ex.ToString());
-                return $"<div class='alert alert-danger'>Lỗi mạng khi gọi Gemini: {ex.Message}<br><small>Có thể DNS hoặc firewall chặn googleapis.com</small></div>";
+                stopwatch.Stop();
+                _logger.LogError(ex, "Gemini API network error after {Elapsed}ms. Word={Word}",
+                    stopwatch.ElapsedMilliseconds, word);
+                return CreateFallback(word, context);
             }
             catch (Exception ex)
             {
-                sw.Stop();
-                _logger.LogError(ex, "Gemini API: unexpected error after {Elapsed}ms. Detail={Detail}",
-                    sw.ElapsedMilliseconds, ex.ToString());
-                return $"<div class='alert alert-danger'>Lỗi kết nối AI: {ex.Message}</div>";
+                stopwatch.Stop();
+                _logger.LogError(ex, "Gemini API unexpected error after {Elapsed}ms. Word={Word}",
+                    stopwatch.ElapsedMilliseconds, word);
+                return CreateFallback(word, context);
             }
         }
 
-        private static string ExtractText(string responseBody)
+        private static string BuildPrompt(string word, string? context)
+        {
+            var contextInstruction = string.IsNullOrWhiteSpace(context)
+                ? "Không có nghĩa tiếng Việt bổ sung."
+                : $"Nghĩa/ngữ cảnh hiện có: {context.Trim()}";
+
+            return $$"""
+Bạn là trợ lý học từ vựng tiếng Anh cho người Việt.
+Hãy tạo nội dung ngắn, thực tế, dễ quét cho từ "{{word.Trim()}}".
+{{contextInstruction}}
+
+Chỉ trả về JSON hợp lệ theo đúng cấu trúc:
+{
+  "summary": "Tóm tắt thân thiện, tối đa 3 câu",
+  "quickUsage": "Cách dùng tự nhiên, tối đa 2 câu",
+  "collocations": [
+    { "phrase": "cụm từ", "meaning": "nghĩa tiếng Việt", "example": "ví dụ tiếng Anh ngắn" }
+  ],
+  "confusingWords": [
+    { "word": "từ dễ nhầm", "difference": "phân biệt ngắn bằng tiếng Việt" }
+  ],
+  "commonMistakes": [
+    { "wrong": "câu sai", "correct": "câu đúng", "explanation": "giải thích ngắn bằng tiếng Việt" }
+  ]
+}
+
+Yêu cầu:
+- Viết giải thích bằng tiếng Việt; câu ví dụ bằng tiếng Anh.
+- Tập trung cách dùng tự nhiên, cụm từ phổ biến, từ dễ nhầm, lỗi người Việt hay mắc.
+- Tối đa 5 collocations, 3 confusingWords, 3 commonMistakes.
+- Không viết bài luận, markdown, HTML hoặc nội dung ngoài JSON.
+""";
+        }
+
+        private static VocabularyExplanationViewModel? ExtractExplanation(string responseBody)
         {
             try
             {
@@ -123,26 +159,77 @@ Vui lòng định dạng phản hồi bằng HTML cơ bản (chỉ dùng <b>, <i
                     .GetProperty("parts")[0]
                     .GetProperty("text")
                     .GetString();
-                return text ?? "Không thể lấy được phản hồi từ AI.";
+
+                if (string.IsNullOrWhiteSpace(text))
+                    return null;
+
+                var json = StripCodeFence(text);
+                var explanation = JsonSerializer.Deserialize<VocabularyExplanationViewModel>(json, JsonOptions);
+                if (explanation is null || string.IsNullOrWhiteSpace(explanation.Summary))
+                    return null;
+
+                explanation.Summary = explanation.Summary.Trim();
+                explanation.QuickUsage = explanation.QuickUsage?.Trim() ?? string.Empty;
+                explanation.Collocations = explanation.Collocations?
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Phrase))
+                    .Take(5)
+                    .ToList() ?? [];
+                explanation.ConfusingWords = explanation.ConfusingWords?
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Word))
+                    .Take(3)
+                    .ToList() ?? [];
+                explanation.CommonMistakes = explanation.CommonMistakes?
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Correct))
+                    .Take(3)
+                    .ToList() ?? [];
+                explanation.Explanation = BuildCompatibilityExplanation(explanation);
+                explanation.IsFallback = false;
+
+                return explanation;
             }
             catch
             {
-                return $"<div class='alert alert-warning'>Không thể parse phản hồi từ Gemini.</div>";
+                return null;
             }
         }
 
-        private static string ExtractErrorMessage(string responseBody)
+        private static string StripCodeFence(string value)
         {
-            try
-            {
-                using var doc = JsonDocument.Parse(responseBody);
-                return doc.RootElement.GetProperty("error").GetProperty("message").GetString() ?? responseBody;
-            }
-            catch
-            {
-                return responseBody;
-            }
+            var trimmed = value.Trim();
+            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+                return trimmed;
+
+            var firstLineEnd = trimmed.IndexOf('\n');
+            if (firstLineEnd >= 0)
+                trimmed = trimmed[(firstLineEnd + 1)..];
+
+            if (trimmed.EndsWith("```", StringComparison.Ordinal))
+                trimmed = trimmed[..^3];
+
+            return trimmed.Trim();
         }
 
+        private static string BuildCompatibilityExplanation(VocabularyExplanationViewModel explanation)
+        {
+            return string.IsNullOrWhiteSpace(explanation.QuickUsage)
+                ? explanation.Summary
+                : $"{explanation.Summary}\n\n{explanation.QuickUsage}";
+        }
+
+        private static VocabularyExplanationViewModel CreateFallback(string word, string? context)
+        {
+            var normalizedWord = word.Trim();
+            var meaning = string.IsNullOrWhiteSpace(context)
+                ? "ngữ cảnh đang học"
+                : context.Trim();
+
+            return new VocabularyExplanationViewModel
+            {
+                Summary = $"{normalizedWord} là từ vựng tiếng Anh liên quan đến “{meaning}”.",
+                QuickUsage = "Hãy xem nghĩa và ví dụ hiện có, sau đó thử đặt một câu ngắn với từ này.",
+                Explanation = $"{normalizedWord}: {meaning}",
+                IsFallback = true
+            };
+        }
     }
 }

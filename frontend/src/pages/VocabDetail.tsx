@@ -5,7 +5,7 @@ import { Badge, Button, typography } from '../components/ui';
 import { apiFetch } from '../services/apiClient';
 
 const VocabDetail = ({ word, onBack }: any) => {
-    const [aiResponse, setAiResponse] = useState<string | null>(null);
+    const [aiResponse, setAiResponse] = useState<{ summary: string; quickUsage: string } | null>(null);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
 
     if (!word) return null;
@@ -27,16 +27,15 @@ const VocabDetail = ({ word, onBack }: any) => {
             });
 
             if (response.ok) {
-                const htmlContent = await response.text();
-                setAiResponse(htmlContent);
+                setAiResponse(await response.json() as { summary: string; quickUsage: string });
             } else {
-                setAiResponse(`<div class='text-red-500'>Lỗi ${response.status}: Không thể gọi AI. Vui lòng thử lại.</div>`);
+                setAiResponse({ summary: 'Trợ lý AI chưa thể phân tích từ này.', quickUsage: 'Vui lòng thử lại sau.' });
             }
         } catch (error: any) {
             if (error.name === 'AbortError') {
-                setAiResponse("<div class='text-red-500'>Hết thời gian chờ (30s). Kiểm tra kết nối hoặc thử lại.</div>");
+                setAiResponse({ summary: 'Trợ lý AI phản hồi quá lâu.', quickUsage: 'Kiểm tra kết nối hoặc thử lại.' });
             } else {
-                setAiResponse(`<div class='text-red-500'>Lỗi kết nối: ${error.message}</div>`);
+                setAiResponse({ summary: 'Không thể kết nối với trợ lý AI.', quickUsage: 'Vui lòng thử lại sau.' });
             }
         } finally {
             clearTimeout(timeoutId);
@@ -84,10 +83,12 @@ const VocabDetail = ({ word, onBack }: any) => {
                                         <Loader2 size={32} className="animate-spin" />
                                     </div>
                                 ) : (
-                                    <div 
-                                        className="text-base leading-relaxed text-text-primary prose prose-cyan" 
-                                        dangerouslySetInnerHTML={{ __html: aiResponse || '' }} 
-                                    />
+                                    <div className="text-base leading-relaxed text-text-primary">
+                                        <p>{aiResponse?.summary}</p>
+                                        {aiResponse?.quickUsage && (
+                                            <p className="mt-3 text-text-secondary">{aiResponse.quickUsage}</p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
