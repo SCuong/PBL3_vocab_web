@@ -1334,6 +1334,10 @@
 }
 
 @layer utilities {
+    .font-ipa {
+        font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+    }
+
     h1.home-hero-title {
         font-family: var(--font-decorative);
         font-size: clamp(3rem, 4.8vw, 4rem);

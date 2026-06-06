@@ -51,7 +51,7 @@ const VocabDetail = ({ word, onBack }: any) => {
                     <div className="text-center md:text-left flex-1">
                         <Badge variant="cyan" className="mb-4">{word.cefr}</Badge>
                         <h1 className={`${typography.pageTitle} mb-2`}>{word.word}</h1>
-                        <p className="text-lg sm:text-xl text-text-muted font-mono mb-8">{word.transcription}</p>
+                        <p className="text-lg sm:text-xl text-text-muted font-ipa mb-8">{word.transcription}</p>
                         <div className="flex flex-col gap-3">
                             <Button variant="primary" className="text-lg px-8 w-full md:w-auto" onClick={() => playPronunciationAudio(word.audioUrl, word.word)}><Volume2 size={24} /> Nghe phát âm</Button>
                             <Button variant="accent" className="text-lg px-8 w-full md:w-auto" onClick={handleAskAi} disabled={isLoadingAi}>
