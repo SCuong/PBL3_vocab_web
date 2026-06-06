@@ -142,7 +142,7 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
                             <Input label="Word" value={form.word} onChange={set('word')} placeholder="e.g. eloquent" required autoFocus />
                         </div>
                         <div>
-                            <Input label="IPA" className="font-mono" value={form.ipa} onChange={set('ipa')} placeholder="/el.o.kwent/" />
+                            <Input label="IPA" className="font-ipa" value={form.ipa} onChange={set('ipa')} placeholder="/el.o.kwent/" />
                         </div>
                         <div>
                             <Select label="CEFR Level" value={form.level} onChange={set('level')} required>
@@ -720,7 +720,7 @@ const AdminVocabulary = () => {
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-3 text-xs text-text-muted font-mono whitespace-nowrap">
+                                                                                            <td className="px-4 py-3 text-xs text-text-muted font-ipa whitespace-nowrap">
                                                             {vocab.ipa ?? '—'}
                                                         </td>
                                                         <td className="px-4 py-3">

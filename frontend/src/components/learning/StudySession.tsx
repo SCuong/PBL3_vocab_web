@@ -733,7 +733,7 @@ const StudySession = () => {
                           <div className="text-[4.5rem] font-display font-extrabold mb-4 text-primary leading-none">
                             {words[currentIndex].word}
                           </div>
-                          <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
+                          <div className="text-2xl text-text-muted font-ipa bg-purple/5 px-6 py-2 rounded-xl mb-12">
                             {words[currentIndex].transcription}
                           </div>
                           <div className="flex items-center gap-3">
@@ -1034,7 +1034,7 @@ const StudySession = () => {
                                   className={`learning-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
                                 >
                                   <div className="text-lg font-bold mb-0.5">{w.word}</div>
-                                  <div className="text-xs text-text-muted font-mono">{w.transcription}</div>
+                                  <div className="text-xs text-text-muted font-ipa">{w.transcription}</div>
                                 </div>
                               );
                             })}
@@ -1080,7 +1080,7 @@ const StudySession = () => {
                                           {w.cefr || "-"}
                                         </Badge>
                                       </div>
-                                      <div className="text-xs text-text-muted font-mono mt-1">
+                                      <div className="text-xs text-text-muted font-ipa mt-1">
                                         {w.transcription}
                                       </div>
                                     </div>
@@ -1153,7 +1153,7 @@ const StudySession = () => {
                                         {w.cefr || "-"}
                                       </Badge>
                                     </div>
-                                    <div className="text-xs text-text-muted font-mono mt-1">
+                                    <div className="text-xs text-text-muted font-ipa mt-1">
                                       {w.transcription}
                                     </div>
                                   </div>
@@ -1300,7 +1300,7 @@ const StudySession = () => {
                       <div className="text-[4.5rem] font-display font-extrabold mb-4 text-primary leading-none">
                         {activeSessionWords[currentIndex].word}
                       </div>
-                      <div className="text-2xl text-text-muted font-mono bg-purple/5 px-6 py-2 rounded-xl mb-12">
+                      <div className="text-2xl text-text-muted font-ipa bg-purple/5 px-6 py-2 rounded-xl mb-12">
                         {activeSessionWords[currentIndex].transcription}
                       </div>
                       <div className="flex items-center gap-3">

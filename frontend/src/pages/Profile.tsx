@@ -746,7 +746,7 @@ const Profile = () => {
                                                         return (
                                                             <tr key={item.id} className="hover:bg-surface-hover transition-colors">
                                                                 <td className="px-4 py-2.5 font-bold text-text-primary">{item.word}</td>
-                                                                <td className="px-3 py-2.5 text-text-muted font-mono text-xs">{item.ipa || '—'}</td>
+                                                                        <td className="px-3 py-2.5 text-text-muted font-ipa text-xs">{item.ipa || '—'}</td>
                                                                 <td className="px-3 py-2.5 text-text-secondary">{item.meaning || '—'}</td>
                                                                 <td className="px-3 py-2.5">
                                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">

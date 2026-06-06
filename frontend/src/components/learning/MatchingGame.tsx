@@ -239,6 +239,7 @@ export const MatchingGame = ({ words, type, onFinish }: MatchingGameProps) => {
               className={`
                 p-4 min-h-[80px] flex items-center justify-center rounded-2xl border-2
                 transition-all duration-200 font-bold text-sm text-center leading-snug
+                ${type === "ipa" && card.cardType === "word" ? "font-ipa" : ""}
                 ${
                   state === "matched"
                     ? "border-purple-400 bg-purple-50 text-purple-700 opacity-60 cursor-default"
