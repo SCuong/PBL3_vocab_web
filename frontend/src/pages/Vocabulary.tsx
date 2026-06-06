@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search, Volume2, X, Sparkles, Loader2, ChevronDown, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, Volume2, X, Sparkles, Loader2, ChevronDown, RotateCcw, Lock } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { Badge, Button, PageTitle, typography } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
@@ -7,6 +8,7 @@ import { apiFetch } from '../services/apiClient';
 import { playPronunciationAudio } from '../utils/audio';
 import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
 import { useAppContext } from '../context/AppContext';
+import { PATHS } from '../routes/paths';
 
 const PAGE_SIZE = 24;
 
@@ -48,6 +50,38 @@ type AiAssistantPanelProps = {
     onRetry: () => void;
 };
 
+type AiAccordionSectionProps = {
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+    bodyClassName?: string;
+};
+
+const AiAccordionSection = ({ title, open, onToggle, children, bodyClassName }: AiAccordionSectionProps) => (
+    <section>
+        <button
+            type="button"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-text-primary cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-surface-hover active:scale-[0.995]"
+            onClick={onToggle}
+            aria-expanded={open}
+        >
+            {title}
+            <ChevronDown size={16} className={`shrink-0 transition-transform duration-300 ease-out ${open ? 'rotate-180' : ''}`} />
+        </button>
+        <div
+            className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+            aria-hidden={!open}
+        >
+            <div className="min-h-0 overflow-hidden">
+                <div className={`px-4 pb-4 text-sm leading-relaxed text-text-secondary transition-transform duration-300 ease-out ${open ? 'translate-y-0' : '-translate-y-1'} ${bodyClassName ?? ''}`}>
+                    {children}
+                </div>
+            </div>
+        </div>
+    </section>
+);
+
 const AiAssistantPanel = ({
     response,
     error,
@@ -56,9 +90,6 @@ const AiAssistantPanel = ({
     onToggleSection,
     onRetry,
 }: AiAssistantPanelProps) => {
-    const sectionButtonClass = 'w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-text-primary hover:bg-surface-hover transition-colors';
-    const sectionBodyClass = 'px-4 pb-4 text-sm leading-relaxed text-text-secondary';
-
     return (
         <aside className="rounded-card border border-border bg-bg-secondary/70 p-4 md:p-5 min-w-0">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -117,71 +148,58 @@ const AiAssistantPanel = ({
                     </div>
 
                     <div className="overflow-hidden rounded-lg border border-border bg-surface divide-y divide-border">
-                        <section>
-                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('usage')} aria-expanded={openSection === 'usage'}>
-                                Cách dùng nhanh
-                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'usage' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openSection === 'usage' && (
-                                <div className={sectionBodyClass}>
-                                    {response.quickUsage || 'Chưa có gợi ý cách dùng cho từ này.'}
-                                </div>
-                            )}
-                        </section>
+                        <AiAccordionSection
+                            title="Cách dùng nhanh"
+                            open={openSection === 'usage'}
+                            onToggle={() => onToggleSection('usage')}
+                        >
+                            {response.quickUsage || 'Chưa có gợi ý cách dùng cho từ này.'}
+                        </AiAccordionSection>
 
-                        <section>
-                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('collocations')} aria-expanded={openSection === 'collocations'}>
-                                Cụm từ hay gặp
-                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'collocations' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openSection === 'collocations' && (
-                                <div className={`${sectionBodyClass} space-y-3`}>
-                                    {response.collocations.length === 0 && 'Chưa có cụm từ gợi ý.'}
-                                    {response.collocations.map(item => (
-                                        <div key={`${item.phrase}-${item.example}`}>
-                                            <p><strong className="text-text-primary">{item.phrase}</strong> · {item.meaning}</p>
-                                            {item.example && <p className="mt-1 text-xs italic text-text-muted">{item.example}</p>}
-                                        </div>
-                                    ))}
+                        <AiAccordionSection
+                            title="Cụm từ hay gặp"
+                            open={openSection === 'collocations'}
+                            onToggle={() => onToggleSection('collocations')}
+                            bodyClassName="space-y-3"
+                        >
+                            {response.collocations.length === 0 && 'Chưa có cụm từ gợi ý.'}
+                            {response.collocations.map(item => (
+                                <div key={`${item.phrase}-${item.example}`}>
+                                    <p><strong className="text-text-primary">{item.phrase}</strong> · {item.meaning}</p>
+                                    {item.example && <p className="mt-1 text-xs italic text-text-muted">{item.example}</p>}
                                 </div>
-                            )}
-                        </section>
+                            ))}
+                        </AiAccordionSection>
 
-                        <section>
-                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('confusingWords')} aria-expanded={openSection === 'confusingWords'}>
-                                Phân biệt dễ nhầm
-                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'confusingWords' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openSection === 'confusingWords' && (
-                                <div className={`${sectionBodyClass} space-y-3`}>
-                                    {response.confusingWords.length === 0 && 'Chưa có từ dễ nhầm cần lưu ý.'}
-                                    {response.confusingWords.map(item => (
-                                        <p key={item.word}>
-                                            <strong className="text-text-primary">{item.word}:</strong> {item.difference}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
+                        <AiAccordionSection
+                            title="Phân biệt dễ nhầm"
+                            open={openSection === 'confusingWords'}
+                            onToggle={() => onToggleSection('confusingWords')}
+                            bodyClassName="space-y-3"
+                        >
+                            {response.confusingWords.length === 0 && 'Chưa có từ dễ nhầm cần lưu ý.'}
+                            {response.confusingWords.map(item => (
+                                <p key={item.word}>
+                                    <strong className="text-text-primary">{item.word}:</strong> {item.difference}
+                                </p>
+                            ))}
+                        </AiAccordionSection>
 
-                        <section>
-                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('commonMistakes')} aria-expanded={openSection === 'commonMistakes'}>
-                                Lỗi thường gặp
-                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'commonMistakes' ? 'rotate-180' : ''}`} />
-                            </button>
-                            {openSection === 'commonMistakes' && (
-                                <div className={`${sectionBodyClass} space-y-4`}>
-                                    {response.commonMistakes.length === 0 && 'Chưa có lỗi thường gặp cần lưu ý.'}
-                                    {response.commonMistakes.map(item => (
-                                        <div key={`${item.wrong}-${item.correct}`}>
-                                            {item.wrong && <p className="text-danger-color line-through">{item.wrong}</p>}
-                                            <p className="font-semibold text-success-color">{item.correct}</p>
-                                            {item.explanation && <p className="mt-1 text-xs text-text-muted">{item.explanation}</p>}
-                                        </div>
-                                    ))}
+                        <AiAccordionSection
+                            title="Lỗi thường gặp"
+                            open={openSection === 'commonMistakes'}
+                            onToggle={() => onToggleSection('commonMistakes')}
+                            bodyClassName="space-y-4"
+                        >
+                            {response.commonMistakes.length === 0 && 'Chưa có lỗi thường gặp cần lưu ý.'}
+                            {response.commonMistakes.map(item => (
+                                <div key={`${item.wrong}-${item.correct}`}>
+                                    {item.wrong && <p className="text-danger-color line-through">{item.wrong}</p>}
+                                    <p className="font-semibold text-success-color">{item.correct}</p>
+                                    {item.explanation && <p className="mt-1 text-xs text-text-muted">{item.explanation}</p>}
                                 </div>
-                            )}
-                        </section>
+                            ))}
+                        </AiAccordionSection>
                     </div>
                 </div>
             )}
@@ -190,7 +208,11 @@ const AiAssistantPanel = ({
 };
 
 const Vocabulary = () => {
-    const { topicFilters: topics } = useAppContext();
+    const { topicFilters: topics, currentUser } = useAppContext();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginModalActive, setLoginModalActive] = useState(false);
     const [selectedWord, setSelectedWord] = useState<any>(null);
     const onSelectWord = (word: any) => {
         setSelectedWord(word);
@@ -211,7 +233,13 @@ const Vocabulary = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    
+
+    // Page entrance. Header/filters reveal one frame after mount. Cards reveal
+    // once, after the first list of results arrives — kept to the initial load
+    // so typing in search or paging never triggers a laggy full re-animation.
+    const [mounted, setMounted] = useState(false);
+    const [cardsRevealed, setCardsRevealed] = useState(false);
+
     // AI State
     const [aiResponse, setAiResponse] = useState<VocabularyAiResponse | null>(null);
     const [aiError, setAiError] = useState('');
@@ -237,6 +265,29 @@ const Vocabulary = () => {
         const id = requestAnimationFrame(() => setModalActive(true));
         return () => cancelAnimationFrame(id);
     }, [selectedWord]);
+
+    // Drives the enter fade/scale for the login-required modal.
+    useEffect(() => {
+        if (!showLoginModal) {
+            setLoginModalActive(false);
+            return;
+        }
+        const id = requestAnimationFrame(() => setLoginModalActive(true));
+        return () => cancelAnimationFrame(id);
+    }, [showLoginModal]);
+
+    // Header + filters entrance on mount.
+    useEffect(() => {
+        const id = requestAnimationFrame(() => setMounted(true));
+        return () => cancelAnimationFrame(id);
+    }, []);
+
+    // Cards entrance once the first page of results has loaded.
+    useEffect(() => {
+        if (cardsRevealed || items.length === 0) return;
+        const id = requestAnimationFrame(() => setCardsRevealed(true));
+        return () => cancelAnimationFrame(id);
+    }, [items, cardsRevealed]);
 
     const requestAiExplanation = async () => {
         if (!selectedWord) return;
@@ -265,6 +316,10 @@ const Vocabulary = () => {
     };
 
     const handleAskAi = () => {
+        if (!currentUser) {
+            setShowLoginModal(true);
+            return;
+        }
         setIsAiPanelOpen(true);
         if (aiResponse && !aiError) return;
         void requestAiExplanation();
@@ -365,13 +420,13 @@ const Vocabulary = () => {
     return (
         <div className="max-w-6xl mx-auto px-6 py-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                <div>
+                <div className={`vocab-fade-in ${mounted ? 'is-visible' : ''}`}>
                     <PageTitle>Từ vựng</PageTitle>
                     <p className="text-sm text-text-muted mt-2">
                         Trang {page} / {Math.max(totalPages, 1)} · Tổng {totalCount} từ vựng
                     </p>
                 </div>
-                <div className="w-full md:w-[640px] grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className={`w-full md:w-[640px] grid grid-cols-1 md:grid-cols-3 gap-3 vocab-fade-in delay-[100ms] ${mounted ? 'is-visible' : ''}`}>
                     <div className="relative md:col-span-2">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" size={20} />
                         <input
@@ -423,33 +478,38 @@ const Vocabulary = () => {
             )}
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 vocab-defer">
-                {items.map((v: any) => (
+                {items.map((v: any, i: number) => (
                     <div
                         key={v.id}
-                        data-testid="vocab-card"
-                        data-vocab-id={v.id}
-                        className="vocab-card group"
-                        onClick={() => onSelectWord(v)}
+                        className={`vocab-fade-in ${cardsRevealed ? 'is-visible' : ''}`}
+                        style={{ transitionDelay: `${Math.min(i * 45, 360)}ms` }}
                     >
-                        <div className="flex justify-between items-start mb-4">
-                            <Badge variant="purple">{v.cefr}</Badge>
-                            <Button
-                                variant="ghost"
-                                className="p-2 min-h-0 rounded-full"
-                                onClick={(e: any) => {
-                                    e.stopPropagation();
-                                    playPronunciationAudio(v.audioUrl, v.word);
-                                }}
-                                aria-label={`Phát âm từ ${v.word}`}
-                            >
-                                <Volume2 size={16} />
-                            </Button>
+                        <div
+                            data-testid="vocab-card"
+                            data-vocab-id={v.id}
+                            className="vocab-card group"
+                            onClick={() => onSelectWord(v)}
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <Badge variant="purple">{v.cefr}</Badge>
+                                <Button
+                                    variant="ghost"
+                                    className="p-2 min-h-0 rounded-full"
+                                    onClick={(e: any) => {
+                                        e.stopPropagation();
+                                        playPronunciationAudio(v.audioUrl, v.word);
+                                    }}
+                                    aria-label={`Phát âm từ ${v.word}`}
+                                >
+                                    <Volume2 size={16} />
+                                </Button>
+                            </div>
+                            <h3 className="text-2xl mb-1 group-hover:text-primary transition-colors">{v.word}</h3>
+                            <p className="text-text-muted font-ipa text-sm mb-4">
+                                {v.transcription}
+                            </p>
+                            <p className="text-text-secondary line-clamp-2">{v.meaning}</p>
                         </div>
-                        <h3 className="text-2xl mb-1 group-hover:text-primary transition-colors">{v.word}</h3>
-                        <p className="text-text-muted font-ipa text-sm mb-4">
-                            {v.transcription}
-                        </p>
-                        <p className="text-text-secondary line-clamp-2">{v.meaning}</p>
                     </div>
                 ))}
             </div>
@@ -553,7 +613,7 @@ const Vocabulary = () => {
                             <div className="min-w-0 space-y-6">
                                 <div className="flex flex-wrap gap-3">
                                     <Button
-                                        variant="primary"
+                                        variant="ghost"
                                         className="px-6"
                                         onClick={() => playPronunciationAudio(selectedWord.audioUrl, selectedWord.word)}
                                     >
@@ -573,7 +633,7 @@ const Vocabulary = () => {
                                         onClick={handleAskAi}
                                         disabled={isLoadingAi}
                                         aria-pressed={isAiPanelOpen}
-                                        className={`px-5 py-2.5 rounded-pill border font-display font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60 disabled:cursor-wait ${
+                                        className={`px-5 py-2.5 rounded-pill border font-display font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 hover:shadow-md hover:shadow-primary/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60 disabled:cursor-wait ${
                                             isAiPanelOpen
                                                 ? 'border-primary/35 bg-primary/10 text-primary'
                                                 : 'border-border bg-surface text-text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-primary'
@@ -609,6 +669,56 @@ const Vocabulary = () => {
                                     onRetry={handleRetryAi}
                                 />
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showLoginModal && (
+                <div
+                    className={`fixed inset-0 z-[800] flex items-center justify-center p-4 md:p-6 transition-opacity duration-200 ${loginModalActive ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ background: 'rgba(15, 23, 42, 0.55)' }}
+                    onClick={() => setShowLoginModal(false)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="ai-login-title"
+                >
+                    <div
+                        className={`relative w-full max-w-md rounded-card border border-primary/15 bg-surface p-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.28)] transition-all duration-200 ease-out ${loginModalActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            className="absolute right-4 top-4 w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer transition-all duration-150 active:scale-90"
+                            onClick={() => setShowLoginModal(false)}
+                            aria-label="Đóng"
+                        >
+                            <X size={18} />
+                        </button>
+                        <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                            <Lock size={24} />
+                        </div>
+                        <h2 id="ai-login-title" className="text-xl font-display font-bold text-text-primary mb-2">
+                            Tính năng cần đăng nhập
+                        </h2>
+                        <p className="text-sm text-text-muted leading-relaxed mb-6">
+                            Đăng nhập để sử dụng Trợ lý AI và lưu tiến trình học tập của bạn.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <Button
+                                variant="primary"
+                                className="flex-1 justify-center active:scale-[0.98]"
+                                onClick={() => navigate(PATHS.login, { state: { from: location } })}
+                            >
+                                Đăng nhập
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                className="flex-1 justify-center hover:shadow-md hover:shadow-primary/10 active:scale-[0.98]"
+                                onClick={() => setShowLoginModal(false)}
+                            >
+                                Tiếp tục xem
+                            </Button>
                         </div>
                     </div>
                 </div>

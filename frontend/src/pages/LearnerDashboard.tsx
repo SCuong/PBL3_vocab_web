@@ -47,6 +47,14 @@ const LearnerDashboard = () => {
     const [continuing, setContinuing] = useState(false);
     const [dashboard, setDashboard] = useState<LearnerDashboardData | null>(null);
     const [dashboardError, setDashboardError] = useState(false);
+    const [revealed, setRevealed] = useState(false);
+
+    // Drive the on-mount entrance: flip the reveal class one frame after mount so
+    // cards transition from hidden → visible instead of all appearing at once.
+    useEffect(() => {
+        const id = requestAnimationFrame(() => setRevealed(true));
+        return () => cancelAnimationFrame(id);
+    }, []);
 
     // Real analytics (streak, XP, recent activity, due reviews, mastery) come from
     // the backend dashboard endpoint, not local game data. Local values are only a
@@ -215,10 +223,12 @@ const LearnerDashboard = () => {
         }
     };
 
+    const reveal = revealed ? 'is-visible' : '';
+
     return (
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
             <PageHeader
-                className="mb-8"
+                className={`mb-8 dashboard-fade-in ${reveal}`}
                 eyebrow="Bảng điều khiển học tập"
                 title={`Chào mừng trở lại${currentUser?.username ? `, ${currentUser.username}` : ''}`}
                 action={(
@@ -237,6 +247,7 @@ const LearnerDashboard = () => {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardStat
                     variant="flat"
+                    className={`dashboard-fade-in ${reveal} delay-[120ms]`}
                     icon={<Flame size={20} />}
                     label="Chuỗi ngày học"
                     value={`${streak} ngày`}
@@ -245,6 +256,7 @@ const LearnerDashboard = () => {
                 />
                 <DashboardStat
                     variant="flat"
+                    className={`dashboard-fade-in ${reveal} delay-[200ms]`}
                     icon={<Target size={20} />}
                     label="Mức độ thành thạo"
                     value={`${masteryPct}%`}
@@ -253,6 +265,7 @@ const LearnerDashboard = () => {
                 />
                 <DashboardStat
                     variant="flat"
+                    className={`dashboard-fade-in ${reveal} delay-[280ms]`}
                     icon={<CalendarClock size={20} />}
                     label="Cần ôn tập"
                     value={reviewForecast.today}
@@ -261,6 +274,7 @@ const LearnerDashboard = () => {
                 />
                 <DashboardStat
                     variant="flat"
+                    className={`dashboard-fade-in ${reveal} delay-[360ms]`}
                     icon={<Sparkles size={20} />}
                     label="Cấp độ XP"
                     value={`Cấp ${level.level}`}
@@ -270,7 +284,7 @@ const LearnerDashboard = () => {
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
-                <DashboardCard variant="flat" title="Dự báo ôn tập" subtitle="Tổng quan hàng đợi SM-2 theo tiến trình hiện tại.">
+                <DashboardCard variant="flat" className={`dashboard-fade-in ${reveal} delay-[380ms]`} title="Dự báo ôn tập" subtitle="Tổng quan hàng đợi SM-2 theo tiến trình hiện tại.">
                     <div className="grid gap-4 md:grid-cols-3">
                         {[
                             ['Hôm nay', reviewForecast.today, 'primary'],
@@ -303,7 +317,7 @@ const LearnerDashboard = () => {
                     </div>
                 </DashboardCard>
 
-                <DashboardCard variant="flat" title="Tiếp tục nhanh" subtitle="Phiên học phù hợp nhất, mở bằng một lần bấm.">
+                <DashboardCard variant="flat" className={`dashboard-fade-in ${reveal} delay-[500ms]`} title="Tiếp tục nhanh" subtitle="Phiên học phù hợp nhất, mở bằng một lần bấm.">
                     {topicStats.nextTopic ? (
                         <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                             <div className="flex items-start gap-3">
@@ -337,7 +351,7 @@ const LearnerDashboard = () => {
             </div>
 
             <div className="mt-6 grid gap-6 xl:grid-cols-3 dashboard-defer">
-                <DashboardCard variant="flat" title="XP và mức độ thành thạo" subtitle="Tiến độ cấp độ và phạm vi từ vựng đã nắm.">
+                <DashboardCard variant="flat" className={`dashboard-fade-in ${reveal} delay-[560ms]`} title="XP và mức độ thành thạo" subtitle="Tiến độ cấp độ và phạm vi từ vựng đã nắm.">
                     <div className="rounded-2xl border border-primary/15 bg-primary/5 p-5">
                         <div className="flex items-end justify-between gap-4">
                             <div>
@@ -375,7 +389,7 @@ const LearnerDashboard = () => {
                     </div>
                 </DashboardCard>
 
-                <DashboardCard variant="flat" title="Hoạt động học gần đây" subtitle="Các phiên học đã lưu gần nhất.">
+                <DashboardCard variant="flat" className={`dashboard-fade-in ${reveal} delay-[660ms]`} title="Hoạt động học gần đây" subtitle="Các phiên học đã lưu gần nhất.">
                     {timelineItems.length > 0 ? (
                         <Timeline items={timelineItems} />
                     ) : (
@@ -387,7 +401,7 @@ const LearnerDashboard = () => {
                     )}
                 </DashboardCard>
 
-                <DashboardCard variant="flat" title="Huy hiệu thành tích" subtitle="Các mốc sẽ mở khóa khi bạn học.">
+                <DashboardCard variant="flat" className={`dashboard-fade-in ${reveal} delay-[760ms]`} title="Huy hiệu thành tích" subtitle="Các mốc sẽ mở khóa khi bạn học.">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {achievements.map(achievement => (
                             <div
