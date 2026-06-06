@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, Pin, PinOff, Plus, Trash2, X } from 'lucide-react';
+import { Pin, PinOff, Plus, Trash2, X } from 'lucide-react';
 import { stickyNotesApi, type StickyNoteItem } from '../../services/stickyNotesApi';
+import { NoteIcon } from '../ui';
+import { useStickyNotes } from './StickyNotesContext';
 
 type StickyNotesWidgetProps = {
     isVisible: boolean;
@@ -27,7 +29,12 @@ const colorOptions: StickyNoteItem['color'][] = ['yellow', 'blue', 'green', 'pin
 const CONTENT_SAVE_DELAY_MS = 600;
 
 export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProps) => {
-    const [isOpen, setIsOpen] = useState(false);
+    const {
+        closeStickyNotes,
+        isLauncherHidden,
+        isOpen,
+        toggleStickyNotes,
+    } = useStickyNotes();
     const [isLoading, setIsLoading] = useState(false);
     const [notes, setNotes] = useState<StickyNoteItem[]>([]);
     const [hasLoaded, setHasLoaded] = useState(false);
@@ -42,7 +49,7 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
 
     useEffect(() => {
         if (!isVisible) {
-            setIsOpen(false);
+            closeStickyNotes();
             setNotes([]);
             setHasLoaded(false);
             latestContentRef.current.clear();
@@ -71,7 +78,7 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
         };
 
         void loadNotes();
-    }, [hasLoaded, isOpen, isVisible, onNotify]);
+    }, [closeStickyNotes, hasLoaded, isOpen, isVisible, onNotify]);
 
     useEffect(() => {
         return () => {
@@ -211,25 +218,39 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-[450]">
-            <button
-                onClick={() => setIsOpen(prev => !prev)}
-                className="h-14 w-14 rounded-full bg-primary text-text-on-accent shadow-lg shadow-[var(--shadow-color)] hover:bg-primary-hover transition-colors cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary"
-                aria-label="Mở sticky notes"
-            >
-                {isOpen ? <X size={20} /> : <MessageCircle size={20} />}
-            </button>
+        <div className="fixed bottom-6 right-6 z-[470]">
+            {!isLauncherHidden && (
+                <button
+                    onClick={toggleStickyNotes}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-text-on-accent shadow-lg shadow-[var(--shadow-color)] transition-colors hover:bg-primary-hover active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary"
+                    aria-label="Mở sticky notes"
+                >
+                    {isOpen ? <X size={20} /> : <NoteIcon className="h-6 w-6" />}
+                    <span>{isOpen ? 'Đóng' : 'Ghi chú'}</span>
+                </button>
+            )}
 
             {isOpen && (
-                <div className="mt-3 w-[92vw] max-w-[380px] max-h-[70vh] overflow-hidden rounded-2xl border border-border bg-surface text-text-primary shadow-2xl shadow-[var(--shadow-color)]">
-                    <div className="px-4 py-3 border-b border-border bg-bg-secondary/80 flex items-center justify-between">
-                        <p className="text-sm font-bold text-text-primary">Sticky Notes</p>
-                        <button
-                            onClick={handleCreate}
-                            className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light text-primary text-xs font-bold px-3 py-1.5 hover:bg-primary/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                        >
-                            <Plus size={14} /> Note mới
-                        </button>
+                <div className={`${isLauncherHidden ? '' : 'mt-3'} w-[92vw] max-w-[380px] max-h-[70vh] overflow-hidden rounded-2xl border border-border bg-surface text-text-primary shadow-2xl shadow-[var(--shadow-color)]`}>
+                    <div className="px-4 py-3 border-b border-border bg-bg-secondary/80 flex items-center justify-end">
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleCreate}
+                                className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light text-primary text-xs font-bold px-3 py-1.5 hover:bg-primary/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                            >
+                                <Plus size={14} /> Ghi chú mới
+                            </button>
+                            {isLauncherHidden && (
+                                <button
+                                    type="button"
+                                    onClick={closeStickyNotes}
+                                    className="p-1.5 rounded-full text-text-muted hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                    aria-label="Đóng sticky notes"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="p-3 space-y-3 overflow-y-auto max-h-[58vh] bg-surface">

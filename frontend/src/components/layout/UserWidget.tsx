@@ -87,7 +87,7 @@ export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidg
                 </button>
 
                 {dropdownOpen && (
-                    <div className="absolute right-0 top-[calc(100%+8px)] w-52 glass-card py-1.5 shadow-[0_8px_32px_var(--shadow-color)] z-[60] border border-border rounded-2xl overflow-hidden" role="menu">
+                    <div className="absolute right-0 top-[calc(100%+8px)] z-[60] w-52 overflow-hidden rounded-2xl border border-border bg-surface py-1.5 opacity-100 shadow-[0_12px_32px_var(--shadow-color)] backdrop-blur-none" role="menu">
                         <div className="px-4 py-2 border-b border-border/60 mb-1">
                             <p className="text-xs font-display font-bold text-text-primary truncate">{user.username}</p>
                             <p className="text-[10px] text-text-muted truncate">{user.email}</p>
