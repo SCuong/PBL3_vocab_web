@@ -9,7 +9,7 @@ import { PATHS } from './routes/paths';
 import { AdminRoute } from './routes/guards/AdminRoute';
 import { ProtectedRoute } from './routes/guards/ProtectedRoute';
 import { PublicOnlyRoute } from './routes/guards/PublicOnlyRoute';
-import { AuthNavbar, Footer, Navbar, StickyNotesWidget } from './components/layout';
+import { AuthNavbar, Footer, Navbar, StickyNotesProvider, StickyNotesWidget } from './components/layout';
 import { LearningTopics } from './components/learning/LearningTopics';
 import { StudySession } from './components/learning/StudySession';
 import { StreakModal } from './components/learning/streak';
@@ -224,7 +224,9 @@ export default function App() {
         <ErrorBoundary>
             <BrowserRouter>
                 <AppProvider>
-                    <AppShell />
+                    <StickyNotesProvider>
+                        <AppShell />
+                    </StickyNotesProvider>
                 </AppProvider>
             </BrowserRouter>
         </ErrorBoundary>

@@ -6,21 +6,23 @@ import React, {
   useRef,
 } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Badge, Button } from "../ui";
+import { Badge, Button, NoteIcon } from "../ui";
 import { playPronunciationAudio } from "../../utils/audio";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
 import { SM2ReviewButtons } from "./SM2ReviewButtons";
+import { useStickyNotes } from "../layout";
 import { useAppContext } from "../../context/AppContext";
 import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
 import type { LearningSession } from "../../services/learningProgressApi";
 import { PATHS } from "../../routes/paths";
+import studySessionBg from "../../assets/study-session-bg.svg";
+import { useTheme } from "../../hooks/useTheme";
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const REVIEW_PAGE_SIZE = 10;
-
 
 const getCefrRank = (cefr?: string) => {
   const normalized = (cefr || "").toUpperCase();
@@ -65,6 +67,12 @@ const isEditableKeyboardTarget = (target: EventTarget | null) => {
 const StudySession = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const {
+    isOpen: isStickyNotesOpen,
+    openStickyNotes,
+    setStickyNotesLauncherHidden,
+  } = useStickyNotes();
   const {
     learningTopicGroups: topicGroups,
     learningProgressState,
@@ -547,6 +555,13 @@ const StudySession = () => {
     () => Math.ceil(customNewWords.length / REVIEW_PAGE_SIZE),
     [customNewWords.length],
   );
+  const isActiveFullscreenSession = tab === "learn" && learnStep === 2;
+  const isDarkFocusedSession = isActiveFullscreenSession && theme === "dark";
+
+  useEffect(() => {
+    setStickyNotesLauncherHidden(isActiveFullscreenSession);
+    return () => setStickyNotesLauncherHidden(false);
+  }, [isActiveFullscreenSession, setStickyNotesLauncherHidden]);
 
   const handleFinishMatching = async (
     correct: number,
@@ -597,6 +612,8 @@ const StudySession = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
+      {!isActiveFullscreenSession && (
+        <>
       <nav className="flex items-center gap-2 text-sm text-text-muted mb-6">
         <button
           onClick={() => onFinish()}
@@ -667,6 +684,8 @@ const StudySession = () => {
           ))}
         </div>
       </header>
+        </>
+      )}
 
       <AnimatePresence mode="wait">
         {tab === "flashcard" && (
@@ -905,7 +924,7 @@ const StudySession = () => {
             exit={{ opacity: 0 }}
             key="learn-tab"
           >
-            <div className="max-w-3xl mx-auto mb-16">
+            {learnStep !== 2 && <div className="max-w-3xl mx-auto mb-16">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-500 ${learnStep >= 1 ? "bg-primary border-primary text-text-on-accent" : "bg-surface border-primary/10 text-text-muted"}`}>
@@ -942,7 +961,7 @@ const StudySession = () => {
                   </span>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {learnStep === 1 && (
               <div className="max-w-4xl mx-auto">
@@ -1283,99 +1302,213 @@ const StudySession = () => {
             )}
 
             {learnStep === 2 && (
-              <div className="max-w-2xl mx-auto">
-                <div className="relative h-[480px] perspective-1000 mb-12">
-                  <motion.div
-                    onClick={() => setIsFlipped(!isFlipped)}
-                    key={`step2-${currentIndex}`}
-                    initial={{ scale: 0.9 }}
-                    animate={{ rotateY: isFlipped ? 180 : 0, scale: 1 }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                    className="w-full h-full relative preserve-3d cursor-pointer"
-                  >
-                    <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
-                      <Badge variant="purple" className="mb-12 scale-125">
-                        Thẻ từ vựng
-                      </Badge>
-                      <div className="text-[4.5rem] font-display font-extrabold mb-4 text-primary leading-none">
-                        {activeSessionWords[currentIndex].word}
-                      </div>
-                      <div className="text-2xl text-text-muted font-ipa bg-purple/5 px-6 py-2 rounded-xl mb-12">
-                        {activeSessionWords[currentIndex].transcription}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant="ghost"
-                          className="p-2 min-h-0 rounded-full"
-                          onClick={(e: any) => {
-                            e.stopPropagation();
-                            playPronunciationAudio(
-                              activeSessionWords[currentIndex].audioUrl,
-                              activeSessionWords[currentIndex].word,
-                            );
-                          }}
-                        >
-                          <Volume2 size={18} />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="px-10 py-4 text-lg"
-                        >
-                          Xem nghĩa ▼
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
-                      <Badge variant="pink" className="mb-12 scale-125">
-                        Nghĩa
-                      </Badge>
-                      <div className="text-[2rem] sm:text-[2.5rem] font-bold mb-10 text-text-primary leading-tight">
-                        {activeSessionWords[currentIndex].meaning}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        className="p-2 min-h-0 rounded-full mb-4"
-                        onClick={(e: any) => {
-                          e.stopPropagation();
-                          playPronunciationAudio(
-                            activeSessionWords[currentIndex].exampleAudioUrl,
-                            activeSessionWords[currentIndex].example,
-                          );
-                        }}
+              <div
+                className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
+                  isDarkFocusedSession
+                    ? "bg-[#282138] text-[#f5f0ff]"
+                    : "bg-[#f3ecff] text-[#2b2140]"
+                }`}
+                style={{
+                  backgroundImage: `url(${studySessionBg})`,
+                  backgroundColor: isDarkFocusedSession ? "#332942" : "#f3ecff",
+                  backgroundBlendMode: isDarkFocusedSession ? "multiply" : "normal",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "cover",
+                }}
+              >
+
+                <header className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+                  isDarkFocusedSession
+                    ? "border-[#584a70] bg-[#302742]/95"
+                    : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+                }`}>
+                  <div className="mx-auto w-full max-w-5xl px-4 py-3 sm:px-6 sm:py-4">
+                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:grid-cols-[1fr_minmax(240px,480px)_1fr] sm:gap-6">
+                      <button
+                        type="button"
+                        onClick={() => onFinish()}
+                        className={`flex h-10 shrink-0 items-center justify-self-start rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                          isDarkFocusedSession
+                            ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5] hover:text-[#dac5f7]"
+                            : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0] hover:text-[#7440a8]"
+                        }`}
+                        aria-label="Thoát phiên học"
                       >
-                        <Volume2 size={18} />
-                      </Button>
-                      <div className="bg-surface/70 p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
-                        <p className="italic font-serif text-xl leading-loose">"{activeSessionWords[currentIndex].example}"</p>
-                        {activeSessionWords[currentIndex].translation && (
-                          <p className="text-sm text-text-muted mt-3">"{activeSessionWords[currentIndex].translation}"</p>
-                        )}
+                        <X size={20} />
+                        <span className="ml-2 hidden sm:inline">Thoát</span>
+                      </button>
+                      <div className="min-w-0 text-center">
+                        <div className={`flex items-baseline justify-center gap-1 text-sm font-bold tabular-nums sm:text-base ${
+                          isDarkFocusedSession ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                        }`}>
+                          <span>{currentIndex + 1}</span>
+                          <span className={isDarkFocusedSession ? "text-[#b9a8d2]" : "text-[#76688e]"}>/ {activeSessionWords.length}</span>
+                        </div>
+                        <div className={`mt-2 h-2 overflow-hidden rounded-full ${
+                          isDarkFocusedSession ? "bg-[#4a3c60]" : "bg-[#e5d8f7]"
+                        }`}>
+                          <div
+                            className={`h-full rounded-full transition-[width] duration-300 ${
+                              isDarkFocusedSession ? "bg-[#b78ce9]" : "bg-[#8b5fc7]"
+                            }`}
+                            style={{ width: `${((currentIndex + 1) / activeSessionWords.length) * 100}%` }}
+                          />
+                        </div>
+                        <div className={`mt-1 hidden truncate text-[11px] sm:block ${
+                          isDarkFocusedSession ? "text-[#b9a8d2]" : "text-[#76688e]"
+                        }`}>
+                          {topicTitle} · {isReviewMode ? "Ôn tập" : "Học từ vựng"}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={openStickyNotes}
+                        className={`inline-flex h-10 shrink-0 items-center justify-self-end gap-2 rounded-2xl px-3 text-sm font-semibold transition active:scale-[0.98] sm:px-4 ${
+                          isDarkFocusedSession
+                            ? `text-[#d2b6f4] hover:bg-[#403451] ${isStickyNotesOpen ? "bg-[#463858]" : ""}`
+                            : `text-[#7440a8] hover:bg-[#eee4fa] ${isStickyNotesOpen ? "bg-[#e8daf8]" : ""}`
+                        }`}
+                        aria-expanded={isStickyNotesOpen}
+                      >
+                        <NoteIcon className="h-7 w-7" />
+                        <span className="hidden sm:inline">Ghi chú</span>
+                      </button>
                     </div>
-                  </motion.div>
+                  </div>
+                </header>
+
+                <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-6">
+                  <div className="mx-auto flex min-h-full w-full max-w-5xl items-center justify-center">
+                    <div className="w-full max-w-2xl">
+                      <div className="relative mb-4 h-[clamp(300px,50dvh,430px)] perspective-1000">
+                        <motion.div
+                          onClick={() => setIsFlipped(!isFlipped)}
+                          key={`step2-${currentIndex}`}
+                          initial={{ scale: 0.96 }}
+                          animate={{ rotateY: isFlipped ? 180 : 0, scale: 1 }}
+                          transition={{ duration: 0.5, ease: "easeInOut" }}
+                          className="relative h-full w-full cursor-pointer preserve-3d"
+                        >
+                          <div className={`absolute inset-0 backface-hidden flex h-full flex-col items-center justify-center rounded-[24px] border-2 p-6 text-center sm:p-10 ${
+                            isDarkFocusedSession
+                              ? "border-[#66557f] bg-[#3a304d]/95 text-[#f5f0ff] shadow-[0_16px_40px_rgba(20,14,31,0.28)]"
+                              : "border-[#d8c7f7] bg-white/95 text-[#2b2140] shadow-[0_16px_40px_rgba(88,65,125,0.16)]"
+                          }`}>
+                            <Badge variant="purple" className={`mb-6 sm:mb-8 ${
+                              isDarkFocusedSession
+                                ? "!border-[#735d91] !bg-[#493a60] !text-[#dcc5f7]"
+                                : "!border-[#cdb4f6] !bg-[#eee4fa] !text-[#7440a8]"
+                            }`}>
+                              Thẻ từ vựng
+                            </Badge>
+                            <div className={`mb-3 text-5xl font-display font-extrabold leading-none sm:text-[4rem] ${
+                              isDarkFocusedSession ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                            }`}>
+                              {activeSessionWords[currentIndex].word}
+                            </div>
+                            <div className={`mb-6 rounded-xl px-5 py-2 font-ipa text-xl sm:mb-8 sm:text-2xl ${
+                              isDarkFocusedSession ? "bg-[#302742] text-[#cbbce2]" : "bg-[#f3ecff] text-[#6f6185]"
+                            }`}>
+                              {activeSessionWords[currentIndex].transcription}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Button
+                                variant="ghost"
+                                className={`min-h-0 rounded-full p-2 !backdrop-blur-none ${
+                                  isDarkFocusedSession
+                                    ? "!border-[#66557f] !bg-[#302742] !text-[#d2b6f4] hover:!bg-[#493a60] hover:!text-[#eadcff]"
+                                    : "!border-[#d8c7f7] !bg-white !text-[#7440a8] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
+                                }`}
+                                onClick={(e: any) => {
+                                  e.stopPropagation();
+                                  playPronunciationAudio(
+                                    activeSessionWords[currentIndex].audioUrl,
+                                    activeSessionWords[currentIndex].word,
+                                  );
+                                }}
+                              >
+                                <Volume2 size={18} />
+                              </Button>
+                              <Button variant="secondary" className={`px-6 py-3 sm:px-8 ${
+                                isDarkFocusedSession
+                                  ? "!border-[#735d91] !bg-[#302742] !text-[#d2b6f4] hover:!border-[#9f82c5] hover:!bg-[#493a60] hover:!text-[#eadcff]"
+                                  : "!border-[#cdb4f6] !bg-white !text-[#7440a8] hover:!border-[#9b72d0] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
+                              }`}>
+                                Xem nghĩa ▼
+                              </Button>
+                            </div>
+                          </div>
+                          <div className={`absolute inset-0 backface-hidden rotate-y-180 flex h-full flex-col items-center justify-center rounded-[24px] border-2 p-6 text-center sm:p-10 ${
+                            isDarkFocusedSession
+                              ? "border-[#66557f] bg-[#3a304d]/95 text-[#f5f0ff] shadow-[0_16px_40px_rgba(20,14,31,0.28)]"
+                              : "border-[#d8c7f7] bg-white/95 text-[#2b2140] shadow-[0_16px_40px_rgba(88,65,125,0.16)]"
+                          }`}>
+                            <Badge variant="pink" className={`mb-5 sm:mb-7 ${
+                              isDarkFocusedSession
+                                ? "!border-[#735d91] !bg-[#493a60] !text-[#dcc5f7]"
+                                : "!border-[#cdb4f6] !bg-[#eee4fa] !text-[#7440a8]"
+                            }`}>
+                              Nghĩa
+                            </Badge>
+                            <div className={`mb-5 text-2xl font-bold leading-tight sm:text-[2.25rem] ${
+                              isDarkFocusedSession ? "text-[#f5f0ff]" : "text-[#2b2140]"
+                            }`}>
+                              {activeSessionWords[currentIndex].meaning}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              className={`mb-3 min-h-0 rounded-full p-2 !backdrop-blur-none ${
+                                isDarkFocusedSession
+                                  ? "!border-[#66557f] !bg-[#302742] !text-[#d2b6f4] hover:!bg-[#493a60] hover:!text-[#eadcff]"
+                                  : "!border-[#d8c7f7] !bg-white !text-[#7440a8] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
+                              }`}
+                              onClick={(e: any) => {
+                                e.stopPropagation();
+                                playPronunciationAudio(
+                                  activeSessionWords[currentIndex].exampleAudioUrl,
+                                  activeSessionWords[currentIndex].example,
+                                );
+                              }}
+                            >
+                              <Volume2 size={18} />
+                            </Button>
+                            <div className={`w-full rounded-2xl border p-4 sm:p-6 ${
+                              isDarkFocusedSession
+                                ? "border-[#584a70] bg-[#302742] text-[#f5f0ff]"
+                                : "border-[#d8c7f7] bg-[#f8f3ff] text-[#2b2140]"
+                            }`}>
+                              <p className="font-serif text-base italic leading-relaxed sm:text-lg">"{activeSessionWords[currentIndex].example}"</p>
+                              {activeSessionWords[currentIndex].translation && (
+                                <p className={`mt-3 text-sm ${
+                                  isDarkFocusedSession ? "text-[#cbbce2]" : "text-[#76688e]"
+                                }`}>"{activeSessionWords[currentIndex].translation}"</p>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      </div>
+                      <SM2ReviewButtons
+                        options={activeReviewOptions}
+                        appearance={isDarkFocusedSession ? "focusedDark" : "focusedLight"}
+                        onSelect={(quality) =>
+                          handleReviewQuality(
+                            quality,
+                            activeSessionWords[currentIndex].id,
+                            activeSessionWords,
+                            currentIndex,
+                            () => {
+                              setLearnStep(3);
+                              setMatchType(null);
+                              setIpaFallbackNotice(false);
+                            },
+                          )
+                        }
+                        isSubmitting={reviewSubmitting}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-center mb-4">
-                  <span className="font-bold text-sm text-text-muted bg-primary/10 px-4 py-1 rounded-full">
-                    {currentIndex + 1} / {activeSessionWords.length}
-                  </span>
-                </div>
-                <SM2ReviewButtons
-                  options={activeReviewOptions}
-                  onSelect={(quality) =>
-                    handleReviewQuality(
-                      quality,
-                      activeSessionWords[currentIndex].id,
-                      activeSessionWords,
-                      currentIndex,
-                      () => {
-                        setLearnStep(3);
-                        setMatchType(null);
-                        setIpaFallbackNotice(false);
-                      },
-                    )
-                  }
-                  isSubmitting={reviewSubmitting}
-                />
               </div>
             )}
 

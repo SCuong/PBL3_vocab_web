@@ -1,0 +1,48 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1920" height="1080" fill="#F3ECFF"/>
+
+  <rect x="1.5" y="1.5" width="1917" height="1077" rx="24" stroke="#C4A7F5" stroke-width="3" stroke-opacity="0.95"/>
+
+  <path d="M-120 1030C38 925 200 940 320 1048C425 1140 545 1162 700 1110" stroke="#CDB4F6" stroke-width="2.2" stroke-opacity="0.92"/>
+  <path d="M1738 1110C1658 1002 1714 874 1840 806C1925 760 1982 718 1996 625" stroke="#CDB4F6" stroke-width="2.2" stroke-opacity="0.92"/>
+  <path d="M-95 430C20 512 112 505 178 435C238 372 305 355 392 388" stroke="#CDB4F6" stroke-width="2" stroke-opacity="0.88"/>
+
+  <!-- circles -->
+  <circle cx="105" cy="620" r="9" stroke="#CDB4F6" stroke-width="3" stroke-opacity="0.95"/>
+  <circle cx="1782" cy="225" r="10" stroke="#CDB4F6" stroke-width="3" stroke-opacity="0.95"/>
+  <circle cx="1855" cy="555" r="6" stroke="#D3BDF5" stroke-width="2.5" stroke-opacity="0.92"/>
+  <circle cx="42" cy="405" r="6" stroke="#D3BDF5" stroke-width="2.5" stroke-opacity="0.92"/>
+  <circle cx="285" cy="255" r="5" stroke="#D8C7F7" stroke-width="2.5" stroke-opacity="0.88"/>
+  <circle cx="1485" cy="170" r="5" stroke="#D8C7F7" stroke-width="2.5" stroke-opacity="0.88"/>
+  <circle cx="1638" cy="730" r="7" stroke="#D3BDF5" stroke-width="2.5" stroke-opacity="0.9"/>
+  <circle cx="520" cy="800" r="6" stroke="#D3BDF5" stroke-width="2.5" stroke-opacity="0.9"/>
+  <circle cx="890" cy="160" r="4" stroke="#D8C7F7" stroke-width="2" stroke-opacity="0.88"/>
+  <circle cx="1125" cy="910" r="5" stroke="#D8C7F7" stroke-width="2" stroke-opacity="0.88"/>
+  <circle cx="1520" cy="510" r="4" stroke="#D8C7F7" stroke-width="2" stroke-opacity="0.86"/>
+  <circle cx="710" cy="690" r="4" stroke="#D8C7F7" stroke-width="2" stroke-opacity="0.86"/>
+
+  <!-- outlined sparkle stars -->
+  <path d="M180 254L190 282L218 292L190 302L180 330L170 302L142 292L170 282L180 254Z" stroke="#CDB4F6" stroke-width="3" stroke-linejoin="round" stroke-opacity="1"/>
+  <path d="M1578 355L1587 380L1612 389L1587 398L1578 423L1569 398L1544 389L1569 380L1578 355Z" stroke="#CDB4F6" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.98"/>
+  <path d="M304 855L314 884L343 894L314 904L304 933L294 904L265 894L294 884L304 855Z" stroke="#CDB4F6" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.94"/>
+  <path d="M1715 880L1726 912L1758 923L1726 934L1715 966L1704 934L1672 923L1704 912L1715 880Z" stroke="#CDB4F6" stroke-width="3" stroke-linejoin="round" stroke-opacity="0.96"/>
+  <path d="M1430 240L1437 261L1458 268L1437 275L1430 296L1423 275L1402 268L1423 261L1430 240Z" stroke="#D3BDF5" stroke-width="2.8" stroke-linejoin="round" stroke-opacity="0.96"/>
+  <path d="M735 190L742 210L762 217L742 224L735 244L728 224L708 217L728 210L735 190Z" stroke="#D3BDF5" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.94"/>
+  <path d="M1188 170L1196 192L1218 200L1196 208L1188 230L1180 208L1158 200L1180 192L1188 170Z" stroke="#D3BDF5" stroke-width="2.5" stroke-linejoin="round" stroke-opacity="0.94"/>
+  <path d="M490 420L497 440L517 447L497 454L490 474L483 454L463 447L483 440L490 420Z" stroke="#D8C7F7" stroke-width="2.4" stroke-linejoin="round" stroke-opacity="0.92"/>
+  <path d="M1345 585L1353 608L1376 616L1353 624L1345 647L1337 624L1314 616L1337 608L1345 585Z" stroke="#D3BDF5" stroke-width="2.7" stroke-linejoin="round" stroke-opacity="0.94"/>
+  <path d="M845 850L852 870L872 877L852 884L845 904L838 884L818 877L838 870L845 850Z" stroke="#D8C7F7" stroke-width="2.4" stroke-linejoin="round" stroke-opacity="0.9"/>
+  <path d="M1510 755L1518 779L1542 787L1518 795L1510 819L1502 795L1478 787L1502 779L1510 755Z" stroke="#D3BDF5" stroke-width="2.7" stroke-linejoin="round" stroke-opacity="0.94"/>
+  <path d="M980 640L988 663L1011 671L988 679L980 702L972 679L949 671L972 663L980 640Z" stroke="#D3BDF5" stroke-width="2.6" stroke-linejoin="round" stroke-opacity="0.9"/>
+  <path d="M610 300L617 320L637 327L617 334L610 354L603 334L583 327L603 320L610 300Z" stroke="#D8C7F7" stroke-width="2.4" stroke-linejoin="round" stroke-opacity="0.9"/>
+  <path d="M1260 860L1267 880L1287 887L1267 894L1260 914L1253 894L1233 887L1253 880L1260 860Z" stroke="#D8C7F7" stroke-width="2.4" stroke-linejoin="round" stroke-opacity="0.9"/>
+
+  <!-- tiny plus stars -->
+  <path d="M1160 805V829M1148 817H1172" stroke="#D3BDF5" stroke-width="3" stroke-linecap="round" stroke-opacity="0.9"/>
+  <path d="M520 780V800M510 790H530" stroke="#D3BDF5" stroke-width="3" stroke-linecap="round" stroke-opacity="0.88"/>
+  <path d="M1010 245V263M1001 254H1019" stroke="#D3BDF5" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.88"/>
+  <path d="M260 690V710M250 700H270" stroke="#D3BDF5" stroke-width="2.8" stroke-linecap="round" stroke-opacity="0.86"/>
+  <path d="M1690 430V450M1680 440H1700" stroke="#D3BDF5" stroke-width="2.8" stroke-linecap="round" stroke-opacity="0.86"/>
+  <path d="M1380 690V710M1370 700H1390" stroke="#D3BDF5" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.84"/>
+  <path d="M780 500V518M771 509H789" stroke="#D3BDF5" stroke-width="2.6" stroke-linecap="round" stroke-opacity="0.84"/>
+</svg>
