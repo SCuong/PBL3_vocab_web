@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Volume2, X, Sparkles, Loader2 } from 'lucide-react';
+import { Search, Volume2, X, Sparkles, Loader2, ChevronDown, RotateCcw } from 'lucide-react';
 import { CEFR_LEVELS } from '../constants/appConstants';
 import { Badge, Button, PageTitle, typography } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
@@ -9,6 +9,185 @@ import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
 import { useAppContext } from '../context/AppContext';
 
 const PAGE_SIZE = 24;
+
+type AiCollocation = {
+    phrase: string;
+    meaning: string;
+    example: string;
+};
+
+type AiConfusingWord = {
+    word: string;
+    difference: string;
+};
+
+type AiCommonMistake = {
+    wrong: string;
+    correct: string;
+    explanation: string;
+};
+
+type VocabularyAiResponse = {
+    summary: string;
+    quickUsage: string;
+    collocations: AiCollocation[];
+    confusingWords: AiConfusingWord[];
+    commonMistakes: AiCommonMistake[];
+    explanation: string;
+    isFallback: boolean;
+};
+
+type AiSectionKey = 'usage' | 'collocations' | 'confusingWords' | 'commonMistakes';
+
+type AiAssistantPanelProps = {
+    response: VocabularyAiResponse | null;
+    error: string;
+    isLoading: boolean;
+    openSection: AiSectionKey | null;
+    onToggleSection: (section: AiSectionKey) => void;
+    onRetry: () => void;
+};
+
+const AiAssistantPanel = ({
+    response,
+    error,
+    isLoading,
+    openSection,
+    onToggleSection,
+    onRetry,
+}: AiAssistantPanelProps) => {
+    const sectionButtonClass = 'w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-text-primary hover:bg-surface-hover transition-colors';
+    const sectionBodyClass = 'px-4 pb-4 text-sm leading-relaxed text-text-secondary';
+
+    return (
+        <aside className="rounded-card border border-border bg-bg-secondary/70 p-4 md:p-5 min-w-0">
+            <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <Sparkles size={17} />
+                    </span>
+                    <div>
+                        <h3 className="text-base font-bold text-text-primary">Trợ lý AI</h3>
+                        <p className="text-xs text-text-muted">Gợi ý học từ ngắn gọn</p>
+                    </div>
+                </div>
+                <Badge variant="cyan" className="normal-case">Beta</Badge>
+            </div>
+
+            {isLoading && (
+                <div className="space-y-3" aria-live="polite">
+                    <div className="h-24 rounded-lg bg-surface animate-pulse" />
+                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
+                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
+                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
+                </div>
+            )}
+
+            {!isLoading && error && (
+                <div className="rounded-lg border border-warning-color/25 bg-warning-color/10 p-4">
+                    <p className="text-sm text-text-secondary">{error}</p>
+                    <button
+                        type="button"
+                        onClick={onRetry}
+                        className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary hover:text-primary-hover cursor-pointer"
+                    >
+                        <RotateCcw size={15} /> Thử lại
+                    </button>
+                </div>
+            )}
+
+            {!isLoading && !error && response && (
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-primary/15 bg-surface p-4">
+                        <p className="text-sm leading-relaxed text-text-primary">{response.summary}</p>
+                        {response.isFallback && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs text-text-muted">
+                                    Đang hiển thị gợi ý cơ bản.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={onRetry}
+                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-hover cursor-pointer"
+                                >
+                                    <RotateCcw size={13} /> Thử lại
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="overflow-hidden rounded-lg border border-border bg-surface divide-y divide-border">
+                        <section>
+                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('usage')} aria-expanded={openSection === 'usage'}>
+                                Cách dùng nhanh
+                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'usage' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openSection === 'usage' && (
+                                <div className={sectionBodyClass}>
+                                    {response.quickUsage || 'Chưa có gợi ý cách dùng cho từ này.'}
+                                </div>
+                            )}
+                        </section>
+
+                        <section>
+                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('collocations')} aria-expanded={openSection === 'collocations'}>
+                                Cụm từ hay gặp
+                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'collocations' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openSection === 'collocations' && (
+                                <div className={`${sectionBodyClass} space-y-3`}>
+                                    {response.collocations.length === 0 && 'Chưa có cụm từ gợi ý.'}
+                                    {response.collocations.map(item => (
+                                        <div key={`${item.phrase}-${item.example}`}>
+                                            <p><strong className="text-text-primary">{item.phrase}</strong> · {item.meaning}</p>
+                                            {item.example && <p className="mt-1 text-xs italic text-text-muted">{item.example}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
+                        <section>
+                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('confusingWords')} aria-expanded={openSection === 'confusingWords'}>
+                                Phân biệt dễ nhầm
+                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'confusingWords' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openSection === 'confusingWords' && (
+                                <div className={`${sectionBodyClass} space-y-3`}>
+                                    {response.confusingWords.length === 0 && 'Chưa có từ dễ nhầm cần lưu ý.'}
+                                    {response.confusingWords.map(item => (
+                                        <p key={item.word}>
+                                            <strong className="text-text-primary">{item.word}:</strong> {item.difference}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
+                        <section>
+                            <button type="button" className={sectionButtonClass} onClick={() => onToggleSection('commonMistakes')} aria-expanded={openSection === 'commonMistakes'}>
+                                Lỗi thường gặp
+                                <ChevronDown size={16} className={`shrink-0 transition-transform ${openSection === 'commonMistakes' ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openSection === 'commonMistakes' && (
+                                <div className={`${sectionBodyClass} space-y-4`}>
+                                    {response.commonMistakes.length === 0 && 'Chưa có lỗi thường gặp cần lưu ý.'}
+                                    {response.commonMistakes.map(item => (
+                                        <div key={`${item.wrong}-${item.correct}`}>
+                                            {item.wrong && <p className="text-danger-color line-through">{item.wrong}</p>}
+                                            <p className="font-semibold text-success-color">{item.correct}</p>
+                                            {item.explanation && <p className="mt-1 text-xs text-text-muted">{item.explanation}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                </div>
+            )}
+        </aside>
+    );
+};
 
 const Vocabulary = () => {
     const { topicFilters: topics } = useAppContext();
@@ -34,8 +213,11 @@ const Vocabulary = () => {
     const [errorMessage, setErrorMessage] = useState('');
     
     // AI State
-    const [aiResponse, setAiResponse] = useState<string | null>(null);
+    const [aiResponse, setAiResponse] = useState<VocabularyAiResponse | null>(null);
+    const [aiError, setAiError] = useState('');
     const [isLoadingAi, setIsLoadingAi] = useState(false);
+    const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+    const [openAiSection, setOpenAiSection] = useState<AiSectionKey | null>('usage');
 
     // Drives the .is-open class one frame after mount so the modal fade
     // transitions from opacity:0 → 1 instead of snapping.
@@ -44,7 +226,10 @@ const Vocabulary = () => {
     // Reset AI response when word changes; also retrigger the open animation.
     useEffect(() => {
         setAiResponse(null);
+        setAiError('');
         setIsLoadingAi(false);
+        setIsAiPanelOpen(false);
+        setOpenAiSection('usage');
         if (!selectedWord) {
             setModalActive(false);
             return;
@@ -53,9 +238,10 @@ const Vocabulary = () => {
         return () => cancelAnimationFrame(id);
     }, [selectedWord]);
 
-    const handleAskAi = async () => {
+    const requestAiExplanation = async () => {
         if (!selectedWord) return;
         setIsLoadingAi(true);
+        setAiError('');
         try {
             const formData = new FormData();
             formData.append('word', selectedWord.word);
@@ -67,16 +253,31 @@ const Vocabulary = () => {
             });
 
             if (response.ok) {
-                const htmlContent = await response.text();
-                setAiResponse(htmlContent);
+                setAiResponse(await response.json() as VocabularyAiResponse);
             } else {
-                setAiResponse("<div class='text-red-500'>Có lỗi xảy ra khi gọi AI. Vui lòng thử lại.</div>");
+                setAiError('Trợ lý AI chưa thể phân tích từ này. Vui lòng thử lại.');
             }
-        } catch (error: any) {
-            setAiResponse(`<div class='text-red-500'>Lỗi kết nối mạng: ${error.message}</div>`);
+        } catch {
+            setAiError('Không thể kết nối với trợ lý AI. Vui lòng thử lại.');
         } finally {
             setIsLoadingAi(false);
         }
+    };
+
+    const handleAskAi = () => {
+        setIsAiPanelOpen(true);
+        if (aiResponse && !aiError) return;
+        void requestAiExplanation();
+    };
+
+    const handleRetryAi = () => {
+        setAiResponse(null);
+        setAiError('');
+        void requestAiExplanation();
+    };
+
+    const toggleAiSection = (section: AiSectionKey) => {
+        setOpenAiSection(current => current === section ? null : section);
     };
 
     const topicOptions = useMemo(() => {
@@ -330,7 +531,7 @@ const Vocabulary = () => {
                 >
                     <div
                         data-testid="vocab-modal-content"
-                        className="vocab-modal-card"
+                        className={`vocab-modal-card ${isAiPanelOpen ? 'max-w-6xl' : 'max-w-3xl'}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="vocab-modal-header">
@@ -354,66 +555,66 @@ const Vocabulary = () => {
                             </button>
                         </div>
 
-                        <div className="vocab-modal-body space-y-6">
-                            <div className="flex flex-wrap gap-3">
-                                <Button
-                                    variant="primary"
-                                    className="px-6"
-                                    onClick={() => playPronunciationAudio(selectedWord.audioUrl, selectedWord.word)}
-                                >
-                                    <Volume2 size={18} /> Nghe phát âm
-                                </Button>
-                                {selectedWord.example && (
+                        <div className={`vocab-modal-body grid gap-5 ${isAiPanelOpen ? 'lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]' : 'grid-cols-1'}`}>
+                            <div className="min-w-0 space-y-6">
+                                <div className="flex flex-wrap gap-3">
                                     <Button
-                                        variant="ghost"
+                                        variant="primary"
                                         className="px-6"
-                                        onClick={() => playPronunciationAudio(selectedWord.exampleAudioUrl, selectedWord.example)}
+                                        onClick={() => playPronunciationAudio(selectedWord.audioUrl, selectedWord.word)}
                                     >
-                                        <Volume2 size={18} /> Nghe ví dụ
+                                        <Volume2 size={18} /> Nghe phát âm
                                     </Button>
-                                )}
-                                <Button
-                                    variant="accent"
-                                    className="px-6"
-                                    onClick={handleAskAi}
-                                    disabled={isLoadingAi}
-                                >
-                                    {isLoadingAi ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                                    {isLoadingAi ? "Đang xử lý..." : "Hỏi AI ✨"}
-                                </Button>
+                                    {selectedWord.example && (
+                                        <Button
+                                            variant="ghost"
+                                            className="px-6"
+                                            onClick={() => playPronunciationAudio(selectedWord.exampleAudioUrl, selectedWord.example)}
+                                        >
+                                            <Volume2 size={18} /> Nghe ví dụ
+                                        </Button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleAskAi}
+                                        disabled={isLoadingAi}
+                                        aria-pressed={isAiPanelOpen}
+                                        className={`px-5 py-2.5 rounded-pill border font-display font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60 disabled:cursor-wait ${
+                                            isAiPanelOpen
+                                                ? 'border-primary/35 bg-primary/10 text-primary'
+                                                : 'border-border bg-surface text-text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-primary'
+                                        }`}
+                                    >
+                                        {isLoadingAi ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={16} />}
+                                        Trợ lý AI
+                                    </button>
+                                </div>
+
+                                <div className="rounded-card border border-primary/10 bg-primary/[0.04] p-5">
+                                    <h3 className="text-sm font-bold uppercase tracking-wide text-primary mb-2">Ý nghĩa</h3>
+                                    <p className="text-lg mb-4">{selectedWord.meaning}</p>
+                                    {selectedWord.example && (
+                                        <>
+                                            <h3 className="text-sm font-bold uppercase tracking-wide text-purple mb-2">Ví dụ</h3>
+                                            <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
+                                            {selectedWord.translation && (
+                                                <p className="text-sm text-text-muted mt-2 italic">"{selectedWord.translation}"</p>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="rounded-card border border-primary/10 bg-primary/[0.04] p-5">
-                                <h3 className="text-sm font-bold uppercase tracking-wide text-primary mb-2">Ý nghĩa</h3>
-                                <p className="text-lg mb-4">{selectedWord.meaning}</p>
-                                {selectedWord.example && (
-                                    <>
-                                        <h3 className="text-sm font-bold uppercase tracking-wide text-purple mb-2">Ví dụ</h3>
-                                        <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
-                                        {selectedWord.translation && (
-                                            <p className="text-sm text-text-muted mt-2 italic">"{selectedWord.translation}"</p>
-                                        )}
-                                    </>
-                                )}
-
-                                {(isLoadingAi || aiResponse) && (
-                                    <div className="mt-6 pt-4 border-t border-primary/10">
-                                        <h3 className="text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2 text-cyan-600">
-                                            <Sparkles size={16} /> Giải thích từ AI
-                                        </h3>
-                                        {isLoadingAi ? (
-                                            <div className="flex justify-center p-4">
-                                                <Loader2 size={24} className="animate-spin text-cyan-500" />
-                                            </div>
-                                        ) : (
-                                            <div
-                                                className="text-sm leading-relaxed prose prose-cyan max-w-none"
-                                                dangerouslySetInnerHTML={{ __html: aiResponse || '' }}
-                                            />
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            {isAiPanelOpen && (
+                                <AiAssistantPanel
+                                    response={aiResponse}
+                                    error={aiError}
+                                    isLoading={isLoadingAi}
+                                    openSection={openAiSection}
+                                    onToggleSection={toggleAiSection}
+                                    onRetry={handleRetryAi}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
