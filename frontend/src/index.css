@@ -1022,13 +1022,29 @@
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
-        transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+        transition: border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
         position: relative;
         overflow: hidden;
         cursor: pointer;
     }
+    .home-topic-card > span:first-child {
+        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
     .home-topic-card:hover {
-        transform: translateY(-3px);
+        transform: translateY(-4px);
+        border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+        box-shadow: 0 14px 32px var(--shadow-color), 0 0 0 1px color-mix(in srgb, var(--accent-color) 14%, transparent);
+    }
+    .home-topic-card:hover > span:first-child {
+        transform: scale(1.14) rotate(-5deg);
+    }
+    .home-topic-card:active {
+        transform: translateY(-1px) scale(0.99);
+    }
+    .home-topic-card:focus-visible {
+        outline: none;
+        border-color: color-mix(in srgb, var(--accent-color) 55%, var(--border-color));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 24%, transparent);
     }
 
     /* ── Step card ── */
@@ -1041,10 +1057,16 @@
         transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
         box-shadow: 0 4px 20px var(--shadow-color);
     }
+    .home-step-card > div:nth-child(2) {
+        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
     .home-step-card:hover {
         border-color: var(--accent-color);
-        box-shadow: 0 4px 16px var(--shadow-color), 0 2px 6px var(--shadow-color);
+        box-shadow: 0 12px 28px var(--shadow-color), 0 2px 6px var(--shadow-color);
         transform: translateY(-4px);
+    }
+    .home-step-card:hover > div:nth-child(2) {
+        transform: scale(1.12) translateY(-2px);
     }
 
     /* ── CTA Section ── */
@@ -1096,6 +1118,11 @@
         justify-content: center;
         flex-shrink: 0;
         box-shadow: 0 10px 28px color-mix(in srgb, var(--accent-color) 12%, transparent);
+        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .home-feature-strip .home-fade-in:hover .home-feature-icon {
+        transform: scale(1.08) rotate(-3deg);
+        box-shadow: 0 14px 32px color-mix(in srgb, var(--accent-color) 20%, transparent);
     }
 
     .home-feature-icon svg {
@@ -1107,12 +1134,13 @@
     /* ── Fade-in animation ── */
     .home-fade-in {
         opacity: 0;
-        transform: translateY(24px);
-        transition: opacity 0.6s ease, transform 0.6s ease;
+        transform: translate3d(0, 26px, 0);
+        transition: opacity 1000ms cubic-bezier(0.22, 1, 0.36, 1), transform 1000ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: opacity, transform;
     }
     .home-fade-in.visible {
         opacity: 1;
-        transform: translateY(0);
+        transform: translate3d(0, 0, 0);
     }
 
     /* ── Hero entry (replaces framer-motion) ── */
@@ -1149,7 +1177,6 @@
 
     /* ── Honour reduced-motion preference ── */
     @media (prefers-reduced-motion: reduce) {
-        .home-fade-in,
         .home-hero-slide-left,
         .home-hero-slide-right,
         .home-cta-bounce,
@@ -1161,6 +1188,30 @@
             animation: none !important;
             transition: none !important;
             opacity: 1 !important;
+            transform: none !important;
+        }
+        /* Scroll reveal still runs, but as a motion-safe opacity-only fade:
+           content stays hidden until it enters the viewport (no translate). */
+        .home-fade-in {
+            transform: none !important;
+            transition: opacity 600ms ease !important;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .home-topic-card,
+        .home-topic-card > span:first-child,
+        .home-step-card,
+        .home-step-card > div:nth-child(2),
+        .home-feature-icon {
+            transition: none !important;
+        }
+        .home-topic-card:hover,
+        .home-topic-card:active,
+        .home-topic-card:hover > span:first-child,
+        .home-step-card:hover,
+        .home-step-card:hover > div:nth-child(2),
+        .home-feature-strip .home-fade-in:hover .home-feature-icon {
             transform: none !important;
         }
     }
@@ -1256,6 +1307,34 @@
         content-visibility: auto;
         contain-intrinsic-size: 360px;
     }
+
+    /* ── Learning page entrance ──
+       .learning-fade-in : opacity + translateY (topic cards, right index).
+       .learning-fade    : opacity only — used on the sticky category header so
+       it never carries a transform that would break sticky positioning. ── */
+    .learning-fade-in {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0);
+        transition: opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .learning-fade-in.is-visible {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+    .learning-fade {
+        opacity: 0;
+        transition: opacity 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .learning-fade.is-visible {
+        opacity: 1;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .learning-fade-in,
+        .learning-fade {
+            transform: none !important;
+            transition: opacity 300ms ease !important;
+        }
+    }
     @keyframes minitest-result-enter {
         from { opacity: 0; transform: scale(0.94); }
         to   { opacity: 1; transform: none; }
@@ -1295,6 +1374,25 @@
         content-visibility: auto;
         contain-intrinsic-size: 480px;
     }
+
+    /* ── Vocabulary entrance (header/filters on mount, cards staggered).
+       No will-change: a full page of cards would promote too many layers. ── */
+    .vocab-fade-in {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0);
+        transition: opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .vocab-fade-in.is-visible {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        /* Opacity-only, no movement, no stagger delay. */
+        .vocab-fade-in {
+            transform: none !important;
+            transition: opacity 300ms ease !important;
+        }
+    }
     .vocab-modal-overlay {
         @apply fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-6;
         background: rgba(15, 23, 42, 0.5);
@@ -1330,6 +1428,25 @@
     .dashboard-defer {
         content-visibility: auto;
         contain-intrinsic-size: 320px;
+    }
+
+    /* ── Dashboard entrance (on-mount, staggered via delay-* utilities) ── */
+    .dashboard-fade-in {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0);
+        transition: opacity 650ms cubic-bezier(0.22, 1, 0.36, 1), transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: opacity, transform;
+    }
+    .dashboard-fade-in.is-visible {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        /* Opacity-only, no movement, no stagger delay. */
+        .dashboard-fade-in {
+            transform: none !important;
+            transition: opacity 300ms ease !important;
+        }
     }
 }
 

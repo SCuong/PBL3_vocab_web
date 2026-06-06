@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,6 +15,11 @@ const LearningTopics = () => {
   const navigate = useNavigate();
   const topicScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { currentUser, learningTopicGroups: topicGroups, addToast } = useAppContext();
+
+  // Page entrance: flip one frame after the topic groups are available (covers
+  // both synchronous context data and a later async load) so the header/cards/
+  // index transition from hidden → visible instead of appearing all at once.
+  const [mounted, setMounted] = useState(false);
 
   const onStartStudy = useCallback(async (topicId: number, mode?: string) => {
     try {
@@ -97,6 +102,12 @@ const LearningTopics = () => {
       document.documentElement.style.overflow = previousRootOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    if (mounted || topicGroups.length === 0) return;
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, [mounted, topicGroups]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-4 relative lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
@@ -199,7 +210,7 @@ const LearningTopics = () => {
                     isCategoryLocked ? "opacity-50" : "hover:border-primary/20"
                   }`}
                 >
-                  <div className="z-40 flex flex-col gap-4 rounded-t-card border-b border-primary/10 bg-surface p-5 shadow-[0_12px_30px_var(--shadow-color)] sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:sticky lg:top-0">
+                  <div className={`learning-fade ${mounted ? "is-visible" : ""} z-40 flex flex-col gap-4 rounded-t-card border-b border-primary/10 bg-surface p-5 shadow-[0_12px_30px_var(--shadow-color)] sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:sticky lg:top-0`}>
                     <div className="flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-[1.75rem]">
                         {cat.icon ?? "📚"}
@@ -263,9 +274,13 @@ const LearningTopics = () => {
                             : 0;
 
                         return (
-                          <article
+                          <div
                             key={topic.id}
-                            className={`learning-card relative flex min-h-[18rem] flex-col p-5 transition-all sm:p-6 ${
+                            className={`learning-fade-in h-full ${mounted ? "is-visible" : ""}`}
+                            style={{ transitionDelay: `${Math.min(idx * 60, 420)}ms` }}
+                          >
+                          <article
+                            className={`learning-card relative flex h-full min-h-[18rem] flex-col p-5 transition-all sm:p-6 ${
                               isTopicLocked
                                 ? "pointer-events-none blur-[2px] opacity-70"
                                 : "hover:-translate-y-1 hover:border-primary/40"
@@ -379,6 +394,7 @@ const LearningTopics = () => {
                               )}
                             </div>
                           </article>
+                          </div>
                         );
                       })}
                     </div>
@@ -392,7 +408,7 @@ const LearningTopics = () => {
 
         {categoryNavItems.length > 0 && (
           <aside
-            className="hidden lg:block"
+            className={`hidden lg:block learning-fade-in delay-[200ms] ${mounted ? "is-visible" : ""}`}
             aria-label="Mục lục chủ đề học tập"
           >
             <div className="learning-card sticky top-24 p-4">

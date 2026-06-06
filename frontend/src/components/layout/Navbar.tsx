@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { LogOut, Shield } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, ThemeToggle } from '../ui';
 import { UserWidget } from './UserWidget';
@@ -32,6 +31,39 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
     const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
     const isOnAdmin = activePath.startsWith('/admin');
 
+    // Active underline indicator — slides horizontally only (transform + width).
+    // Measured from layout (offsetLeft/offsetWidth), so it is immune to page
+    // scroll and never animates vertically.
+    const visibleLinks = navLinks.filter(link => !link.authOnly || currentUser);
+    const activeKey = isOnAdmin
+        ? 'admin'
+        : (visibleLinks.some(l => l.path === activePath) ? activePath : null);
+    const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
+    const [animate, setAnimate] = useState(false);
+
+    useLayoutEffect(() => {
+        const measure = () => {
+            const target = activeKey ? itemRefs.current[activeKey] : null;
+            if (!target || target.offsetParent === null) {
+                setIndicator(prev => ({ ...prev, ready: false }));
+                return;
+            }
+            setIndicator({
+                left: target.offsetLeft + 12,
+                width: Math.max(target.offsetWidth - 24, 0),
+                ready: true,
+            });
+        };
+        measure();
+        const raf = requestAnimationFrame(() => setAnimate(true));
+        window.addEventListener('resize', measure);
+        return () => {
+            window.removeEventListener('resize', measure);
+            cancelAnimationFrame(raf);
+        };
+    }, [activeKey, currentUser, isAdmin, reviewCount]);
+
     return (
         <nav
             className="sticky top-0 z-50 border-b border-border bg-bg-light/85 backdrop-blur-xl"
@@ -49,10 +81,11 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                 </button>
 
                 {/* Desktop nav */}
-                <div className="hidden md:flex items-center gap-1 ml-4">
-                    {navLinks.filter(link => !link.authOnly || currentUser).map(link => (
+                <div className="relative hidden md:flex items-center gap-1 ml-4">
+                    {visibleLinks.map(link => (
                         <button
                             key={link.path}
+                            ref={(el) => { itemRefs.current[link.path] = el; }}
                             onClick={() => navigate(link.path)}
                             className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors cursor-pointer ${
                                 activePath === link.path
@@ -68,18 +101,13 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                                     </span>
                                 )}
                             </span>
-                            {activePath === link.path && (
-                                <motion.div
-                                    layoutId="nav-active"
-                                    className="absolute -bottom-px left-3 right-3 h-0.5 bg-primary rounded-full"
-                                />
-                            )}
                         </button>
                     ))}
 
                     {/* Admin nav link — ADMIN role only */}
                     {isAdmin && (
                         <button
+                            ref={(el) => { itemRefs.current['admin'] = el; }}
                             onClick={() => navigate(PATHS.admin)}
                             className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors cursor-pointer flex items-center gap-1.5 ${
                                 isOnAdmin
@@ -89,14 +117,22 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                         >
                             <Shield size={13} />
                             Quản trị
-                            {isOnAdmin && (
-                                <motion.div
-                                    layoutId="nav-active"
-                                    className="absolute -bottom-px left-3 right-3 h-0.5 bg-primary rounded-full"
-                                />
-                            )}
                         </button>
                     )}
+
+                    {/* Active indicator — horizontal slide only (transform + width) */}
+                    <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-px left-0 h-0.5 bg-primary rounded-full"
+                        style={{
+                            width: indicator.width,
+                            transform: `translateX(${indicator.left}px)`,
+                            opacity: indicator.ready ? 1 : 0,
+                            transition: animate
+                                ? 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), width 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease'
+                                : 'none',
+                        }}
+                    />
                 </div>
 
                 {/* Desktop right side */}

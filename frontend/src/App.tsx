@@ -128,7 +128,10 @@ const AppShell = () => {
                                 path={PATHS.profile}
                                 element={<ProtectedRoute><Profile /></ProtectedRoute>}
                             />
-                            <Route path={PATHS.leaderboard} element={<Leaderboard />} />
+                            <Route
+                                path={PATHS.leaderboard}
+                                element={<ProtectedRoute><Leaderboard /></ProtectedRoute>}
+                            />
                             <Route
                                 path={`${PATHS.admin}/*`}
                                 element={<AdminRoute><AdminDashboard /></AdminRoute>}
