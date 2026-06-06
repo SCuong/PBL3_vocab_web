@@ -8,7 +8,6 @@ import {
     Settings,
     StickyNote,
     KeyRound,
-    MailCheck,
     Trash2,
     ChevronRight,
     LogOut,
@@ -280,7 +279,6 @@ const Profile = () => {
         return `${year}-${month}-${day}`;
     }, [user?.createdAt]);
 
-    const isEmailVerified = Boolean((user as any)?.isEmailVerified);
     const joinedDateLabel = useMemo(() => {
         return accountCreatedDate ? formatDateVN(accountCreatedDate) : FALLBACK_JOINED_DATE;
     }, [accountCreatedDate]);
@@ -788,34 +786,6 @@ const Profile = () => {
                                     <div className="font-bold text-sm text-text-primary">Đổi mật khẩu</div>
                                     <div className="text-xs text-text-muted mt-0.5">
                                         Cập nhật mật khẩu để bảo vệ tài khoản.
-                                    </div>
-                                </div>
-                                <ChevronRight size={18} className="text-text-muted shrink-0" />
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (isEmailVerified) {
-                                        onAddToast?.('Email của bạn đã được xác minh.', 'success');
-                                    } else {
-                                        navigate(PATHS.verifyEmail);
-                                    }
-                                }}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-primary/40 hover:bg-surface-hover transition-colors text-left cursor-pointer active:scale-[0.99]"
-                            >
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isEmailVerified ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'}`}>
-                                    <MailCheck size={18} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-sm text-text-primary flex items-center gap-2">
-                                        Xác minh email
-                                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${isEmailVerified ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
-                                            {isEmailVerified ? 'Đã xác minh' : 'Chưa xác minh'}
-                                        </span>
-                                    </div>
-                                    <div className="text-xs text-text-muted mt-0.5 truncate">
-                                        {user.email || '—'}
                                     </div>
                                 </div>
                                 <ChevronRight size={18} className="text-text-muted shrink-0" />
