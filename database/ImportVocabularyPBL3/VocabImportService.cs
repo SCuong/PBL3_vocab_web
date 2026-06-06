@@ -130,7 +130,7 @@ namespace ImportVocabularyPBL3.Services
             }
 
             using var sel = new NpgsqlCommand(
-                "SELECT vocab_id FROM vocabulary WHERE word = @w",
+                "SELECT vocab_id FROM vocabulary WHERE word = CAST(@w AS citext)",
                 conn, tran);
             sel.Parameters.AddWithValue("@w", word);
             var existingRaw = sel.ExecuteScalar();
@@ -249,7 +249,7 @@ namespace ImportVocabularyPBL3.Services
             bool created = insert.ExecuteNonQuery() > 0;
 
             using var sel = new NpgsqlCommand(
-                "SELECT topic_id FROM topic WHERE name = @name",
+                "SELECT topic_id FROM topic WHERE name = CAST(@name AS citext)",
                 conn, tran);
             sel.Parameters.AddWithValue("@name", trimmed);
             var raw = sel.ExecuteScalar();
