@@ -65,13 +65,13 @@ const features = [
 
 /* ── Topics data ────────────────────────────────────────────────────── */
 const topics = [
-    { emoji: '💬', name: 'Giao tiếp hàng ngày', count: '10 chủ đề', tone: 'hover:border-primary hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '💼', name: 'Công việc & Học tập', count: '9 chủ đề', tone: 'hover:border-cyan hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '🏥', name: 'Sức khoẻ', count: '5 chủ đề', tone: 'hover:border-success-color hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '✈️', name: 'Giải trí & Du lịch', count: '5 chủ đề', tone: 'hover:border-warning-color hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '🏠', name: 'Cuộc sống hàng ngày', count: '10 chủ đề', tone: 'hover:border-accent hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '💭', name: 'Cảm xúc & Ý kiến', count: '5 chủ đề', tone: 'hover:border-primary hover:shadow-[0_8px_24px_var(--shadow-color)]' },
-    { emoji: '🔬', name: 'Văn hoá & Khoa học', count: '6 chủ đề', tone: 'hover:border-cyan hover:shadow-[0_8px_24px_var(--shadow-color)]' },
+    { emoji: '💬', name: 'Giao tiếp hàng ngày', count: '10 chủ đề', tone: 'hover:border-primary' },
+    { emoji: '💼', name: 'Công việc & Học tập', count: '9 chủ đề', tone: 'hover:border-cyan' },
+    { emoji: '🏥', name: 'Sức khoẻ', count: '5 chủ đề', tone: 'hover:border-success-color' },
+    { emoji: '✈️', name: 'Giải trí & Du lịch', count: '5 chủ đề', tone: 'hover:border-warning-color' },
+    { emoji: '🏠', name: 'Cuộc sống hàng ngày', count: '10 chủ đề', tone: 'hover:border-accent' },
+    { emoji: '💭', name: 'Cảm xúc & Ý kiến', count: '5 chủ đề', tone: 'hover:border-primary' },
+    { emoji: '🔬', name: 'Văn hoá & Khoa học', count: '6 chủ đề', tone: 'hover:border-cyan' },
 ];
 
 /* ── Steps data ─────────────────────────────────────────────────────── */
@@ -90,7 +90,7 @@ function useFadeIn() {
         const items = el.querySelectorAll('.home-fade-in');
         const obs = new IntersectionObserver(
             entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } }),
-            { threshold: 0.1 }
+            { threshold: 0.22, rootMargin: '0px 0px -18% 0px' }
         );
         items.forEach(item => obs.observe(item));
         return () => obs.disconnect();
@@ -110,24 +110,24 @@ const Home = () => {
             <section className="min-h-[calc(100vh-64px)] px-8 py-16 sm:py-20 lg:py-24 flex items-center">
                 <div className="max-w-[1200px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Text */}
-                    <div className="home-hero-slide-left flex flex-col gap-6">
-                        <div className="inline-flex items-center gap-3 bg-primary-light/80 text-primary text-sm sm:text-base font-semibold px-5 py-2.5 rounded-full border border-primary/15 w-fit shadow-[0_1px_2px_var(--shadow-color)]">
+                    <div className="flex flex-col gap-6">
+                        <div className="home-fade-in inline-flex items-center gap-3 bg-primary-light/80 text-primary text-sm sm:text-base font-semibold px-5 py-2.5 rounded-full border border-primary/15 w-fit shadow-[0_1px_2px_var(--shadow-color)]" style={{ transitionDelay: '0ms' }}>
                             <Star size={18} fill="currentColor" strokeWidth={1.75} className="text-[#F5B82E] shrink-0" />
                             Học thông minh – Nhớ lâu hơn
                         </div>
 
-                        <h1 className={`${typography.heroTitle} home-hero-title`}>
+                        <h1 className={`${typography.heroTitle} home-hero-title home-fade-in`} style={{ transitionDelay: '140ms' }}>
                             Học từ vựng<br />tiếng Anh
                             <span className="block bg-clip-text text-transparent bg-linear-to-r from-primary to-cyan">
                                 dễ dàng &amp; hiệu quả
                             </span>
                         </h1>
 
-                        <p className="text-base sm:text-lg text-text-secondary leading-relaxed max-w-[46ch]">
+                        <p className="home-fade-in text-base sm:text-lg text-text-secondary leading-relaxed max-w-[46ch]" style={{ transitionDelay: '280ms' }}>
                             Phương pháp lặp lại ngắt quãng kết hợp trò chơi thú vị giúp bạn ghi nhớ từ vựng tự nhiên và bền vững.
                         </p>
 
-                        <div className="flex items-center gap-4 flex-wrap">
+                        <div className="home-fade-in flex items-center gap-4 flex-wrap" style={{ transitionDelay: '420ms' }}>
                             <button
                                 onClick={() => navigate(PATHS.learning)}
                                 className="btn-primary !px-8 !py-4 !text-sm !font-bold"
@@ -148,7 +148,7 @@ const Home = () => {
                     </div>
 
                     {/* Right: Visual */}
-                    <div className="home-hero-slide-right hidden lg:block">
+                    <div className="home-fade-in hidden lg:block" style={{ transitionDelay: '560ms' }}>
                         <HeroVisual />
                     </div>
                 </div>
@@ -160,7 +160,7 @@ const Home = () => {
                     {features.map((feat, i) => (
                         <div key={i} className="flex items-center">
                             {i > 0 && <div className="hidden md:block w-px h-16 bg-primary/15 mx-0" />}
-                            <div className="home-fade-in flex-1 flex items-center gap-5 px-7 lg:px-12 py-4 text-left" style={{ transitionDelay: `${i * 60}ms` }}>
+                            <div className="home-fade-in flex-1 flex items-center gap-5 px-7 lg:px-12 py-4 text-left" style={{ transitionDelay: `${i * 180}ms` }}>
                                 <div className={`home-feature-icon ${feat.tone}`}>
                                     {feat.icon}
                                 </div>
@@ -177,7 +177,7 @@ const Home = () => {
             {/* ── TOPICS ── */}
             <section className="px-8 py-16 sm:py-20 lg:py-24">
                 <div className="max-w-[1200px] mx-auto">
-                    <div className="text-center mb-12">
+                    <div className="home-fade-in text-center mb-12">
                         <h2 className={`${typography.sectionTitle} block w-full text-center`}>
                             Khám phá chủ đề
                         </h2>
@@ -191,7 +191,7 @@ const Home = () => {
                                 key={i}
                                 onClick={() => navigate(PATHS.vocabulary)}
                                 className={`home-fade-in home-topic-card group text-left ${topic.tone}`}
-                                style={{ transitionDelay: `${i * 60}ms` }}
+                                style={{ transitionDelay: `${i * 110}ms` }}
                             >
                                 <span className="text-[28px] relative z-10">{topic.emoji}</span>
                                 <span className="font-bold text-sm text-text-primary relative z-10">{topic.name}</span>
@@ -201,7 +201,7 @@ const Home = () => {
                         <button
                             onClick={() => navigate(PATHS.vocabulary)}
                             className="home-fade-in home-topic-card text-left"
-                            style={{ transitionDelay: `${topics.length * 60}ms`, borderStyle: 'dashed' }}
+                            style={{ transitionDelay: `${topics.length * 110}ms`, borderStyle: 'dashed' }}
                         >
                             <span className="text-[28px] relative z-10">📚</span>
                             <span className="font-bold text-sm text-text-primary relative z-10">Xem tất cả</span>
@@ -214,7 +214,7 @@ const Home = () => {
             {/* ── HOW IT WORKS ── */}
             <section className="home-defer px-8 py-16 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
                 <div className="max-w-[1200px] mx-auto">
-                    <div className="text-center mb-12">
+                    <div className="home-fade-in text-center mb-12">
                         <h2 className={`${typography.sectionTitle} block w-full text-center`}>
                             Cách hoạt động
                         </h2>
@@ -228,7 +228,7 @@ const Home = () => {
                                 {i > 0 && (
                                     <div className="hidden md:flex justify-center text-[2.75rem] text-primary/40 font-display">→</div>
                                 )}
-                                <div className="home-fade-in home-step-card" style={{ transitionDelay: `${i * 60}ms` }}>
+                                <div className="home-fade-in home-step-card" style={{ transitionDelay: `${i * 160}ms` }}>
                                     <div className="text-xs font-bold text-primary tracking-[0.1em] mb-3">{step.num}</div>
                                     <div className="text-[40px] mb-4">{step.icon}</div>
                                     <h3 className="font-display font-bold text-xl text-text-primary mb-3">{step.title}</h3>
@@ -242,7 +242,7 @@ const Home = () => {
 
             {!currentUser && (
                 <section className="home-cta-section home-defer px-8 py-16 sm:py-20 lg:py-24">
-                    <div className="max-w-[680px] mx-auto px-8 text-center relative z-10">
+                    <div className="home-fade-in max-w-[680px] mx-auto px-8 text-center relative z-10">
                         <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
                             📚
                         </div>
@@ -255,13 +255,13 @@ const Home = () => {
                         <div className="flex justify-center items-center gap-4 flex-wrap">
                             <button
                                 onClick={() => navigate(PATHS.register)}
-                                className="inline-flex items-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 transition-[transform,filter] duration-200 px-10 py-4 cursor-pointer"
+                                className="inline-flex items-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 hover:shadow-[0_10px_34px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-[transform,filter,box-shadow] duration-200 px-10 py-4 cursor-pointer"
                             >
                                 Tạo tài khoản miễn phí
                             </button>
                             <button
                                 onClick={() => navigate(PATHS.vocabulary)}
-                                className="inline-flex items-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light transition-colors duration-200 px-8 py-4 cursor-pointer"
+                                className="inline-flex items-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-[transform,background-color,border-color] duration-200 px-8 py-4 cursor-pointer"
                             >
                                 Xem từ vựng trước
                             </button>

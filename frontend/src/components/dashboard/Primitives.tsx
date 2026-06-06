@@ -65,6 +65,7 @@ export const DashboardStat = ({
     detail,
     tone = 'primary',
     variant = 'glass',
+    className = '',
 }: {
     icon: ReactNode;
     label: ReactNode;
@@ -72,8 +73,9 @@ export const DashboardStat = ({
     detail?: ReactNode;
     tone?: Tone;
     variant?: DashboardCardVariant;
+    className?: string;
 }) => (
-    <DashboardCard className="min-h-[132px]" variant={variant}>
+    <DashboardCard className={`min-h-[132px] ${className}`} variant={variant}>
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
                 <p className="text-xs font-display font-bold uppercase tracking-wide text-text-muted">{label}</p>
