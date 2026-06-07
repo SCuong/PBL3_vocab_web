@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, typography } from '../components/ui';
 import { authApi } from '../services/authApi';
@@ -38,6 +38,7 @@ declare global {
                             width?: number;
                         }
                     ) => void;
+                    prompt?: () => void;
                     disableAutoSelect?: () => void;
                 };
             };
@@ -120,8 +121,6 @@ const Auth = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [verificationLink, setVerificationLink] = useState('');
     const [registerEmailTouched, setRegisterEmailTouched] = useState(false);
-    const googleLoginButtonRef = useRef<HTMLDivElement>(null);
-    const googleRegisterButtonRef = useRef<HTMLDivElement>(null);
     // 'idle' | 'active' | 'close' — mirrors the sample's container class
     const [flipState, setFlipState] = useState<'idle' | 'active' | 'close'>(
         initialMode === 'register' ? 'active' : 'idle'
@@ -166,6 +165,23 @@ const Auth = () => {
             setIsGoogleSubmitting(false);
         }
     }, [addToast, isGoogleSubmitting, navigate, syncUserGameData]);
+
+    // Custom button trigger. Auth flow is unchanged: this opens Google's prompt,
+    // whose credential is handled by the same handleGoogleCredential callback
+    // wired in initialize() → authApi.googleLogin({ idToken }).
+    const handleGoogleButtonClick = useCallback(() => {
+        if (isGoogleSubmitting) return;
+        if (!googleClientId) {
+            setErrorMessage('Google login chưa được cấu hình.');
+            return;
+        }
+        if (!window.google?.accounts?.id?.prompt) {
+            setErrorMessage('Đang tải Google Sign-In, vui lòng thử lại sau giây lát.');
+            return;
+        }
+        setErrorMessage('');
+        window.google.accounts.id.prompt();
+    }, [isGoogleSubmitting]);
 
     useEffect(() => {
         const nextLogin = initialMode !== 'register';
@@ -229,19 +245,6 @@ const Auth = () => {
                 callback: handleGoogleCredential,
                 auto_select: false,
                 cancel_on_tap_outside: true
-            });
-
-            [googleLoginButtonRef.current, googleRegisterButtonRef.current].forEach((target) => {
-                if (!target) return;
-                target.innerHTML = '';
-                window.google?.accounts.id.renderButton(target, {
-                    theme: 'outline',
-                    size: 'large',
-                    type: 'standard',
-                    text: 'continue_with',
-                    shape: 'pill',
-                    width: Math.min(target.clientWidth || 320, 400)
-                });
             });
         };
 
@@ -309,24 +312,23 @@ const Auth = () => {
         </div>
     );
 
-    const renderGoogleLoginArea = (targetRef: RefObject<HTMLDivElement | null>) => (
+    const renderGoogleLoginArea = () => (
         <div className="mb-4 w-full space-y-3">
-            {googleClientId ? (
-                <div
-                    className="flex min-h-11 w-full items-center justify-center rounded-full border border-border bg-surface px-2 py-1"
-                    aria-busy={isGoogleSubmitting}
-                >
-                    <div ref={targetRef} className="w-full max-w-[400px]" />
-                </div>
-            ) : (
-                <button
-                    type="button"
-                    className="min-h-11 w-full rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    onClick={() => setErrorMessage('Google login chưa được cấu hình.')}
-                >
-                    Continue with Google
-                </button>
-            )}
+            <button
+                type="button"
+                onClick={handleGoogleButtonClick}
+                disabled={isGoogleSubmitting}
+                aria-busy={isGoogleSubmitting}
+                className="flex min-h-11 w-full min-w-0 items-center justify-center gap-2.5 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-hover active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="shrink-0">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
+                    <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z" />
+                </svg>
+                <span className="truncate">{isGoogleSubmitting ? 'Đang kết nối...' : 'Tiếp tục với Google'}</span>
+            </button>
             <div className="flex items-center gap-3 text-xs text-text-secondary">
                 <span className="h-px flex-1 bg-border" />
                 <span>hoặc</span>
@@ -613,7 +615,7 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
                         </div>
 
-                        {renderGoogleLoginArea(googleLoginButtonRef)}
+                        {renderGoogleLoginArea()}
 
                         <div className="space-y-3 w-full">
                             <input
@@ -699,7 +701,7 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
                         </div>
 
-                        {renderGoogleLoginArea(googleRegisterButtonRef)}
+                        {renderGoogleLoginArea()}
 
                         <div className="space-y-2 w-full">
                             <input type="text" placeholder="Tên hiển thị"

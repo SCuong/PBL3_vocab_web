@@ -453,21 +453,21 @@ const Profile = () => {
 
     return (
         <div className="min-h-screen w-full bg-bg-light text-text-primary">
-            <div className="max-w-6xl mx-auto px-6 py-10 space-y-6">
+            <div className="max-w-6xl mx-auto px-4 py-6 space-y-5 sm:px-6 sm:py-10 sm:space-y-6">
 
                 {/* ── Profile header card ─────────────────────────────── */}
-                <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-6 sm:p-8">
+                <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-4 sm:p-8">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-                        <div className="flex items-start gap-5 sm:gap-6 min-w-0">
+                        <div className="flex items-start gap-4 sm:gap-6 min-w-0">
                             <div className="relative shrink-0">
                                 {avatarUrl ? (
                                     <img
                                         src={avatarUrl}
                                         alt="Avatar"
-                                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-border shadow-sm"
+                                    className="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-border shadow-sm"
                                     />
                                 ) : (
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl sm:text-4xl font-display font-bold text-text-on-accent border-4 border-border shadow-sm">
+                                    <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-2xl sm:text-4xl font-display font-bold text-text-on-accent border-4 border-border shadow-sm">
                                         {initials}
                                     </div>
                                 )}
@@ -487,10 +487,10 @@ const Profile = () => {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex w-full items-center gap-2 shrink-0 md:w-auto">
                             <Button
                                 variant="primary"
-                                className="px-5 py-2.5"
+                                className="flex-1 justify-center px-4 py-2.5 md:flex-none md:px-5"
                                 onClick={() => setIsEditing(true)}
                             >
                                 <Pencil size={16} /> Chỉnh sửa hồ sơ
@@ -510,7 +510,7 @@ const Profile = () => {
                     {/* ── Inline stats row with vertical dividers ─────────── */}
                     <div className="mt-7 pt-6 border-t border-border grid grid-cols-2 md:grid-cols-4 md:divide-x divide-border gap-y-5">
                         {stats.map((s) => (
-                            <div key={s.key} className="flex flex-col items-start text-left px-4 md:px-5">
+                            <div key={s.key} className="flex flex-col items-start text-left px-2 sm:px-4 md:px-5">
                                 <div className={`flex items-center gap-1.5 ${s.accent}`}>
                                     {s.icon}
                                     <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
@@ -533,7 +533,7 @@ const Profile = () => {
                 {/* ── 2-column grid: Study history + Quick notes ──────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Study history */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
                         <div className="flex items-center justify-between gap-3 mb-2">
                             <h2 className="text-lg font-bold text-text-primary">Lịch sử học tập</h2>
                             <button
@@ -601,7 +601,7 @@ const Profile = () => {
                     </section>
 
                     {/* Quick notes */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
                         <div className="flex items-start justify-between gap-3 mb-5">
                             <div>
                                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -667,7 +667,7 @@ const Profile = () => {
                 {/* ── 2-column grid: Learned words + Security ─────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Vocabulary notebook (formerly Learned words) */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div className="min-w-0">
                                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -767,7 +767,7 @@ const Profile = () => {
                     </section>
 
                     {/* Security */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-6 sm:p-7">
+                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
                         <h2 className="text-lg font-bold text-text-primary mb-1">Bảo mật</h2>
                         <p className="text-xs text-text-muted mb-5">
                             Quản lý mật khẩu, email và tài khoản của bạn.
@@ -831,12 +831,12 @@ const Profile = () => {
             </div>
 
             {isTaglineModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="fixed inset-0 z-50 flex items-end justify-center px-0 sm:items-center sm:px-4">
                     <div
                         className="absolute inset-0 bg-black/40"
                         onClick={() => setIsTaglineModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-md bg-surface rounded-3xl shadow-2xl border border-border overflow-hidden">
+                    <div className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto bg-surface rounded-t-3xl shadow-2xl border border-border sm:rounded-3xl">
                         <div className="px-6 py-4 border-b border-border">
                             <h3 className="font-bold text-text-primary">Chỉnh sửa giới thiệu</h3>
                             <p className="text-xs text-text-muted mt-1">

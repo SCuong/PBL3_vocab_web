@@ -35,6 +35,8 @@ interface AppContextValue {
     learnedWordIds: number[];
     totalReviewCount: number;
     learnerAnalytics: LearnerDashboard | null;
+    applyLearningProgress: (state: LearningProgressState) => void;
+    refreshLearnerAnalytics: () => Promise<LearnerDashboard | null>;
     handleWordsLearned: (topicId: number, wordIds: number[]) => Promise<void>;
     handleRecordStudyHistory: (sessionInput: StudySessionRecordInput) => void;
     showStreakModal: boolean;
@@ -89,6 +91,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setLearningProgressState(nextState);
         } catch {
             setLearningProgressState(null);
+        }
+    }, [currentUser?.userId]);
+
+    const applyLearningProgress = useCallback((state: LearningProgressState) => {
+        setLearningProgressState(state);
+    }, []);
+
+    const refreshLearnerAnalytics = useCallback(async (): Promise<LearnerDashboard | null> => {
+        if (!currentUser?.userId) {
+            setLearnerAnalytics(null);
+            return null;
+        }
+
+        try {
+            const data = await dashboardApi.getLearnerDashboard();
+            setLearnerAnalytics(data);
+            return data;
+        } catch {
+            // Preserve current analytics when a background refresh fails.
+            return null;
         }
     }, [currentUser?.userId]);
 
@@ -198,6 +220,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
         learnerAnalytics,
+        applyLearningProgress, refreshLearnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal, setShowStreakModal,
         isLoading,
@@ -209,6 +232,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
         learnerAnalytics,
+        applyLearningProgress, refreshLearnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal,
         isLoading,

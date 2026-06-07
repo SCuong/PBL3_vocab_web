@@ -88,13 +88,19 @@ interface UserFormModalProps {
     onSubmit: (data: UserFormData) => Promise<void>;
     saving: boolean;
     error: string | null;
+    currentUserId?: number;
 }
 
-const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFormModalProps) => {
+const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUserId }: UserFormModalProps) => {
     const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
     const [showPassword, setShowPassword] = useState(false);
     const passwordId = useId();
     const isEdit = modalState.mode === 'edit';
+    const editingUser = modalState.mode === 'edit' ? modalState.user : null;
+    // No SUPER_ADMIN role -> role/status of an admin account (or your own) must
+    // not be editable from here. Username/email/password stay editable.
+    const lockSensitive = editingUser != null
+        && (editingUser.role.toUpperCase() === 'ADMIN' || editingUser.userId === currentUserId);
     const passwordPolicy = checkPasswordPolicy(form.password);
 
     useEffect(() => {
@@ -212,7 +218,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                                 label="Role"
                                 value={form.role}
                                 onChange={setField('role')}
-                                disabled={saving}
+                                disabled={saving || lockSensitive}
                             >
                                 <option value="LEARNER">LEARNER</option>
                                 <option value="ADMIN">ADMIN</option>
@@ -223,13 +229,18 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error }: UserFor
                                 label="Status"
                                 value={form.status}
                                 onChange={setField('status')}
-                                disabled={saving}
+                                disabled={saving || lockSensitive}
                             >
                                 <option value="ACTIVE">ACTIVE</option>
                                 <option value="INACTIVE">INACTIVE</option>
                             </Select>
                         </div>
                     </div>
+                    {lockSensitive && (
+                        <p className="text-xs text-text-muted">
+                            Không thể thay đổi quyền hoặc trạng thái của tài khoản quản trị.
+                        </p>
+                    )}
 
                     {error && (
                         <ErrorNotice>
@@ -335,7 +346,7 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
 // ── AdminUsers ────────────────────────────────────────────────────────────────
 
 const AdminUsers = () => {
-    const { addToast } = useAppContext();
+    const { addToast, currentUser } = useAppContext();
 
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -613,9 +624,19 @@ const AdminUsers = () => {
                                                         icon={<Pencil size={14} />}
                                                     />
                                                     <IconButton
-                                                        onClick={() => openDelete(user)}
+                                                        onClick={() => {
+                                                            if (user.role.toUpperCase() === 'ADMIN' || currentUser?.userId === user.userId) return;
+                                                            openDelete(user);
+                                                        }}
                                                         aria-label={`Delete ${user.username}`}
-                                                        title="Delete user"
+                                                        disabled={user.role.toUpperCase() === 'ADMIN' || currentUser?.userId === user.userId}
+                                                        title={
+                                                            currentUser?.userId === user.userId
+                                                                ? 'Không thể xóa chính bạn'
+                                                                : user.role.toUpperCase() === 'ADMIN'
+                                                                    ? 'Không thể xóa tài khoản quản trị'
+                                                                    : 'Delete user'
+                                                        }
                                                         tone="danger"
                                                         icon={<Trash2 size={14} />}
                                                     />
@@ -645,6 +666,7 @@ const AdminUsers = () => {
                     onSubmit={handleSubmit}
                     saving={saving}
                     error={formError}
+                    currentUserId={currentUser?.userId}
                 />
             )}
             {deleteTarget && (

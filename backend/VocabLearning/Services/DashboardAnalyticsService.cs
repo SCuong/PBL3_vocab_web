@@ -9,7 +9,7 @@ namespace VocabLearning.Services
     {
         private const int HeatmapDays = 28;
         private const int DefaultAnalyticsDays = 30;
-        private const int XpPerWord = 10;
+        public const int XpPerWord = 10;
         private const int XpPerCorrectExercise = 5;
         private const int XpPerLevel = 1000;
 

@@ -68,7 +68,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
         <nav
             className="sticky top-0 z-50 border-b border-border bg-bg-light/85 backdrop-blur-xl"
         >
-            <div className="max-w-[1200px] mx-auto px-8 h-16 flex items-center gap-8">
+            <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 sm:gap-5 lg:gap-8">
                 <button
                     onClick={() => navigate(PATHS.home)}
                     className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-85 active:scale-95"
@@ -81,7 +81,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                 </button>
 
                 {/* Desktop nav */}
-                <div className="relative hidden md:flex items-center gap-1 ml-4">
+                <div className="relative hidden lg:flex items-center gap-1 ml-4">
                     {visibleLinks.map(link => (
                         <button
                             key={link.path}
@@ -136,7 +136,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                 </div>
 
                 {/* Desktop right side */}
-                <div className="hidden md:flex items-center gap-3 ml-auto">
+                <div className="hidden lg:flex items-center gap-3 ml-auto">
                     <ThemeToggle />
                     {currentUser ? (
                         <div className="flex items-center gap-3">
@@ -168,11 +168,11 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                     )}
                 </div>
 
-                <ThemeToggle className="ml-auto md:hidden" />
+                <ThemeToggle className="ml-auto lg:hidden" />
 
                 {/* Mobile hamburger */}
                 <button
-                    className="md:hidden flex flex-col gap-[5px] p-2 cursor-pointer rounded-lg hover:bg-primary/10 transition-colors"
+                    className="lg:hidden flex flex-col gap-[5px] p-2 cursor-pointer rounded-lg hover:bg-primary/10 transition-colors"
                     onClick={() => setMobileOpen(!mobileOpen)}
                     aria-label="Mở menu"
                     aria-expanded={mobileOpen}
@@ -185,7 +185,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
 
             {/* Mobile menu */}
             {mobileOpen && (
-                <div className="md:hidden border-t border-border bg-bg-light p-4 flex flex-col gap-2 animate-slide-down">
+                <div className="lg:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border bg-bg-light p-3 sm:p-4 flex flex-col gap-2 animate-slide-down">
                     {navLinks.filter(link => !link.authOnly || currentUser).map(link => (
                         <button
                             key={link.path}
@@ -221,22 +221,22 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                         </>
                     )}
 
-                    <div className="flex items-center gap-2 mt-2 px-4">
+                    <div className="flex flex-wrap items-center gap-2 mt-2 px-2 sm:px-4">
                         {currentUser ? (
-                            <Button variant="ghost" onClick={() => { onLogout(); setMobileOpen(false); }}>
+                            <Button variant="ghost" className="w-full justify-center" onClick={() => { onLogout(); setMobileOpen(false); }}>
                                 <LogOut size={18} /> Đăng xuất
                             </Button>
                         ) : (
                             <>
                                 <button
                                     onClick={() => { navigate(PATHS.login); setMobileOpen(false); }}
-                                    className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:bg-primary-light cursor-pointer transition-colors"
+                                    className="min-h-11 flex-1 text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:bg-primary-light cursor-pointer transition-colors"
                                 >
                                     Đăng nhập
                                 </button>
                                 <button
                                     onClick={() => { navigate(PATHS.register); setMobileOpen(false); }}
-                                    className="text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full cursor-pointer transition-all hover:bg-primary-hover"
+                                    className="min-h-11 flex-1 text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full cursor-pointer transition-all hover:bg-primary-hover"
                                 >
                                     Đăng ký
                                 </button>
