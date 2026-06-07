@@ -232,7 +232,7 @@ const LearnerDashboard = () => {
                 eyebrow="Bảng điều khiển học tập"
                 title={`Chào mừng trở lại${currentUser?.username ? `, ${currentUser.username}` : ''}`}
                 action={(
-                    <Button variant="primary" onClick={handleContinue} disabled={continuing}>
+                    <Button variant="primary" className="w-full justify-center sm:w-auto" onClick={handleContinue} disabled={continuing}>
                         <Play size={16} /> {continuing ? 'Đang tải...' : 'Tiếp tục học'}
                     </Button>
                 )}

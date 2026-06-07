@@ -93,17 +93,16 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
-        public async Task CompleteSession_Twice_DoesNotDuplicateLog()
+        public async Task CompleteSession_Twice_ReturnsCompletedSessionWithoutDuplicateLog()
         {
             var sessionId = await SeedInProgressSessionAsync(userId: 1, topicId: 1, wordCount: 2);
 
-            await _service.CompleteSessionAsync(1, sessionId, CancellationToken.None);
-
-            // Second completion is rejected by the in-progress status guard.
-            var act = async () => await _service.CompleteSessionAsync(1, sessionId, CancellationToken.None);
-            await act.Should().ThrowAsync<InvalidOperationException>();
+            var first = await _service.CompleteSessionAsync(1, sessionId, CancellationToken.None);
+            var second = await _service.CompleteSessionAsync(1, sessionId, CancellationToken.None);
 
             var logs = await _context.LearningLogs.Where(l => l.UserId == 1).CountAsync();
+            second.SessionId.Should().Be(first.SessionId);
+            second.Status.Should().Be(LearningSessionStatuses.Completed);
             logs.Should().Be(1);
         }
 

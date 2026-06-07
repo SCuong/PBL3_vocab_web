@@ -81,6 +81,8 @@ namespace VocabLearning.ViewModels.Learning
 
         public int CommittedItemCount { get; set; }
 
+        public int XpGained { get; set; }
+
         public LearningProgressStateViewModel Progress { get; set; } = new();
     }
 }

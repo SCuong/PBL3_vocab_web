@@ -1335,6 +1335,28 @@
             transition: opacity 300ms ease !important;
         }
     }
+
+    /* ── Leaderboard entrance ──
+       background-color is part of the transition so list rows get both the
+       entrance fade and a smooth hover without a separate transition-colors
+       utility (which would override this single transition property). ── */
+    .leaderboard-fade-in {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0);
+        transition: opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+            transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+            background-color 180ms ease;
+    }
+    .leaderboard-fade-in.is-visible {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .leaderboard-fade-in {
+            transform: none !important;
+            transition: opacity 300ms ease, background-color 180ms ease !important;
+        }
+    }
     @keyframes minitest-result-enter {
         from { opacity: 0; transform: scale(0.94); }
         to   { opacity: 1; transform: none; }
@@ -1394,14 +1416,14 @@
         }
     }
     .vocab-modal-overlay {
-        @apply fixed inset-0 z-[700] flex items-center justify-center p-4 md:p-6;
+        @apply fixed inset-0 z-[700] flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6;
         background: rgba(15, 23, 42, 0.5);
         opacity: 0;
         transition: opacity 150ms ease;
     }
     .vocab-modal-overlay.is-open { opacity: 1; }
     .vocab-modal-card {
-        @apply bg-surface rounded-card w-full max-w-3xl p-0 max-h-[90vh] overflow-hidden border border-primary/10;
+        @apply bg-surface rounded-t-3xl sm:rounded-card w-full max-w-3xl p-0 max-h-[92dvh] sm:max-h-[90vh] overflow-hidden border border-primary/10;
         box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 6px 16px rgba(15, 23, 42, 0.08);
         transform: translateY(10px);
         opacity: 0;
@@ -1409,12 +1431,18 @@
     }
     .vocab-modal-overlay.is-open .vocab-modal-card { transform: none; opacity: 1; }
     .vocab-modal-header {
-        @apply px-6 md:px-8 pt-6 pb-5 border-b border-primary/10 flex items-start justify-between gap-4;
+        @apply px-4 sm:px-6 md:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-primary/10 flex items-start justify-between gap-4;
         background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
     }
     .vocab-modal-body {
-        @apply px-6 md:px-8 py-6 overflow-y-auto;
-        max-height: calc(90vh - 96px);
+        @apply px-4 sm:px-6 md:px-8 py-5 sm:py-6 overflow-y-auto;
+        max-height: calc(92dvh - 88px);
+    }
+
+    @media (min-width: 640px) {
+        .vocab-modal-body {
+            max-height: calc(90vh - 96px);
+        }
     }
 
     /* ─── Dashboard-scoped lightweight primitives ───────────────────────
