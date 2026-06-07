@@ -9,11 +9,16 @@ namespace VocabLearning.Services
     public sealed class AdminLearningManagementService : IAdminLearningManagementService
     {
         private const int MaxAbsoluteAdjustment = 1_000_000;
+        private const int MaxTargetTotalXp = 1_000_000;
         private readonly AppDbContext _context;
+        private readonly IDashboardAnalyticsService _dashboardAnalyticsService;
 
-        public AdminLearningManagementService(AppDbContext context)
+        public AdminLearningManagementService(
+            AppDbContext context,
+            IDashboardAnalyticsService dashboardAnalyticsService)
         {
             _context = context;
+            _dashboardAnalyticsService = dashboardAnalyticsService;
         }
 
         public async Task<(bool Succeeded, string Message)> AdjustXpAsync(
@@ -24,7 +29,8 @@ namespace VocabLearning.Services
             if (amount == 0 || Math.Abs((long)amount) > MaxAbsoluteAdjustment)
                 return (false, "Mức điều chỉnh XP phải khác 0 và không vượt quá 1.000.000.");
 
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            // Single SaveChanges is atomic on its own; no manual transaction needed
+            // (a manual transaction would break the Npgsql retry execution strategy).
             _context.XpAdjustments.Add(new XpAdjustment
             {
                 UserId = targetUserId,
@@ -35,8 +41,44 @@ namespace VocabLearning.Services
             });
             AddAudit(adminUserId, targetUserId, "XP_ADJUSTED", reason, new { amount });
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
             return (true, "Đã điều chỉnh XP.");
+        }
+
+        public async Task<(bool Succeeded, string Message)> SetXpTargetAsync(
+            long adminUserId,
+            long targetUserId,
+            int targetTotalXp,
+            string reason,
+            CancellationToken cancellationToken)
+        {
+            var validation = await ValidateActionAsync(adminUserId, targetUserId, reason, cancellationToken);
+            if (!validation.Succeeded) return (false, validation.Message);
+            if (targetTotalXp < 0 || targetTotalXp > MaxTargetTotalXp)
+                return (false, "Tổng XP mong muốn phải từ 0 đến 1.000.000.");
+
+            var dashboard = await _dashboardAnalyticsService.GetLearnerDashboardAsync(targetUserId, cancellationToken);
+            var currentTotalXp = dashboard.Xp.TotalXp;
+            var adjustmentAmount = targetTotalXp - currentTotalXp;
+
+            if (adjustmentAmount == 0)
+                return (true, "XP hiện tại đã bằng XP mong muốn.");
+
+            _context.XpAdjustments.Add(new XpAdjustment
+            {
+                UserId = targetUserId,
+                Amount = adjustmentAmount,
+                Reason = reason.Trim(),
+                CreatedByAdminId = adminUserId,
+                CreatedAt = DateTime.Now,
+            });
+            AddAudit(
+                adminUserId,
+                targetUserId,
+                "XP_TARGET_SET",
+                reason,
+                new { currentTotalXp, targetTotalXp, adjustmentAmount });
+            await _context.SaveChangesAsync(cancellationToken);
+            return (true, "Đã đặt XP người học.");
         }
 
         public async Task<(bool Succeeded, string Message)> ResetProgressAsync(
@@ -53,12 +95,18 @@ namespace VocabLearning.Services
             if (topicId.HasValue && !await _context.Topics.AnyAsync(item => item.TopicId == topicId.Value, cancellationToken))
                 return (false, "Không tìm thấy chủ đề.");
 
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            await ClearLearningDataAsync(targetUserId, normalizedScope == "topic" ? topicId : null, false, cancellationToken);
-            AddAudit(adminUserId, targetUserId, "PROGRESS_RESET", reason, new { scope = normalizedScope, topicId });
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return (true, "Đã reset tiến độ học tập.");
+            // Multiple ExecuteDelete statements must be atomic AND retriable -> run the
+            // whole transaction through the Npgsql execution strategy.
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                await ClearLearningDataAsync(targetUserId, normalizedScope == "topic" ? topicId : null, false, cancellationToken);
+                AddAudit(adminUserId, targetUserId, "PROGRESS_RESET", reason, new { scope = normalizedScope, topicId });
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return (true, "Đã reset tiến độ học tập.");
+            });
         }
 
         public async Task<(bool Succeeded, string Message)> DeleteLearningDataAsync(
@@ -72,12 +120,16 @@ namespace VocabLearning.Services
             if (!confirmed)
                 return (false, "Nội dung xác nhận không khớp tên đăng nhập hoặc email.");
 
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            await ClearLearningDataAsync(targetUserId, null, true, cancellationToken);
-            AddAudit(adminUserId, targetUserId, "LEARNING_DATA_DELETED", reason, new { confirmation = "matched" });
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return (true, "Đã xóa dữ liệu học tập.");
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                await ClearLearningDataAsync(targetUserId, null, true, cancellationToken);
+                AddAudit(adminUserId, targetUserId, "LEARNING_DATA_DELETED", reason, new { confirmation = "matched" });
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return (true, "Đã xóa dữ liệu học tập.");
+            });
         }
 
         public async Task<(bool Succeeded, string Message)> SetLeaderboardVisibilityAsync(
@@ -86,11 +138,10 @@ namespace VocabLearning.Services
             var validation = await ValidateActionAsync(adminUserId, targetUserId, reason, cancellationToken);
             if (!validation.Succeeded) return (false, validation.Message);
 
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            // Single SaveChanges is atomic; no manual transaction (would break retry strategy).
             validation.Target!.IsHiddenFromLeaderboard = hidden;
             AddAudit(adminUserId, targetUserId, hidden ? "LEADERBOARD_HIDDEN" : "LEADERBOARD_SHOWN", reason, new { hidden });
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
             return (true, hidden ? "Đã ẩn người học khỏi bảng xếp hạng." : "Đã hiện người học trên bảng xếp hạng.");
         }
 

@@ -173,6 +173,20 @@ namespace VocabLearning.Controllers
             return result.Succeeded ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message }) : BadRequest(Fail(result.Message));
         }
 
+        [HttpPost("users/{userId:long}/xp-target")]
+        public async Task<ActionResult<AdminApiResponse>> SetXpTarget(
+            long userId, [FromBody] AdminXpTargetRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null) return BadRequest(Fail("Yêu cầu không hợp lệ."));
+            var adminUserId = await ResolveCurrentAdminIdAsync(cancellationToken);
+            if (adminUserId is null) return Unauthorized(Fail("Phiên quản trị không hợp lệ."));
+            var result = await _learningManagementService.SetXpTargetAsync(
+                adminUserId.Value, userId, request.TargetTotalXp, request.Reason ?? string.Empty, cancellationToken);
+            return result.Succeeded
+                ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message })
+                : BadRequest(Fail(result.Message));
+        }
+
         [HttpPost("users/{userId:long}/reset-progress")]
         public async Task<ActionResult<AdminApiResponse>> ResetProgress(
             long userId, [FromBody] AdminResetProgressRequest? request, CancellationToken cancellationToken)
