@@ -1,3 +1,5 @@
+using VocabLearning.ViewModels.Dashboard;
+
 namespace VocabLearning.ViewModels.Admin
 {
     // ── Request DTOs ─────────────────────────────────────────────────────────
@@ -18,6 +20,31 @@ namespace VocabLearning.ViewModels.Admin
         public string? Password { get; set; }
         public string Role { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+    }
+
+    public sealed class AdminXpAdjustmentRequest
+    {
+        public int Amount { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public sealed class AdminResetProgressRequest
+    {
+        public string? Scope { get; set; }
+        public long? TopicId { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public sealed class AdminDeleteLearningDataRequest
+    {
+        public string? Reason { get; set; }
+        public string? ConfirmationText { get; set; }
+    }
+
+    public sealed class AdminLeaderboardVisibilityRequest
+    {
+        public bool Hidden { get; set; }
+        public string? Reason { get; set; }
     }
 
     public sealed class AdminCreateTopicRequest
@@ -48,6 +75,7 @@ namespace VocabLearning.ViewModels.Admin
         public DateTime CreatedAt { get; set; }
         public bool IsDeleted { get; set; }
         public DateTime? DeletedAt { get; set; }
+        public bool IsHiddenFromLeaderboard { get; set; }
     }
 
     public sealed class AdminTopicResponse
@@ -80,6 +108,14 @@ namespace VocabLearning.ViewModels.Admin
         public bool Succeeded { get; set; }
         public string? Message { get; set; }
         public AdminUserResponse? User { get; set; }
+    }
+
+    public sealed class AdminLearnerDetailApiResponse
+    {
+        public bool Succeeded { get; set; }
+        public string? Message { get; set; }
+        public AdminUserResponse? User { get; set; }
+        public LearnerDashboardApiResponse? Learning { get; set; }
     }
 
     public sealed class AdminTopicListApiResponse

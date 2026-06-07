@@ -63,6 +63,19 @@ const isEditableKeyboardTarget = (target: EventTarget | null) => {
   );
 };
 
+const MINITEST_REQUIRED_WORDS = 10;
+
+// Fisher-Yates. Used once when a test starts so the question set is random
+// (not always the first learned words) yet stable for the test's duration.
+const shuffleArray = <T,>(items: T[]): T[] => {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 const StudySession = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -111,7 +124,10 @@ const StudySession = () => {
   const hasAutoSelectedReview = useRef(false);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
   const [showMinitestConfirm, setShowMinitestConfirm] = useState(false);
+  const [showMinitestInsufficient, setShowMinitestInsufficient] = useState(false);
   const [isMinitestActive, setIsMinitestActive] = useState(false);
+  const [minitestWords, setMinitestWords] = useState<any[]>([]);
+  const [minitestProgress, setMinitestProgress] = useState({ answered: 0, total: 0 });
   const [ipaFallbackNotice, setIpaFallbackNotice] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -522,6 +538,12 @@ const StudySession = () => {
     if (tab !== "minitest") setIsMinitestActive(false);
   }, [tab]);
 
+  // Stable so Minitest's progress-report effect doesn't loop.
+  const handleMinitestProgress = useCallback(
+    (answered: number, total: number) => setMinitestProgress({ answered, total }),
+    [],
+  );
+
   useEffect(() => {
     setStickyNotesLauncherHidden(isActiveFullscreenSession || isMatchingFullscreen || isMinitestFullscreen);
     return () => setStickyNotesLauncherHidden(false);
@@ -718,7 +740,11 @@ const StudySession = () => {
               key={t}
               onClick={() => {
                 if (t === "minitest") {
-                  setShowMinitestConfirm(true);
+                  if (learnedWordsForMinitest.length < MINITEST_REQUIRED_WORDS) {
+                    setShowMinitestInsufficient(true);
+                  } else {
+                    setShowMinitestConfirm(true);
+                  }
                   return;
                 }
                 setTab(t);
@@ -1759,13 +1785,32 @@ const StudySession = () => {
                   <X size={20} />
                   <span className="ml-2 hidden sm:inline">Thoát</span>
                 </button>
-                <span
-                  className={`font-display text-base font-bold ${
-                    isMinitestDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
-                  }`}
-                >
-                  Kiểm tra
-                </span>
+                <div className="min-w-0 flex-1 px-2 text-center">
+                  <div
+                    className={`flex items-baseline justify-center gap-1.5 text-sm font-bold tabular-nums ${
+                      isMinitestDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Kiểm tra ·</span>
+                    <span>
+                      {minitestProgress.answered} / {minitestProgress.total} câu
+                    </span>
+                  </div>
+                  <div
+                    className={`mx-auto mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full ${
+                      isMinitestDark ? "bg-[#4a3c60]" : "bg-[#e5d8f7]"
+                    }`}
+                  >
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isMinitestDark ? "bg-[#b78ce9]" : "bg-[#8b5fc7]"
+                      }`}
+                      style={{
+                        width: `${minitestProgress.total > 0 ? (minitestProgress.answered / minitestProgress.total) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={openStickyNotes}
@@ -1785,9 +1830,11 @@ const StudySession = () => {
             <div className="relative z-10 flex-1 overflow-y-auto px-3 py-6 sm:px-6 sm:py-8">
               <Minitest
                 topicId={topicId}
-                learnedWords={learnedWordsForMinitest}
+                learnedWords={minitestWords}
                 topicWords={words}
                 onFinish={onFinish}
+                hideProgressCard
+                onProgressChange={handleMinitestProgress}
               />
             </div>
           </div>
@@ -1817,6 +1864,8 @@ const StudySession = () => {
                 variant="primary"
                 onClick={() => {
                   setShowMinitestConfirm(false);
+                  // Randomize the test set once, capped at the required count.
+                  setMinitestWords(shuffleArray(learnedWordsForMinitest).slice(0, MINITEST_REQUIRED_WORDS));
                   setTab("minitest");
                   setCurrentIndex(0);
                   setIsFlipped(false);
@@ -1824,6 +1873,43 @@ const StudySession = () => {
                 }}
               >
                 Bắt đầu kiểm tra
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Not enough learned words to take the test. */}
+      {showMinitestInsufficient && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowMinitestInsufficient(false)}
+          />
+          <div className="relative w-full max-w-sm rounded-3xl border border-primary/15 bg-surface p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-warning-color/15 text-3xl">
+              📚
+            </div>
+            <h3 className="font-display text-xl font-bold text-text-primary">
+              Chưa đủ từ để kiểm tra
+            </h3>
+            <p className="mx-auto mt-2 max-w-xs text-sm text-text-muted">
+              Bạn cần học ít nhất {MINITEST_REQUIRED_WORDS} từ trong chủ đề này trước khi làm kiểm tra.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+              <Button variant="ghost" onClick={() => setShowMinitestInsufficient(false)}>
+                Đóng
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowMinitestInsufficient(false);
+                  setTab("learn");
+                  setCurrentIndex(0);
+                  setIsFlipped(false);
+                }}
+              >
+                Tiếp tục học
               </Button>
             </div>
           </div>

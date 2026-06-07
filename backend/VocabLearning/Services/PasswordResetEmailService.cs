@@ -12,6 +12,7 @@ namespace VocabLearning.Services
     public class PasswordResetEmailService : IPasswordResetEmailService
     {
         private const string ResendEndpoint = "https://api.resend.com/emails";
+        private const string BrandLogoUrl = "https://vocablearning.online/logo.png";
 
         private readonly IConfiguration configuration;
         private readonly ILogger<PasswordResetEmailService> logger;
@@ -35,9 +36,9 @@ namespace VocabLearning.Services
         {
             await SendEmailAsync(
                 toEmail,
-                "Dat lai mat khau VocabLearning",
+                "Đặt lại mật khẩu VocabLearning",
                 BuildPasswordResetHtmlBody(username, resetLink),
-                null,
+                BuildPasswordResetTextBody(username, resetLink),
                 "Password reset",
                 cancellationToken);
         }
@@ -323,14 +324,88 @@ namespace VocabLearning.Services
 
         private static string BuildPasswordResetHtmlBody(string username, string resetLink)
         {
-            var displayName = string.IsNullOrWhiteSpace(username) ? "ban" : WebUtility.HtmlEncode(username);
+            var displayName = string.IsNullOrWhiteSpace(username) ? "bạn" : WebUtility.HtmlEncode(username);
             var safeLink = WebUtility.HtmlEncode(resetLink);
 
-            return $@"<p>Chao {displayName},</p>
-<p>Chung toi da nhan duoc yeu cau dat lai mat khau cho tai khoan VocabLearning cua ban.</p>
-<p>Hay nhan vao lien ket duoi day de tao mat khau moi. Lien ket nay co hieu luc trong 30 phut:</p>
-<p><a href=""{safeLink}"">Dat lai mat khau</a></p>
-<p>Neu ban khong yeu cau thao tac nay, ban co the bo qua email.</p>";
+            return $@"<!doctype html>
+<html lang=""vi"">
+<head>
+  <meta charset=""utf-8"">
+  <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+  <title>Đặt lại mật khẩu VocabLearning</title>
+</head>
+<body style=""margin:0;padding:0;background:#f5f7fb;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;color:#172033;"">
+  <table role=""presentation"" width=""100%"" cellspacing=""0"" cellpadding=""0"" border=""0"" style=""background:#f5f7fb;margin:0;padding:32px 16px;"">
+    <tr>
+      <td align=""center"">
+        <table role=""presentation"" width=""100%"" cellspacing=""0"" cellpadding=""0"" border=""0"" style=""width:100%;max-width:600px;background:#ffffff;border:1px solid #e6eaf2;border-radius:20px;overflow:hidden;box-shadow:0 18px 44px rgba(23,32,51,0.08);"">
+          <tr>
+            <td style=""padding:32px 36px 20px 36px;"">
+              <table role=""presentation"" cellspacing=""0"" cellpadding=""0"" border=""0"" width=""100%"">
+                <tr>
+                  <td style=""vertical-align:middle;"">
+                    <img src=""{BrandLogoUrl}"" width=""48"" height=""32"" alt=""VocabLearning"" style=""display:inline-block;width:48px;height:32px;object-fit:contain;vertical-align:middle;border:0;outline:none;text-decoration:none;"">
+                    <span style=""display:inline-block;margin-left:10px;color:#172033;font-size:18px;font-weight:700;vertical-align:middle;"">VocabLearning</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:4px 36px 0 36px;"">
+              <h1 style=""margin:0;color:#172033;font-size:28px;line-height:1.25;font-weight:700;"">Đặt lại mật khẩu VocabLearning</h1>
+              <p style=""margin:18px 0 0 0;color:#4b587c;font-size:16px;line-height:1.65;"">Chào {displayName},</p>
+              <p style=""margin:18px 0 0 0;color:#4b587c;font-size:16px;line-height:1.65;"">Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản VocabLearning của bạn. Hãy nhấn nút bên dưới để tạo mật khẩu mới.</p>
+            </td>
+          </tr>
+          <tr>
+            <td align=""center"" style=""padding:28px 36px 20px 36px;"">
+              <a href=""{safeLink}"" style=""display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:999px;padding:14px 28px;font-size:16px;font-weight:700;line-height:1;"">Đặt lại mật khẩu</a>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:0 36px 28px 36px;"">
+              <div style=""margin:0;padding:14px 16px;border-radius:14px;background:#f8fafc;border:1px solid #e6eaf2;"">
+                <p style=""margin:0;color:#4b587c;font-size:14px;line-height:1.55;"">Liên kết này có hiệu lực trong 30 phút và chỉ dùng được một lần.</p>
+              </div>
+              <p style=""margin:18px 0 6px 0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu nút không hoạt động, hãy mở liên kết sau:</p>
+              <a href=""{safeLink}"" style=""display:block;color:#4f46e5;font-size:12px;line-height:1.6;word-break:break-all;"">{safeLink}</a>
+              <p style=""margin:18px 0 0 0;color:#6b7694;font-size:13px;line-height:1.6;"">Nếu bạn không yêu cầu đặt lại mật khẩu, bạn có thể bỏ qua email này.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:22px 36px;background:#f8fafc;border-top:1px solid #e6eaf2;text-align:center;"">
+              <p style=""margin:0;color:#8a94ad;font-size:12px;line-height:1.5;"">VocabLearning / PBL3 Project</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>";
+        }
+
+        private static string BuildPasswordResetTextBody(string username, string resetLink)
+        {
+            var displayName = string.IsNullOrWhiteSpace(username) ? "bạn" : username.Trim();
+
+            return $@"VocabLearning
+
+Đặt lại mật khẩu VocabLearning
+
+Chào {displayName},
+
+Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản VocabLearning của bạn. Hãy mở liên kết bên dưới để tạo mật khẩu mới.
+
+Đặt lại mật khẩu:
+{resetLink}
+
+Liên kết này có hiệu lực trong 30 phút và chỉ dùng được một lần.
+
+Nếu bạn không yêu cầu đặt lại mật khẩu, bạn có thể bỏ qua email này.
+
+VocabLearning / PBL3 Project";
         }
 
         private static string BuildEmailVerificationHtmlBody(string username, string email, string verificationLink)
@@ -356,7 +431,7 @@ namespace VocabLearning.Services
               <table role=""presentation"" cellspacing=""0"" cellpadding=""0"" border=""0"" width=""100%"">
                 <tr>
                   <td style=""vertical-align:middle;"">
-                    <span style=""display:inline-block;color:#5b4bff;background:linear-gradient(135deg,#19c6ff 0%,#8b3dff 52%,#ff4fd8 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-size:26px;font-weight:900;line-height:1;letter-spacing:-1.5px;vertical-align:middle;"">VL</span>
+                    <img src=""{BrandLogoUrl}"" width=""48"" height=""32"" alt=""VocabLearning"" style=""display:inline-block;width:48px;height:32px;object-fit:contain;vertical-align:middle;border:0;outline:none;text-decoration:none;"">
                     <span style=""display:inline-block;margin-left:10px;color:#172033;font-size:18px;font-weight:700;vertical-align:middle;"">VocabLearning</span>
                   </td>
                 </tr>

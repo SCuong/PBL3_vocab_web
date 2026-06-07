@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
 import confetti from "canvas-confetti";
-import { Badge, Button } from "../ui";
+import { Button } from "../ui";
 import { buildMinitestFillQuestions } from "../../utils/minitestQuestions";
 import { buildTranslationQuestions, type TranslationQuestion } from "../../utils/translationQuestions";
 
@@ -14,379 +13,314 @@ type MinitestProps = {
   onProgressChange?: (answered: number, total: number) => void;
 };
 
+// Sentence-arrangement comparison: trim, lowercase, drop simple punctuation,
+// collapse repeated spaces. Direction: English prompt -> arrange Vietnamese.
+const normalizeSentence = (value: string): string =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:"'’“”…()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const shuffle = <T,>(items: T[]): T[] => {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish, hideProgressCard = false, onProgressChange }: MinitestProps) => {
+  const [activeSection, setActiveSection] = useState<1 | 2>(1);
   const [fillAnswers, setFillAnswers] = useState<string[]>([]);
-  const [translationAnswers, setTranslationAnswers] = useState<(number | string | null)[]>([]);
+  // Per question id -> ordered list of word-bank slot indices the user picked.
+  const [arranged, setArranged] = useState<Record<number, number[]>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [showingPart2, setShowingPart2] = useState(false);
 
-  const fillQuestions = useMemo(() => {
-    return buildMinitestFillQuestions(
-      Array.isArray(learnedWords) ? learnedWords : [],
-      Array.isArray(topicWords) ? topicWords : [],
-      5,
-    );
-  }, [learnedWords, topicWords]);
+  // 10 questions total: Bài 1 = first 5 words, Bài 2 = up to 5 (prefer the other
+  // words so vocab isn't repeated; fall back to Bài-1 words only if needed).
+  const fillWords = useMemo(
+    () => (Array.isArray(learnedWords) ? learnedWords : []).slice(0, 5),
+    [learnedWords],
+  );
+  const arrangementWords = useMemo(() => {
+    const all = Array.isArray(learnedWords) ? learnedWords : [];
+    const fillIds = new Set(fillWords.map((w: any) => w.id));
+    const eligible = all.filter((w: any) => w && w.example && w.translation);
+    const preferred = eligible.filter((w: any) => !fillIds.has(w.id));
+    const fallback = eligible.filter((w: any) => fillIds.has(w.id));
+    return [...preferred, ...fallback].slice(0, 5);
+  }, [learnedWords, fillWords]);
 
-  const translationQuestions = useMemo(() => {
-    const wordsWithTranslation = (Array.isArray(learnedWords) ? learnedWords : [])
-      .filter((w) => w && w.example && w.translation);
-    return buildTranslationQuestions(wordsWithTranslation, wordsWithTranslation, 4);
-  }, [learnedWords]);
+  const fillQuestions = useMemo(
+    () => buildMinitestFillQuestions(fillWords, Array.isArray(topicWords) ? topicWords : [], 5),
+    [fillWords, topicWords],
+  );
+
+  const translationQuestions = useMemo(
+    () => buildTranslationQuestions(arrangementWords, [], 5),
+    [arrangementWords],
+  );
+
+  // Word bank per question: split the target answer into word tokens and shuffle
+  // once (stable until the question set changes). Slot index = identity, so
+  // duplicate words are still individually removable.
+  const tokenBanks = useMemo(() => {
+    const map: Record<number, string[]> = {};
+    translationQuestions.forEach((q) => {
+      map[q.id] = shuffle(q.answer.split(/\s+/).filter(Boolean));
+    });
+    return map;
+  }, [translationQuestions]);
 
   useEffect(() => {
     setFillAnswers(new Array(fillQuestions.length).fill(""));
-    setTranslationAnswers(new Array(translationQuestions.length).fill(null));
+    setArranged({});
     setIsSubmitted(false);
-    setShowingPart2(false);
+    setActiveSection(1);
   }, [fillQuestions, translationQuestions]);
+
+  const arrangedText = (q: TranslationQuestion) =>
+    (arranged[q.id] ?? []).map((slot) => tokenBanks[q.id]?.[slot] ?? "").join(" ");
+  const isArrangementCorrect = (q: TranslationQuestion) =>
+    normalizeSentence(arrangedText(q)) === normalizeSentence(q.answer);
 
   const answeredCount =
     fillAnswers.filter((a) => a !== "").length +
-    translationAnswers.filter((a) => a !== null && a !== "").length;
+    translationQuestions.filter((q) => (arranged[q.id] ?? []).length > 0).length;
   const totalQuestions = fillQuestions.length + translationQuestions.length;
 
-  // Report live progress so a host (fullscreen top bar) can show it.
+  // Report live progress so the fullscreen top bar can show it.
   useEffect(() => {
     onProgressChange?.(answeredCount, totalQuestions);
   }, [answeredCount, totalQuestions, onProgressChange]);
 
+  const setArr = (qid: number, fn: (prev: number[]) => number[]) =>
+    setArranged((prev) => ({ ...prev, [qid]: fn(prev[qid] ?? []) }));
+  const addToken = (qid: number, slot: number) => setArr(qid, (a) => [...a, slot]);
+  const removeAt = (qid: number, pos: number) => setArr(qid, (a) => a.filter((_, i) => i !== pos));
+  const undo = (qid: number) => setArr(qid, (a) => a.slice(0, -1));
+  const clearAnswer = (qid: number) => setArr(qid, () => []);
+
   const handleSubmit = () => {
     setIsSubmitted(true);
-    let sFill = 0;
-    let sTranslation = 0;
 
+    let sFill = 0;
     fillAnswers.forEach((ans, i) => {
-      if (ans.trim().toLowerCase() === fillQuestions[i].a.toLowerCase()) {
-        sFill++;
-      }
+      if (ans.trim().toLowerCase() === fillQuestions[i].a.toLowerCase()) sFill++;
     });
 
-    translationAnswers.forEach((ans, i) => {
-      if (translationQuestions[i].questionType === "multiple-choice") {
-        if (ans === translationQuestions[i].correctTranslation) {
-          sTranslation++;
-        }
-      } else {
-        if (
-          typeof ans === "string" &&
-          ans.trim().toLowerCase() === translationQuestions[i].correctTranslation.toLowerCase()
-        ) {
-          sTranslation++;
-        }
-      }
+    let sTranslation = 0;
+    translationQuestions.forEach((q) => {
+      if (isArrangementCorrect(q)) sTranslation++;
     });
 
     const bonus = sTranslation === translationQuestions.length && translationQuestions.length > 0 ? 50 : 0;
-
     if (bonus > 0) {
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     }
 
-    const translationReview = translationQuestions.map((q: TranslationQuestion, index: number) => {
-      const answer = translationAnswers[index];
-      const isCorrect =
-        q.questionType === "multiple-choice"
-          ? answer === q.correctTranslation
-          : typeof answer === "string" &&
-            answer.trim().toLowerCase() === q.correctTranslation.toLowerCase();
-
-      return {
-        englishSentence: q.englishSentence,
-        correctTranslation: q.correctTranslation,
-        userAnswer: typeof answer === "string" ? answer : "",
-        isCorrect,
-      };
-    });
+    const review = translationQuestions.map((q) => ({
+      englishSentence: q.prompt,
+      correctTranslation: q.answer,
+      userAnswer: arrangedText(q),
+      isCorrect: isArrangementCorrect(q),
+    }));
 
     onFinish(sFill + sTranslation, totalQuestions, {
       fill: sFill,
       translation: sTranslation,
       bonus,
-      review: translationReview,
+      review,
     });
   };
 
+  const stepPill = (n: 1 | 2, label: string, done: boolean) => {
+    const active = activeSection === n;
+    return (
+      <div
+        className={`flex-1 rounded-xl border px-3 py-2 text-center text-xs font-bold sm:text-sm ${
+          active
+            ? "border-primary bg-primary/10 text-primary"
+            : done
+              ? "border-success-color/40 bg-success-color/10 text-success-color"
+              : "border-border bg-surface text-text-muted"
+        }`}
+      >
+        {done && !active ? "✓ " : ""}
+        {label}
+      </div>
+    );
+  };
+
   return (
-    <div className="max-w-5xl mx-auto pb-24 relative">
-      <div className="sticky top-[80px] z-40 bg-surface p-6 rounded-3xl border-2 border-primary/20 shadow-2xl flex items-center justify-between gap-12 mb-16">
-        <div className="flex-1">
-          <div className="flex justify-between text-xs font-bold text-text-muted mb-2 uppercase tracking-[0.2em]">
-            <span>Tiến độ bài làm</span>
-            <span>
-              {answeredCount} / {totalQuestions} câu
-            </span>
-          </div>
-          <div className="h-4 bg-purple/10 rounded-full overflow-hidden border border-primary/5">
-            <motion.div
-              animate={{
-                width: `${totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0}%`,
-              }}
-              className="h-full bg-linear-to-r from-cyan to-primary"
-            />
-          </div>
-        </div>
+    <div className="mx-auto w-full max-w-3xl rounded-[2rem] border border-primary/15 bg-surface/95 p-5 shadow-[0_18px_50px_var(--shadow-color)] backdrop-blur-sm sm:p-7">
+      {/* Step indicator */}
+      <div className="mb-6 flex gap-2">
+        {stepPill(1, "Bài 1: Chọn từ đúng", activeSection > 1)}
+        {stepPill(2, "Bài 2: Sắp xếp câu", isSubmitted)}
       </div>
 
-      <div className="space-y-24">
-        <section id="part1">
-          <header className="flex items-center gap-6 mb-12">
-            <Badge variant="purple" className="py-3 px-6 text-base font-bold">
-              Bài 1: Chọn từ đúng
-            </Badge>
-            <div className="flex-1 h-px bg-purple/10" />
-          </header>
-          <div className="grid gap-10">
-            {fillQuestions.length === 0 && (
-              <div className="learning-card p-8 text-center text-text-secondary">
-                Bạn chưa có từ nào đã học trong chủ đề này để làm bài 1. Hãy học
-                và hoàn thành phần luyện tập trước.
-              </div>
-            )}
-            {fillQuestions.map((q: any, i: number) => {
-              const isCorrect =
-                isSubmitted &&
-                fillAnswers[i].trim().toLowerCase() === q.a.toLowerCase();
-
-              return (
-                <div
-                  key={q.id}
-                  className={`learning-card p-10 relative overflow-hidden transition-all duration-500 ${isSubmitted ? (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50") : "bg-surface"}`}
-                >
-                  <div className="flex justify-between items-start mb-6">
-                    <span className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center font-bold text-primary">
-                      {i + 1}
-                    </span>
-                  </div>
-                  <div className="text-2xl font-medium mb-8 leading-relaxed italic text-text-primary">
-                    {q.promptType === "example" ? q.q : `Nghĩa: ${q.q}`}
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {q.options.map((option: string, optionIndex: number) => {
-                        const isSelected = fillAnswers[i] === option;
-                        const isCorrectOption =
-                          isSubmitted && option.toLowerCase() === q.a.toLowerCase();
-                        const isWrongSelected =
-                          isSubmitted && isSelected && option.toLowerCase() !== q.a.toLowerCase();
-
-                        return (
-                          <label
-                            key={`${q.id}-${optionIndex}`}
-                            className={`flex items-center gap-4 p-5 border-2 rounded-2xl cursor-pointer transition-all ${
-                              isSubmitted
-                                ? isCorrectOption
-                                  ? "border-green-500 bg-green-100 text-green-900"
-                                  : isWrongSelected
-                                  ? "border-red-500 bg-red-100 text-red-900"
-                                  : "border-primary/10 bg-surface"
-                                : isSelected
-                                ? "border-primary bg-primary/5"
-                                : "border-primary/10 hover:border-primary/30 bg-surface"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`fill-question-${i}`}
-                              checked={isSelected}
-                              disabled={isSubmitted}
-                              onChange={() => {
-                                const next = [...fillAnswers];
-                                next[i] = option;
-                                setFillAnswers(next);
-                              }}
-                              className="w-5 h-5 accent-primary shrink-0"
-                            />
-                            <span className="text-lg font-semibold">{option}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    {isSubmitted && !fillAnswers[i] && (
-                      <div className="text-red-600 font-semibold">
-                        Vui lòng chọn đáp án cho câu này.
-                      </div>
-                    )}
-
-                    {isSubmitted && (
-                      <div
-                        className={`mt-2 font-display font-bold text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}
+      {/* ── Bài 1: choose the correct word ── */}
+      {activeSection === 1 && (
+        <div className="space-y-5">
+          {fillQuestions.length === 0 ? (
+            <div className="rounded-2xl border border-primary/10 bg-surface p-6 text-center text-sm text-text-secondary">
+              Bạn chưa có từ nào đã học trong chủ đề này để làm bài 1.
+            </div>
+          ) : (
+            fillQuestions.map((q: any, i: number) => (
+              <div key={q.id} className="rounded-2xl border border-primary/10 bg-surface p-4 sm:p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {i + 1}
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-primary">Chọn từ đúng</span>
+                </div>
+                <div className="mb-4 text-base font-medium italic leading-relaxed text-text-primary">
+                  {q.promptType === "example" ? q.q : `Nghĩa: ${q.q}`}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {q.options.map((option: string, oi: number) => {
+                    const isSelected = fillAnswers[i] === option;
+                    return (
+                      <label
+                        key={`${q.id}-${oi}`}
+                        className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                          isSubmitted ? "cursor-default" : "cursor-pointer"
+                        } ${isSelected ? "border-primary bg-primary/5" : "border-primary/10 bg-surface hover:border-primary/30"}`}
                       >
-                        {isCorrect ? "✓ Chính xác!" : `Đáp án: ${q.a}`}
-                      </div>
+                        <input
+                          type="radio"
+                          name={`fill-question-${i}`}
+                          checked={isSelected}
+                          disabled={isSubmitted}
+                          onChange={() => {
+                            const next = [...fillAnswers];
+                            next[i] = option;
+                            setFillAnswers(next);
+                          }}
+                          className="h-4 w-4 shrink-0 accent-primary"
+                        />
+                        <span>{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+
+          <div className="flex justify-end pt-1">
+            <Button variant="primary" onClick={() => setActiveSection(2)}>
+              Sang bài 2 →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bài 2: arrange the sentence (word bank) ── */}
+      {activeSection === 2 && (
+        <div className="space-y-5">
+          {translationQuestions.length === 0 ? (
+            <div className="rounded-2xl border border-primary/10 bg-surface p-6 text-center text-sm text-text-secondary">
+              Không có câu nào có bản dịch để sắp xếp.
+            </div>
+          ) : (
+            translationQuestions.map((q, qi) => {
+              const picked = arranged[q.id] ?? [];
+              const bank = tokenBanks[q.id] ?? [];
+              const promptLabel = q.direction === "en-to-vi" ? "Câu tiếng Anh" : "Câu tiếng Việt";
+              const arrangeLabel = q.direction === "en-to-vi" ? "Sắp xếp câu tiếng Việt" : "Sắp xếp câu tiếng Anh";
+              const targetHint = q.direction === "en-to-vi" ? "đáp án là tiếng Việt" : "đáp án là tiếng Anh";
+              return (
+                <div key={q.id} className="rounded-2xl border border-primary/10 bg-surface p-4 sm:p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
+                      {qi + 1}
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-accent">Sắp xếp câu</span>
+                  </div>
+                  <div className="mb-4">
+                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-text-muted">{promptLabel}</p>
+                    <p className="text-lg font-medium italic leading-relaxed text-text-primary">{q.prompt}</p>
+                  </div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-accent">
+                    {arrangeLabel}{" "}
+                    <span className="font-normal normal-case text-text-muted">({targetHint})</span>
+                  </p>
+
+                  {/* Answer area — click a chip to send it back to the bank */}
+                  <div className="mb-3 flex min-h-[52px] flex-wrap gap-2 rounded-xl border-2 border-dashed border-primary/20 bg-bg-secondary/40 p-3">
+                    {picked.length === 0 && (
+                      <span className="self-center text-sm text-text-muted">Chạm các từ bên dưới để xếp câu…</span>
                     )}
+                    {picked.map((slot, pos) => (
+                      <button
+                        key={`${q.id}-picked-${pos}`}
+                        type="button"
+                        disabled={isSubmitted}
+                        onClick={() => removeAt(q.id, pos)}
+                        className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-default"
+                      >
+                        {bank[slot]}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Word bank — unused tokens */}
+                  <div className="flex flex-wrap gap-2">
+                    {bank.map((tok, slot) =>
+                      picked.includes(slot) ? null : (
+                        <button
+                          key={`${q.id}-bank-${slot}`}
+                          type="button"
+                          disabled={isSubmitted}
+                          onClick={() => addToken(q.id, slot)}
+                          className="rounded-lg border border-primary/15 bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-default"
+                        >
+                          {tok}
+                        </button>
+                      ),
+                    )}
+                  </div>
+
+                  {/* Controls */}
+                  <div className="mt-3 flex gap-3 text-xs font-bold">
+                    <button
+                      type="button"
+                      disabled={isSubmitted || picked.length === 0}
+                      onClick={() => undo(q.id)}
+                      className="text-text-muted transition-colors hover:text-primary disabled:opacity-40"
+                    >
+                      ↶ Hoàn tác
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitted || picked.length === 0}
+                      onClick={() => clearAnswer(q.id)}
+                      className="text-text-muted transition-colors hover:text-danger-color disabled:opacity-40"
+                    >
+                      ✕ Xóa đáp án
+                    </button>
                   </div>
                 </div>
               );
-            })}
-          </div>
-          {!isSubmitted && !showingPart2 && (
-            <div className="mt-12 flex justify-center">
-              <Button
-                variant="accent"
-                className="px-16 py-5 text-xl"
-                onClick={() => setShowingPart2(true)}
-              >
-                Sang bài 2 →
-              </Button>
-            </div>
+            })
           )}
-        </section>
 
-        {(showingPart2 || isSubmitted) && (
-          <section id="part2">
-            <header className="flex items-center gap-6 mb-12">
-              <Badge variant="accent" className="py-3 px-6 text-base font-bold">
-                Bài 2: Dịch câu
-              </Badge>
-              <div className="flex-1 h-px bg-accent/20" />
-            </header>
-            {translationQuestions.length === 0 && (
-              <div className="learning-card p-8 text-center text-text-secondary">
-                Không có câu nào có bản dịch để làm bài tập này.
-              </div>
-            )}
-            <div className="grid gap-12">
-              {translationQuestions.map((q: TranslationQuestion, qi: number) => {
-                const userAnswer = translationAnswers[qi];
-                const isCorrect =
-                  isSubmitted &&
-                  (q.questionType === "multiple-choice"
-                    ? userAnswer === q.correctTranslation
-                    : typeof userAnswer === "string" &&
-                      userAnswer.trim().toLowerCase() === q.correctTranslation.toLowerCase());
-
-                return (
-                  <div
-                    key={q.id}
-                    className={`learning-card p-10 border-2 transition-all ${
-                      isSubmitted
-                        ? isCorrect
-                          ? "border-green-500 bg-green-50"
-                          : "border-red-500 bg-red-50"
-                        : "border-transparent bg-surface shadow-xl"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 mb-6">
-                      <span className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center font-bold text-accent">
-                        {qi + 1}
-                      </span>
-                      <span className="text-sm font-bold text-accent uppercase tracking-wide">
-                        {q.questionType === "multiple-choice" ? "Trắc nghiệm" : "Điền từ"}
-                      </span>
-                    </div>
-                    <div className="text-2xl font-medium mb-8 leading-relaxed italic text-text-primary">
-                      {q.englishSentence}
-                    </div>
-                    {q.questionType === "multiple-choice" && q.options && (
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        {q.options.map((opt: string, oi: number) => {
-                          const isSelected = userAnswer === opt;
-                          const isCorrectOption = isSubmitted && opt === q.correctTranslation;
-                          const isWrongSelected =
-                            isSubmitted && isSelected && opt !== q.correctTranslation;
-
-                          return (
-                            <label
-                              key={oi}
-                              className={`flex items-center gap-6 p-6 border-2 rounded-3xl cursor-pointer transition-all ${
-                                isSubmitted
-                                  ? isCorrectOption
-                                    ? "border-green-500 bg-green-100 text-green-900 font-bold scale-[1.02]"
-                                    : isWrongSelected
-                                    ? "border-red-500 bg-red-100 text-red-900"
-                                    : "border-primary/5 bg-surface"
-                                  : isSelected
-                                  ? "border-primary bg-primary/5 shadow-inner"
-                                  : "border-primary/5 hover:border-primary/20 bg-surface"
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                checked={isSelected}
-                                disabled={isSubmitted}
-                                onChange={() => {
-                                  const next = [...translationAnswers];
-                                  next[qi] = opt;
-                                  setTranslationAnswers(next);
-                                }}
-                                className="w-6 h-6 accent-primary shrink-0"
-                              />
-                              <span className="text-xl">{opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {q.questionType === "fill-in" && (
-                      <div className="mt-4">
-                        <input
-                          type="text"
-                          value={typeof userAnswer === "string" ? userAnswer : ""}
-                          disabled={isSubmitted}
-                          onChange={(e) => {
-                            const next = [...translationAnswers];
-                            next[qi] = e.target.value;
-                            setTranslationAnswers(next);
-                          }}
-                          placeholder="Nhập bản dịch tiếng Việt..."
-                          className="w-full p-4 text-xl border-2 border-primary/20 rounded-2xl focus:border-primary focus:outline-none transition-all disabled:bg-bg-secondary"
-                        />
-                      </div>
-                    )}
-                    {isSubmitted && (
-                      <div
-                        className={`mt-8 pt-6 border-t border-primary/10 font-display font-bold text-xl ${
-                          isCorrect ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        {isCorrect ? "✓ Chính xác!" : `Đáp án đúng: ${q.correctTranslation}`}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-      </div>
-
-      <footer className="mt-24 pt-24 border-t border-primary/10 text-center">
-        {!isSubmitted ? (
-          <Button
-            variant="primary"
-            className="px-24 py-6 text-3xl shadow-2xl"
-            onClick={handleSubmit}
-          >
-            Nộp bài ngay 🚀
-          </Button>
-        ) : (
-          <div className="flex flex-col items-center gap-8">
-            <Badge variant="green" className="py-4 px-12 text-2xl animate-bounce">
-              KẾT QUẢ ĐÃ GHI NHẬN! 🏆
-            </Badge>
-            <Button
-              variant="primary"
-              className="px-12 py-5 text-xl"
-              onClick={() =>
-                onFinish(
-                  fillAnswers.filter((a, i) => a.trim().toLowerCase() === fillQuestions[i]?.a.toLowerCase()).length +
-                    translationAnswers.filter((ans, i) =>
-                      translationQuestions[i]?.questionType === "multiple-choice"
-                        ? ans === translationQuestions[i]?.correctTranslation
-                        : typeof ans === "string" &&
-                          ans.trim().toLowerCase() === translationQuestions[i]?.correctTranslation.toLowerCase()
-                    ).length,
-                  totalQuestions
-                )
-              }
-            >
-              Hoàn thành chủ đề
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="ghost" onClick={() => setActiveSection(1)}>
+              ← Quay lại
+            </Button>
+            <Button variant="primary" disabled={isSubmitted} onClick={handleSubmit}>
+              Nộp bài ngay 🚀
             </Button>
           </div>
-        )}
-      </footer>
+        </div>
+      )}
     </div>
   );
 };

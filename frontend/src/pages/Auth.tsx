@@ -26,6 +26,8 @@ declare global {
                         callback: (response: GoogleCredentialResponse) => void;
                         auto_select?: boolean;
                         cancel_on_tap_outside?: boolean;
+                        itp_support?: boolean;
+                        use_fedcm_for_button?: boolean;
                     }) => void;
                     renderButton: (
                         parent: HTMLElement,
@@ -38,7 +40,6 @@ declare global {
                             width?: number;
                         }
                     ) => void;
-                    prompt?: () => void;
                     disableAutoSelect?: () => void;
                 };
             };
@@ -166,23 +167,6 @@ const Auth = () => {
         }
     }, [addToast, isGoogleSubmitting, navigate, syncUserGameData]);
 
-    // Custom button trigger. Auth flow is unchanged: this opens Google's prompt,
-    // whose credential is handled by the same handleGoogleCredential callback
-    // wired in initialize() → authApi.googleLogin({ idToken }).
-    const handleGoogleButtonClick = useCallback(() => {
-        if (isGoogleSubmitting) return;
-        if (!googleClientId) {
-            setErrorMessage('Google login chưa được cấu hình.');
-            return;
-        }
-        if (!window.google?.accounts?.id?.prompt) {
-            setErrorMessage('Đang tải Google Sign-In, vui lòng thử lại sau giây lát.');
-            return;
-        }
-        setErrorMessage('');
-        window.google.accounts.id.prompt();
-    }, [isGoogleSubmitting]);
-
     useEffect(() => {
         const nextLogin = initialMode !== 'register';
         setIsLogin(nextLogin);
@@ -235,6 +219,7 @@ const Auth = () => {
         }
 
         let isCancelled = false;
+        let resizeObserver: ResizeObserver | null = null;
         const renderGoogleButtons = () => {
             if (isCancelled || !window.google?.accounts?.id) {
                 return;
@@ -244,8 +229,43 @@ const Auth = () => {
                 client_id: googleClientId,
                 callback: handleGoogleCredential,
                 auto_select: false,
-                cancel_on_tap_outside: true
+                cancel_on_tap_outside: true,
+                itp_support: true,
+                use_fedcm_for_button: true
             });
+
+            const renderGoogleButton = (container: HTMLElement) => {
+                const availableWidth = Math.floor(container.clientWidth);
+                if (availableWidth <= 0) {
+                    return;
+                }
+
+                const buttonWidth = Math.min(320, availableWidth);
+                if (container.dataset.googleRenderedWidth === String(buttonWidth)) {
+                    return;
+                }
+
+                container.dataset.googleRenderedWidth = String(buttonWidth);
+                container.replaceChildren();
+
+                window.google?.accounts.id.renderButton(container, {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    text: container.dataset.googleButtonText === 'signup_with' ? 'signup_with' : 'signin_with',
+                    shape: 'pill',
+                    width: buttonWidth
+                });
+            };
+
+            const containers = document.querySelectorAll<HTMLElement>('[data-google-signin-button]');
+            containers.forEach(renderGoogleButton);
+
+            resizeObserver?.disconnect();
+            resizeObserver = new ResizeObserver((entries) => {
+                entries.forEach(({ target }) => renderGoogleButton(target as HTMLElement));
+            });
+            containers.forEach((container) => resizeObserver?.observe(container));
         };
 
         const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
@@ -258,6 +278,7 @@ const Auth = () => {
 
             return () => {
                 isCancelled = true;
+                resizeObserver?.disconnect();
                 existingScript.removeEventListener('load', renderGoogleButtons);
             };
         }
@@ -271,6 +292,7 @@ const Auth = () => {
 
         return () => {
             isCancelled = true;
+            resizeObserver?.disconnect();
         };
     }, [handleGoogleCredential, isForgotPasswordMode, isResetPasswordMode]);
 
@@ -294,6 +316,7 @@ const Auth = () => {
     const resetPasswordPolicy = checkPasswordPolicy(newPassword);
     const isPasswordValid = isPasswordPolicyValid(passwordPolicy);
     const isResetPasswordValid = isPasswordPolicyValid(resetPasswordPolicy);
+    const hasValidResetLink = Boolean(forgotEmail.trim() && resetToken.trim());
 
     const renderPasswordPolicyChecklist = (policy: PasswordPolicyResult) => (
         <div className="rounded-xl border border-primary/15 bg-surface/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
@@ -312,23 +335,16 @@ const Auth = () => {
         </div>
     );
 
-    const renderGoogleLoginArea = () => (
+    const renderGoogleLoginArea = (buttonText: 'signin_with' | 'signup_with') => (
         <div className="mb-4 w-full space-y-3">
-            <button
-                type="button"
-                onClick={handleGoogleButtonClick}
-                disabled={isGoogleSubmitting}
+            <div
+                data-google-signin-button
+                data-google-button-text={buttonText}
                 aria-busy={isGoogleSubmitting}
-                className="flex min-h-11 w-full min-w-0 items-center justify-center gap-2.5 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-hover active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="shrink-0">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-                    <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z" />
-                </svg>
-                <span className="truncate">{isGoogleSubmitting ? 'Đang kết nối...' : 'Tiếp tục với Google'}</span>
-            </button>
+                className={`flex min-h-11 w-full max-w-full min-w-0 items-center justify-center overflow-hidden rounded-full ${
+                    isGoogleSubmitting ? 'pointer-events-none opacity-60' : ''
+                }`}
+            />
             <div className="flex items-center gap-3 text-xs text-text-secondary">
                 <span className="h-px flex-1 bg-border" />
                 <span>hoặc</span>
@@ -466,8 +482,12 @@ const Auth = () => {
 
     const handleResetPasswordSubmit = async () => {
         if (isSubmitting) return;
-        if (!forgotEmail.trim() || !resetToken.trim() || !newPassword || !confirmNewPassword) {
-            setErrorMessage('Vui lòng nhập đầy đủ email, mã xác thực và mật khẩu mới.');
+        if (!hasValidResetLink) {
+            setErrorMessage('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
+            return;
+        }
+        if (!newPassword || !confirmNewPassword) {
+            setErrorMessage('Vui lòng nhập mật khẩu mới và xác nhận mật khẩu.');
             return;
         }
         if (!isResetPasswordValid) { setErrorMessage('Mật khẩu chưa đúng định dạng yêu cầu.'); return; }
@@ -523,35 +543,41 @@ const Auth = () => {
                                     </div>
                                 )
                             ) : (
-                                <>
-                                    <input type="email" placeholder="Email tài khoản" className="auth-input"
-                                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} readOnly />
-                                    <input type="text" placeholder="Mã xác thực" className="auth-input"
-                                        value={resetToken} onChange={(e) => setResetToken(e.target.value)} />
-                                    <div className="relative">
-                                        <input type={showNewPassword ? 'text' : 'password'} placeholder="Mật khẩu mới"
-                                            className="auth-input pr-12"
-                                            value={newPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setNewPassword(e.target.value)} />
-                                        <button type="button" className="auth-eye-btn"
-                                            onClick={() => setShowNewPassword((p) => !p)}
-                                            aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>
-                                            {showNewPassword ? '🙈' : '👁'}
-                                        </button>
+                                hasValidResetLink ? (
+                                    <>
+                                        <div className="rounded-xl border border-border bg-surface/70 px-4 py-3 text-left">
+                                            <p className="text-xs text-text-secondary">Đặt lại mật khẩu cho</p>
+                                            <p className="mt-1 break-all text-sm font-semibold text-text-primary">{forgotEmail}</p>
+                                        </div>
+                                        <div className="relative">
+                                            <input type={showNewPassword ? 'text' : 'password'} placeholder="Mật khẩu mới"
+                                                className="auth-input pr-12"
+                                                value={newPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setNewPassword(e.target.value)} />
+                                            <button type="button" className="auth-eye-btn"
+                                                onClick={() => setShowNewPassword((p) => !p)}
+                                                aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>
+                                                {showNewPassword ? '🙈' : '👁'}
+                                            </button>
+                                        </div>
+                                        <div className="relative">
+                                            <input type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu mới"
+                                                className="auth-input pr-12"
+                                                value={confirmNewPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmNewPassword(e.target.value)} />
+                                            <button type="button" className="auth-eye-btn"
+                                                onClick={() => setShowConfirmNewPassword((p) => !p)}
+                                                aria-label={showConfirmNewPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
+                                                {showConfirmNewPassword ? '🙈' : '👁'}
+                                            </button>
+                                        </div>
+                                        {renderPasswordPolicyChecklist(resetPasswordPolicy)}
+                                    </>
+                                ) : (
+                                    <div className="auth-error">
+                                        Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.
                                     </div>
-                                    <div className="relative">
-                                        <input type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu mới"
-                                            className="auth-input pr-12"
-                                            value={confirmNewPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmNewPassword(e.target.value)} />
-                                        <button type="button" className="auth-eye-btn"
-                                            onClick={() => setShowConfirmNewPassword((p) => !p)}
-                                            aria-label={showConfirmNewPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
-                                            {showConfirmNewPassword ? '🙈' : '👁'}
-                                        </button>
-                                    </div>
-                                    {renderPasswordPolicyChecklist(resetPasswordPolicy)}
-                                </>
+                                )
                             )}
-                            {errorMessage && <div className="auth-error">{errorMessage}</div>}
+                            {errorMessage && (!isResetPasswordMode || hasValidResetLink) && <div className="auth-error">{errorMessage}</div>}
                             {successMessage && <div className="auth-success">{successMessage}</div>}
                         </div>
                         <div className="space-y-3">
@@ -574,7 +600,7 @@ const Auth = () => {
                                 </>
                             ) : (
                                 <>
-                                    <Button variant="primary" className="w-full" onClick={handleResetPasswordSubmit} disabled={isSubmitting || !resetToken}>
+                                    <Button variant="primary" className="w-full" onClick={handleResetPasswordSubmit} disabled={isSubmitting || !hasValidResetLink}>
                                         {isSubmitting ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
                                     </Button>
                                     <Button variant="ghost" className="w-full" onClick={goBackToLogin}>Quay lại đăng nhập</Button>
@@ -615,7 +641,7 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
                         </div>
 
-                        {renderGoogleLoginArea()}
+                        {renderGoogleLoginArea('signin_with')}
 
                         <div className="space-y-3 w-full">
                             <input
@@ -701,7 +727,7 @@ const Auth = () => {
                             <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
                         </div>
 
-                        {renderGoogleLoginArea()}
+                        {renderGoogleLoginArea('signup_with')}
 
                         <div className="space-y-2 w-full">
                             <input type="text" placeholder="Tên hiển thị"

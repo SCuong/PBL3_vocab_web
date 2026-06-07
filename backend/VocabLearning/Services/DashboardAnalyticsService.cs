@@ -79,7 +79,11 @@ namespace VocabLearning.Services
                 .AsNoTracking()
                 .Where(log => log.UserId == userId)
                 .SumAsync(log => (int?)log.WordsStudied, cancellationToken) ?? 0;
-            var totalXp = Math.Max(0, totalWordsStudied * XpPerWord + correctExercises * XpPerCorrectExercise);
+            var xpAdjustment = await _context.XpAdjustments
+                .AsNoTracking()
+                .Where(item => item.UserId == userId)
+                .SumAsync(item => (long?)item.Amount, cancellationToken) ?? 0L;
+            var totalXp = ClampXp((long)totalWordsStudied * XpPerWord + (long)correctExercises * XpPerCorrectExercise + xpAdjustment);
 
             var recentActivity = await GetRecentActivityAsync(userId, cancellationToken);
             var continueLearning = await GetContinueLearningAsync(userId, today, cancellationToken);
@@ -532,6 +536,8 @@ namespace VocabLearning.Services
                 LevelProgressPercent = Percent(current, XpPerLevel)
             };
         }
+
+        private static int ClampXp(long value) => (int)Math.Clamp(value, 0L, int.MaxValue);
 
         private static IReadOnlyList<DashboardBadgeViewModel> BuildBadges(
             IReadOnlyList<DateTime> activityDates,
