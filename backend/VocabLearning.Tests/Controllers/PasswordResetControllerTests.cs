@@ -208,7 +208,10 @@ namespace VocabLearning.Tests.Controllers
         public async Task ResetPasswordApi_WithValidToken_ShouldResetPassword()
         {
             // Arrange
-            await _authService.RegisterAsync("testuser", "test@example.com", "OldPassword1!");
+            var (_, _, user) = await _authService.RegisterAsync(
+                "testuser", "test@example.com", "OldPassword1!");
+            user!.IsEmailVerified = true;
+            await _context.SaveChangesAsync();
             var (_, _, _, token) = await _authService.CreatePasswordResetTokenAsync("test@example.com");
 
             // Act
@@ -229,8 +232,8 @@ namespace VocabLearning.Tests.Controllers
             response.Message.Should().Be("Password reset successfully.");
 
             // Verify new password works
-            var user = await _authService.AuthenticateAsync("testuser", "NewPassword1!");
-            user.Should().NotBeNull();
+            var authenticatedUser = await _authService.AuthenticateAsync("testuser", "NewPassword1!");
+            authenticatedUser.Should().NotBeNull();
         }
 
         #endregion

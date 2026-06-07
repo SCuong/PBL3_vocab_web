@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
     AlertTriangle,
-    Eye, EyeOff, Loader2, Pencil, Plus,
-    RefreshCw, Search, Trash2,
+    BarChart3, BookOpen, CalendarClock, Eye, EyeOff, Flame, Loader2, Pencil, Plus,
+    RefreshCw, Search, Trash2, Trophy,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
-import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, adminInputClass, adminLabelClass } from '../../components/admin/ui';
+import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, TextArea, adminInputClass, adminLabelClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
 import {
     checkPasswordPolicy,
@@ -16,6 +16,8 @@ import {
 } from '../../utils/passwordPolicy';
 import {
     adminApi,
+    type AdminLearnerDetail,
+    type AdminTopic,
     type AdminUser,
     type AdminCreateUserPayload,
     type AdminUpdateUserPayload,
@@ -26,6 +28,8 @@ import {
 type ModalState =
     | { mode: 'create' }
     | { mode: 'edit'; user: AdminUser };
+
+type LearningAction = 'xp' | 'reset' | 'delete-data' | 'leaderboard';
 
 interface UserFormData {
     username: string;
@@ -55,7 +59,7 @@ const RoleBadge = ({ role }: { role: string }) => {
                 ? 'bg-primary/10 text-primary border-primary/30'
                 : 'bg-cyan/10 text-cyan border-cyan/30'
         }`}>
-            {role}
+            {isAdmin ? 'Quản trị' : 'Người học'}
         </span>
     );
 };
@@ -64,7 +68,7 @@ const StatusBadge = ({ status, isDeleted }: { status: string; isDeleted: boolean
     if (isDeleted) {
         return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-500 border border-red-200">
-                DELETED
+                Đã xóa
             </span>
         );
     }
@@ -75,7 +79,7 @@ const StatusBadge = ({ status, isDeleted }: { status: string; isDeleted: boolean
                 ? 'bg-green-50 text-green-600 border-green-200'
                 : 'bg-amber-50 text-amber-600 border-amber-200'
         }`}>
-            {status}
+            {isActive ? 'Hoạt động' : 'Tạm khóa'}
         </span>
     );
 };
@@ -132,18 +136,18 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
     const labelClass = adminLabelClass;
 
     return (
-        <Modal title={isEdit ? 'Edit User' : 'Create New User'} onClose={onClose}>
+        <Modal title={isEdit ? 'Chỉnh sửa người dùng' : 'Thêm người dùng'} onClose={onClose}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <Input
-                            label="Username"
+                            label="Tên đăng nhập"
                             type="text"
                             value={form.username}
                             onChange={setField('username')}
                             required
                             minLength={3}
                             maxLength={50}
-                            placeholder="e.g. john_doe"
+                            placeholder="Ví dụ: john_doe"
                             disabled={saving}
                         />
                     </div>
@@ -163,10 +167,10 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
 
                     <div>
                         <label htmlFor={passwordId} className={labelClass}>
-                            Password{' '}
+                            Mật khẩu{' '}
                             {isEdit && (
                                 <span className="text-text-muted font-normal">
-                                    (leave blank to keep current)
+                                    (để trống để giữ mật khẩu hiện tại)
                                 </span>
                             )}
                         </label>
@@ -180,12 +184,12 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                                 required={!isEdit}
                                 minLength={PASSWORD_MIN_LENGTH}
                                 maxLength={PASSWORD_MAX_LENGTH}
-                                placeholder={isEdit ? '••••••••' : `Min ${PASSWORD_MIN_LENGTH} characters`}
+                                placeholder={isEdit ? '••••••••' : `Tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`}
                                 disabled={saving}
                             />
                             <button
                                 type="button"
-                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                                 aria-pressed={showPassword}
                                 aria-controls={passwordId}
                                 onClick={() => setShowPassword(v => !v)}
@@ -215,24 +219,24 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <Select
-                                label="Role"
+                                label="Vai trò"
                                 value={form.role}
                                 onChange={setField('role')}
                                 disabled={saving || lockSensitive}
                             >
-                                <option value="LEARNER">LEARNER</option>
-                                <option value="ADMIN">ADMIN</option>
+                                <option value="LEARNER">Người học</option>
+                                <option value="ADMIN">Quản trị</option>
                             </Select>
                         </div>
                         <div>
                             <Select
-                                label="Status"
+                                label="Trạng thái"
                                 value={form.status}
                                 onChange={setField('status')}
                                 disabled={saving || lockSensitive}
                             >
-                                <option value="ACTIVE">ACTIVE</option>
-                                <option value="INACTIVE">INACTIVE</option>
+                                <option value="ACTIVE">Hoạt động</option>
+                                <option value="INACTIVE">Tạm khóa</option>
                             </Select>
                         </div>
                     </div>
@@ -257,7 +261,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                             onClick={onClose}
                             disabled={saving}
                         >
-                            Cancel
+                            Hủy
                         </Button>
                         <Button
                             type="submit"
@@ -267,12 +271,12 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                         >
                             {saving ? (
                                 <>
-                                    <Loader2 size={16} className="animate-spin" /> Saving…
+                                    <Loader2 size={16} className="animate-spin" /> Đang lưu...
                                 </>
                             ) : isEdit ? (
-                                'Update User'
+                                'Cập nhật'
                             ) : (
-                                'Create User'
+                                'Thêm người dùng'
                             )}
                         </Button>
                     </div>
@@ -292,19 +296,19 @@ interface DeleteConfirmProps {
 }
 
 const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: DeleteConfirmProps) => (
-    <Modal title="Delete User" onClose={onClose} size="sm">
+    <Modal title="Xóa người dùng" onClose={onClose} size="sm">
             <div className="flex flex-col items-center text-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
                     <AlertTriangle size={28} className="text-red-500" />
                 </div>
                 <div>
                     <h2 className="text-xl font-display font-bold text-text-primary mb-1">
-                        Delete User
+                        Xóa người dùng
                     </h2>
                     <p className="text-sm text-text-muted">
-                        Delete{' '}
+                        Xóa{' '}
                         <span className="font-bold text-text-primary">{user.username}</span>?{' '}
-                        This action cannot be undone.
+                        Thao tác này không thể hoàn tác.
                     </p>
                 </div>
 
@@ -322,7 +326,7 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
                         onClick={onClose}
                         disabled={deleting}
                     >
-                        Cancel
+                        Hủy
                     </Button>
                     <Button
                         variant="danger"
@@ -332,10 +336,10 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
                     >
                         {deleting ? (
                             <>
-                                <Loader2 size={16} className="animate-spin" /> Deleting…
+                                <Loader2 size={16} className="animate-spin" /> Đang xóa...
                             </>
                         ) : (
-                            'Delete'
+                            'Xóa'
                         )}
                     </Button>
                 </div>
@@ -345,10 +349,192 @@ const DeleteUserConfirm = ({ user, onClose, onConfirm, deleting, error }: Delete
 
 // ── AdminUsers ────────────────────────────────────────────────────────────────
 
+const LearnerDetailModal = ({
+    detail,
+    loading,
+    error,
+    onClose,
+    onAction,
+}: {
+    detail: AdminLearnerDetail | null;
+    loading: boolean;
+    error: string | null;
+    onClose: () => void;
+    onAction: (action: LearningAction) => void;
+}) => (
+    <Modal title="Chi tiết học tập" onClose={onClose} size="lg">
+        {loading ? (
+            <div className="flex items-center justify-center gap-3 py-16 text-text-muted">
+                <Loader2 size={20} className="animate-spin text-primary" /> Đang tải chi tiết...
+            </div>
+        ) : error || !detail ? (
+            <ErrorNotice><AlertTriangle size={15} /> {error ?? 'Không có dữ liệu học tập.'}</ErrorNotice>
+        ) : (
+            <div className="space-y-6">
+                <div>
+                    <p className="font-display text-lg font-bold text-text-primary">{detail.user.username}</p>
+                    <p className="text-sm text-text-muted">{detail.user.email}</p>
+                    <div className="mt-2 flex gap-2">
+                        <RoleBadge role={detail.user.role} />
+                        <StatusBadge status={detail.user.status} isDeleted={detail.user.isDeleted} />
+                        {detail.user.isHiddenFromLeaderboard && (
+                            <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                                Đang ẩn khỏi bảng xếp hạng
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[
+                        ['Tổng XP', detail.learning.xp.totalXp.toLocaleString('vi-VN'), <BarChart3 size={16} />],
+                        ['Cấp độ', detail.learning.xp.level, <BookOpen size={16} />],
+                        ['Chuỗi ngày học', detail.learning.streak, <Flame size={16} />],
+                        ['Đã học', detail.learning.masteryProgress.learnedWords, <BookOpen size={16} />],
+                        ['Đã thành thạo', detail.learning.masteryProgress.masteredWords, <BookOpen size={16} />],
+                        ['Ôn hôm nay', detail.learning.reviewForecast.dueToday, <CalendarClock size={16} />],
+                        ['Ôn ngày mai', detail.learning.reviewForecast.dueTomorrow, <CalendarClock size={16} />],
+                        ['Ôn tuần này', detail.learning.reviewForecast.dueThisWeek, <CalendarClock size={16} />],
+                    ].map(([label, value, icon]) => (
+                        <div key={String(label)} className="rounded-xl border border-border bg-surface p-3">
+                            <div className="mb-2 text-primary">{icon}</div>
+                            <p className="text-xs text-text-muted">{label}</p>
+                            <p className="mt-1 font-display text-lg font-bold text-text-primary">{value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <div>
+                    <h3 className="mb-3 font-display font-bold text-text-primary">Hoạt động gần đây</h3>
+                    {detail.learning.recentActivity.length === 0 ? (
+                        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">Chưa có hoạt động học tập.</p>
+                    ) : (
+                        <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                            {detail.learning.recentActivity.map((activity, index) => (
+                                <div key={`${activity.sessionId ?? 'activity'}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-text-primary">{activity.topicName || 'Hoạt động học tập'}</p>
+                                        <p className="text-xs text-text-muted">{activity.activityType} · {activity.wordsStudied} từ</p>
+                                    </div>
+                                    <time className="shrink-0 text-xs text-text-muted">{new Date(activity.date).toLocaleDateString('vi-VN')}</time>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    <h3 className="mb-3 font-display font-bold text-text-primary">Công cụ quản trị</h3>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('xp')}>Cộng/trừ XP</Button>
+                        <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('reset')}>Reset tiến độ</Button>
+                        <Button variant="danger" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('delete-data')}>Xóa dữ liệu học</Button>
+                        <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('leaderboard')}>
+                            <Trophy size={16} />
+                            {detail.user.isHiddenFromLeaderboard ? 'Hiện trên bảng xếp hạng' : 'Ẩn trên bảng xếp hạng'}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )}
+    </Modal>
+);
+
+const LearningActionModal = ({
+    action,
+    detail,
+    topics,
+    saving,
+    error,
+    onClose,
+    onSubmit,
+}: {
+    action: LearningAction;
+    detail: AdminLearnerDetail;
+    topics: AdminTopic[];
+    saving: boolean;
+    error: string | null;
+    onClose: () => void;
+    onSubmit: (values: { amount: number; reason: string; scope: 'all' | 'topic'; topicId?: number; confirmationText: string }) => void;
+}) => {
+    const [amount, setAmount] = useState(0);
+    const [reason, setReason] = useState('');
+    const [scope, setScope] = useState<'all' | 'topic'>('all');
+    const [topicId, setTopicId] = useState('');
+    const [confirmationText, setConfirmationText] = useState('');
+    const hidden = detail.user.isHiddenFromLeaderboard;
+    const title = action === 'xp'
+        ? 'Cộng/trừ XP'
+        : action === 'reset'
+            ? 'Reset tiến độ'
+            : action === 'delete-data'
+                ? 'Xóa dữ liệu học'
+                : hidden ? 'Hiện trên bảng xếp hạng' : 'Ẩn trên bảng xếp hạng';
+    const destructive = action === 'reset' || action === 'delete-data';
+    const canSubmit = reason.trim().length > 0
+        && (action !== 'xp' || amount !== 0)
+        && (action !== 'reset' || scope === 'all' || Boolean(topicId))
+        && (action !== 'delete-data'
+            || confirmationText.trim().toLowerCase() === detail.user.username.toLowerCase()
+            || confirmationText.trim().toLowerCase() === detail.user.email.toLowerCase());
+
+    return (
+        <Modal title={title} onClose={onClose}>
+            <div className="space-y-4">
+                {action === 'xp' && (
+                    <Input
+                        label="Số XP điều chỉnh"
+                        type="number"
+                        value={String(amount)}
+                        onChange={event => setAmount(Number(event.target.value))}
+                        placeholder="Ví dụ: 100 hoặc -50"
+                    />
+                )}
+                {action === 'reset' && (
+                    <>
+                        <Select label="Phạm vi" value={scope} onChange={event => setScope(event.target.value as 'all' | 'topic')}>
+                            <option value="all">Toàn bộ tiến độ</option>
+                            <option value="topic">Một chủ đề</option>
+                        </Select>
+                        {scope === 'topic' && (
+                            <Select label="Chủ đề" value={topicId} onChange={event => setTopicId(event.target.value)}>
+                                <option value="">Chọn chủ đề</option>
+                                {topics.map(topic => <option key={topic.topicId} value={topic.topicId}>{topic.name}</option>)}
+                            </Select>
+                        )}
+                    </>
+                )}
+                {action === 'delete-data' && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        Thao tác xóa toàn bộ dữ liệu học nhưng giữ tài khoản. Nhập <strong>{detail.user.username}</strong> hoặc email để xác nhận.
+                    </div>
+                )}
+                {action === 'delete-data' && (
+                    <Input label="Nội dung xác nhận" value={confirmationText} onChange={event => setConfirmationText(event.target.value)} />
+                )}
+                <TextArea label="Lý do" value={reason} onChange={event => setReason(event.target.value)} rows={3} required />
+                {error && <ErrorNotice><AlertTriangle size={15} /> {error}</ErrorNotice>}
+                <div className="flex gap-3">
+                    <Button variant="secondary" className="flex-1" onClick={onClose} disabled={saving}>Hủy</Button>
+                    <Button
+                        variant={destructive ? 'danger' : 'primary'}
+                        className="flex-1"
+                        disabled={!canSubmit || saving}
+                        onClick={() => onSubmit({ amount, reason, scope, topicId: topicId ? Number(topicId) : undefined, confirmationText })}
+                    >
+                        {saving ? <><Loader2 size={16} className="animate-spin" /> Đang xử lý...</> : 'Xác nhận'}
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const AdminUsers = () => {
     const { addToast, currentUser } = useAppContext();
 
     const [users, setUsers] = useState<AdminUser[]>([]);
+    const [topics, setTopics] = useState<AdminTopic[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -363,14 +549,23 @@ const AdminUsers = () => {
     const [deleting, setDeleting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [detail, setDetail] = useState<AdminLearnerDetail | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState<string | null>(null);
+    const [learningAction, setLearningAction] = useState<LearningAction | null>(null);
+    const [actionSaving, setActionSaving] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            setUsers(await adminApi.getUsers());
+            const [userRows, topicRows] = await Promise.all([adminApi.getUsers(), adminApi.getTopics()]);
+            setUsers(userRows);
+            setTopics(topicRows);
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to load users');
+            setError(e instanceof Error ? e.message : 'Không thể tải danh sách người dùng.');
         } finally {
             setLoading(false);
         }
@@ -399,6 +594,68 @@ const AdminUsers = () => {
     const closeModal = () => setModalState(null);
     const openDelete = (user: AdminUser) => { setDeleteError(null); setDeleteTarget(user); };
     const closeDelete = () => setDeleteTarget(null);
+    const openDetail = async (user: AdminUser) => {
+        setDetailOpen(true);
+        setDetail(null);
+        setDetailError(null);
+        setDetailLoading(true);
+        try {
+            setDetail(await adminApi.getLearnerDetail(user.userId));
+        } catch (detailLoadError) {
+            setDetailError(detailLoadError instanceof Error ? detailLoadError.message : 'Không thể tải chi tiết học tập.');
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    const refreshDetail = async () => {
+        if (!detail) return;
+        setDetail(await adminApi.getLearnerDetail(detail.user.userId));
+        await loadUsers();
+    };
+
+    const handleLearningAction = async (values: {
+        amount: number;
+        reason: string;
+        scope: 'all' | 'topic';
+        topicId?: number;
+        confirmationText: string;
+    }) => {
+        if (!detail || !learningAction) return;
+        setActionSaving(true);
+        setActionError(null);
+        try {
+            if (learningAction === 'xp') {
+                await adminApi.adjustXp(detail.user.userId, { amount: values.amount, reason: values.reason });
+                addToast('Đã điều chỉnh XP.', 'success');
+            } else if (learningAction === 'reset') {
+                await adminApi.resetProgress(detail.user.userId, {
+                    scope: values.scope,
+                    topicId: values.topicId,
+                    reason: values.reason,
+                });
+                addToast('Đã reset tiến độ học tập.', 'success');
+            } else if (learningAction === 'delete-data') {
+                await adminApi.deleteLearningData(detail.user.userId, {
+                    reason: values.reason,
+                    confirmationText: values.confirmationText,
+                });
+                addToast('Đã xóa dữ liệu học tập.', 'success');
+            } else {
+                await adminApi.setLeaderboardVisibility(detail.user.userId, {
+                    hidden: !detail.user.isHiddenFromLeaderboard,
+                    reason: values.reason,
+                });
+                addToast(detail.user.isHiddenFromLeaderboard ? 'Đã hiện người học trên bảng xếp hạng.' : 'Đã ẩn người học khỏi bảng xếp hạng.', 'success');
+            }
+            setLearningAction(null);
+            await refreshDetail();
+        } catch (actionFailure) {
+            setActionError(actionFailure instanceof Error ? actionFailure.message : 'Thao tác thất bại. Vui lòng thử lại.');
+        } finally {
+            setActionSaving(false);
+        }
+    };
 
     const handleSubmit = async (form: UserFormData) => {
         setSaving(true);
@@ -406,7 +663,7 @@ const AdminUsers = () => {
         try {
             const shouldValidatePassword = modalState?.mode === 'create' || Boolean(form.password);
             if (shouldValidatePassword && !isPasswordPolicyValid(checkPasswordPolicy(form.password))) {
-                setFormError('Password must be at least 5 characters and include one lowercase letter and one digit.');
+                setFormError('Mật khẩu phải có ít nhất 5 ký tự, gồm một chữ thường và một chữ số.');
                 return;
             }
 
@@ -421,7 +678,7 @@ const AdminUsers = () => {
                 const created = await adminApi.createUser(payload);
                 setUsers(prev => [...prev, created]);
                 closeModal();
-                addToast('User created successfully.', 'success');
+                addToast('Đã thêm người dùng.', 'success');
             } else if (modalState?.mode === 'edit') {
                 const payload: AdminUpdateUserPayload = {
                     username: form.username.trim(),
@@ -433,10 +690,10 @@ const AdminUsers = () => {
                 await adminApi.updateUser(modalState.user.userId, payload);
                 await loadUsers();
                 closeModal();
-                addToast('User updated successfully.', 'success');
+                addToast('Đã cập nhật người dùng.', 'success');
             }
         } catch (e) {
-            setFormError(e instanceof Error ? e.message : 'Operation failed');
+            setFormError(e instanceof Error ? e.message : 'Thao tác thất bại.');
         } finally {
             setSaving(false);
         }
@@ -450,9 +707,9 @@ const AdminUsers = () => {
             await adminApi.deleteUser(deleteTarget.userId);
             setUsers(prev => prev.filter(u => u.userId !== deleteTarget.userId));
             closeDelete();
-            addToast('User deleted.', 'success');
+            addToast('Đã xóa người dùng.', 'success');
         } catch (e) {
-            setDeleteError(e instanceof Error ? e.message : 'Delete failed');
+            setDeleteError(e instanceof Error ? e.message : 'Xóa người dùng thất bại.');
         } finally {
             setDeleting(false);
         }
@@ -462,7 +719,7 @@ const AdminUsers = () => {
         return (
             <div className="flex items-center justify-center py-32 gap-3 text-text-muted">
                 <Loader2 size={24} className="animate-spin text-primary" />
-                <span className="font-display font-bold">Loading users…</span>
+                <span className="font-display font-bold">Đang tải người dùng...</span>
             </div>
         );
     }
@@ -473,7 +730,7 @@ const AdminUsers = () => {
                 <AlertTriangle size={40} className="text-red-400" />
                 <p className="font-bold text-red-500">{error}</p>
                 <Button variant="secondary" onClick={loadUsers}>
-                    <RefreshCw size={16} /> Retry
+                    <RefreshCw size={16} /> Thử lại
                 </Button>
             </div>
         );
@@ -485,7 +742,7 @@ const AdminUsers = () => {
             <FilterBar
                 actions={
                     <Button variant="primary" onClick={openCreate}>
-                        <Plus size={16} /> Add User
+                        <Plus size={16} /> Thêm người dùng
                     </Button>
                 }
             >
@@ -495,37 +752,37 @@ const AdminUsers = () => {
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
                     />
                     <Input
-                        aria-label="Search users"
+                        aria-label="Tìm người dùng"
                         type="text"
-                        placeholder="Search username or email…"
+                        placeholder="Tìm tên đăng nhập hoặc email..."
                         className="pl-10 rounded-pill"
                         value={search}
                         onChange={e => { setSearch(e.target.value); resetPage(); }}
                     />
                 </div>
 
-                    <Select
-                        aria-label="Filter users by role"
-                        className="rounded-pill"
-                        value={roleFilter}
-                        onChange={e => { setRoleFilter(e.target.value); resetPage(); }}
-                    >
-                        <option value="">All Roles</option>
-                        <option value="ADMIN">ADMIN</option>
-                        <option value="LEARNER">LEARNER</option>
-                    </Select>
+                <Select
+                    aria-label="Lọc theo vai trò"
+                    className="rounded-pill"
+                    value={roleFilter}
+                    onChange={e => { setRoleFilter(e.target.value); resetPage(); }}
+                >
+                    <option value="">Tất cả vai trò</option>
+                    <option value="ADMIN">Quản trị</option>
+                    <option value="LEARNER">Người học</option>
+                </Select>
 
-                    <Select
-                        aria-label="Filter users by status"
-                        className="rounded-pill"
-                        value={statusFilter}
-                        onChange={e => { setStatusFilter(e.target.value); resetPage(); }}
-                    >
-                        <option value="">All Status</option>
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="INACTIVE">INACTIVE</option>
-                        <option value="DELETED">DELETED</option>
-                    </Select>
+                <Select
+                    aria-label="Lọc theo trạng thái"
+                    className="rounded-pill"
+                    value={statusFilter}
+                    onChange={e => { setStatusFilter(e.target.value); resetPage(); }}
+                >
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="ACTIVE">Hoạt động</option>
+                    <option value="INACTIVE">Tạm khóa</option>
+                    <option value="DELETED">Đã xóa</option>
+                </Select>
             </FilterBar>
 
             {/* Table */}
@@ -534,7 +791,7 @@ const AdminUsers = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-primary/10">
-                                {['ID', 'Username', 'Email', 'Role', 'Status', 'Login', 'Created', ''].map(h => (
+                                {['ID', 'Tên đăng nhập', 'Email', 'Vai trò', 'Trạng thái', 'Đăng nhập', 'Ngày tạo', ''].map(h => (
                                     <th
                                         key={h}
                                         className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
@@ -552,8 +809,8 @@ const AdminUsers = () => {
                                         className="px-4 py-16 text-center text-text-muted text-sm"
                                     >
                                         {users.length > 0
-                                            ? 'No users match your filters.'
-                                            : 'No users found.'}
+                                            ? 'Không có người dùng phù hợp bộ lọc.'
+                                            : 'Chưa có người dùng.'}
                                     </td>
                                 </tr>
                             ) : (
@@ -594,7 +851,7 @@ const AdminUsers = () => {
                                             <div className="flex gap-1">
                                                 {user.hasLocalPassword && (
                                                     <span
-                                                        aria-label="Password login enabled"
+                                                        aria-label="Có đăng nhập mật khẩu"
                                                         className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
                                                     >
                                                         PW
@@ -602,7 +859,7 @@ const AdminUsers = () => {
                                                 )}
                                                 {user.hasGoogleLogin && (
                                                     <span
-                                                        aria-label="Google login enabled"
+                                                        aria-label="Có đăng nhập Google"
                                                         className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
                                                     >
                                                         G
@@ -611,15 +868,22 @@ const AdminUsers = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3.5 text-xs text-text-muted whitespace-nowrap">
-                                            {new Date(user.createdAt).toLocaleDateString()}
+                                            {new Date(user.createdAt).toLocaleDateString('vi-VN')}
                                         </td>
                                         <td className="px-4 py-3.5">
                                             {!user.isDeleted && (
                                                 <div className="flex gap-1 justify-end">
                                                     <IconButton
+                                                        onClick={() => void openDetail(user)}
+                                                        aria-label={`Chi tiết học tập của ${user.username}`}
+                                                        title="Chi tiết học tập"
+                                                        tone="primary"
+                                                        icon={<BarChart3 size={14} />}
+                                                    />
+                                                    <IconButton
                                                         onClick={() => openEdit(user)}
-                                                        aria-label={`Edit ${user.username}`}
-                                                        title="Edit user"
+                                                        aria-label={`Chỉnh sửa ${user.username}`}
+                                                        title="Chỉnh sửa người dùng"
                                                         tone="primary"
                                                         icon={<Pencil size={14} />}
                                                     />
@@ -628,14 +892,14 @@ const AdminUsers = () => {
                                                             if (user.role.toUpperCase() === 'ADMIN' || currentUser?.userId === user.userId) return;
                                                             openDelete(user);
                                                         }}
-                                                        aria-label={`Delete ${user.username}`}
+                                                        aria-label={`Xóa ${user.username}`}
                                                         disabled={user.role.toUpperCase() === 'ADMIN' || currentUser?.userId === user.userId}
                                                         title={
                                                             currentUser?.userId === user.userId
                                                                 ? 'Không thể xóa chính bạn'
                                                                 : user.role.toUpperCase() === 'ADMIN'
                                                                     ? 'Không thể xóa tài khoản quản trị'
-                                                                    : 'Delete user'
+                                                                    : 'Xóa người dùng'
                                                         }
                                                         tone="danger"
                                                         icon={<Trash2 size={14} />}
@@ -654,7 +918,7 @@ const AdminUsers = () => {
                     page={page}
                     totalPages={totalPages}
                     onPageChange={setPage}
-                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} users`}
+                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} trong ${filtered.length} người dùng`}
                 />
             </DataTable>
 
@@ -676,6 +940,26 @@ const AdminUsers = () => {
                     onConfirm={() => { void handleDelete(); }}
                     deleting={deleting}
                     error={deleteError}
+                />
+            )}
+            {detailOpen && (
+                <LearnerDetailModal
+                    detail={detail}
+                    loading={detailLoading}
+                    error={detailError}
+                    onClose={() => setDetailOpen(false)}
+                    onAction={action => { setActionError(null); setLearningAction(action); }}
+                />
+            )}
+            {learningAction && detail && (
+                <LearningActionModal
+                    action={learningAction}
+                    detail={detail}
+                    topics={topics}
+                    saving={actionSaving}
+                    error={actionError}
+                    onClose={() => setLearningAction(null)}
+                    onSubmit={values => { void handleLearningAction(values); }}
                 />
             )}
         </div>

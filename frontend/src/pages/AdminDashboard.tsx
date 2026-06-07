@@ -8,10 +8,10 @@ import AdminTopics from './admin/AdminTopics';
 import AdminVocabulary from './admin/AdminVocabulary';
 
 const NAV_ITEMS = [
-    { path: PATHS.adminOverview, label: 'Overview', icon: BarChart3 },
-    { path: PATHS.adminUsers, label: 'Users', icon: Users },
-    { path: PATHS.adminTopics, label: 'Topics', icon: BookOpen },
-    { path: PATHS.adminVocabulary, label: 'Vocabulary', icon: BookText },
+    { path: PATHS.adminOverview, label: 'Tổng quan', icon: BarChart3 },
+    { path: PATHS.adminUsers, label: 'Người dùng', icon: Users },
+    { path: PATHS.adminTopics, label: 'Chủ đề', icon: BookOpen },
+    { path: PATHS.adminVocabulary, label: 'Từ vựng', icon: BookText },
 ] as const;
 
 const AdminDashboard = () => (
@@ -19,8 +19,8 @@ const AdminDashboard = () => (
         {/* Header */}
         <PageHeader
             className="mb-8"
-            title="Admin Control Center"
-            description="Manage users, topics and learning data"
+            title="Trung tâm quản trị"
+            description="Quản lý người dùng, chủ đề và dữ liệu học tập"
             icon={(
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-linear-to-br from-primary to-accent">
                     <Shield size={20} className="text-text-on-accent" />

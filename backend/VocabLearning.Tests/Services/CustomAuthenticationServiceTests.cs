@@ -450,44 +450,68 @@ namespace VocabLearning.Tests.Services
             activeTokens.Should().Be(1);
         }
 
+        [Fact]
+        public async Task CreatePasswordResetTokenAsync_WithSoftDeletedActiveUser_ShouldNotReturnToken()
+        {
+            var (_, _, user) = await _service.RegisterAsync(
+                "deleteduser", "deleted@example.com", "OldPassword1!");
+            user!.IsDeleted = true;
+            await _context.SaveChangesAsync();
+
+            var (shouldSendEmail, email, username, token) =
+                await _service.CreatePasswordResetTokenAsync("deleted@example.com");
+
+            shouldSendEmail.Should().BeFalse();
+            email.Should().BeEmpty();
+            username.Should().BeEmpty();
+            token.Should().BeEmpty();
+            (await _context.PasswordResetTokens.CountAsync()).Should().Be(0);
+        }
+
         #endregion
 
         #region ResetPasswordWithTokenAsync
 
         [Fact]
-        public async Task ResetPasswordWithTokenAsync_WithValidToken_ShouldSucceed()
+        public async Task ResetPasswordWithTokenAsync_WithVerifiedActiveUser_ShouldSupportNewPasswordAndRejectOldPasswordAndTokenReuse()
         {
-            // Arrange
-            await _service.RegisterAsync("testuser", "test@example.com", "OldPassword1!");
+            var (_, _, user) = await _service.RegisterAsync(
+                "testuser", "test@example.com", "OldPassword1!");
+            user!.IsEmailVerified = true;
+            await _context.SaveChangesAsync();
             var (_, _, _, token) = await _service.CreatePasswordResetTokenAsync("test@example.com");
 
-            // Act
             var (succeeded, errorMessage) = await _service.ResetPasswordWithTokenAsync(
                 "test@example.com", token, "NewPassword1!", "127.0.0.1");
 
-            // Assert
             succeeded.Should().BeTrue();
             errorMessage.Should().BeNull();
+            (await _service.AuthenticateAsync("testuser", "NewPassword1!")).Should().NotBeNull();
+            (await _service.AuthenticateAsync("test@example.com", "NewPassword1!")).Should().NotBeNull();
+            (await _service.AuthenticateAsync("testuser", "OldPassword1!")).Should().BeNull();
 
-            // Verify new password works
-            var user = await _service.AuthenticateAsync("testuser", "NewPassword1!");
-            user.Should().NotBeNull();
+            var (reused, reuseError) = await _service.ResetPasswordWithTokenAsync(
+                "test@example.com", token, "AnotherPassword1!", "127.0.0.1");
+            reused.Should().BeFalse();
+            reuseError.Should().Contain("invalid or has expired");
         }
 
         [Fact]
         public async Task ResetPasswordWithTokenAsync_WithMinimumPolicyPassword_ShouldSucceed()
         {
-            await _service.RegisterAsync("resetpolicy", "resetpolicy@example.com", "old12");
+            var (_, _, user) = await _service.RegisterAsync(
+                "resetpolicy", "resetpolicy@example.com", "OldPass1!");
+            user!.IsEmailVerified = true;
+            await _context.SaveChangesAsync();
             var (_, _, _, token) = await _service.CreatePasswordResetTokenAsync("resetpolicy@example.com");
 
             var (succeeded, errorMessage) = await _service.ResetPasswordWithTokenAsync(
-                "resetpolicy@example.com", token, "abc12", "127.0.0.1");
+                "resetpolicy@example.com", token, "Abcdef1!", "127.0.0.1");
 
             succeeded.Should().BeTrue();
             errorMessage.Should().BeNull();
 
-            var user = await _service.AuthenticateAsync("resetpolicy", "abc12");
-            user.Should().NotBeNull();
+            (await _service.AuthenticateAsync("resetpolicy", "Abcdef1!")).Should().NotBeNull();
         }
 
         [Fact]
@@ -535,6 +559,25 @@ namespace VocabLearning.Tests.Services
             // Assert
             succeeded.Should().BeFalse();
             errorMessage.Should().Be("Invalid password reset request.");
+        }
+
+        [Fact]
+        public async Task ResetPasswordWithTokenAsync_WithSoftDeletedActiveUser_ShouldFailWithoutChangingPassword()
+        {
+            var (_, _, user) = await _service.RegisterAsync(
+                "deleteduser", "deleted@example.com", "OldPassword1!");
+            var (_, _, _, token) = await _service.CreatePasswordResetTokenAsync("deleted@example.com");
+            var originalPasswordHash = user!.PasswordHash;
+            user.IsDeleted = true;
+            await _context.SaveChangesAsync();
+
+            var (succeeded, errorMessage) = await _service.ResetPasswordWithTokenAsync(
+                "deleted@example.com", token, "NewPassword1!", "127.0.0.1");
+
+            succeeded.Should().BeFalse();
+            errorMessage.Should().Contain("invalid or has expired");
+            user.PasswordHash.Should().Be(originalPasswordHash);
+            (await _context.PasswordResetTokens.SingleAsync()).UsedAt.Should().BeNull();
         }
 
         #endregion

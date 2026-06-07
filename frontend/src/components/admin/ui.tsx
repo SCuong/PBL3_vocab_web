@@ -134,7 +134,7 @@ type ModalProps = {
     footer?: ReactNode;
 };
 
-export const Modal = ({ title, children, onClose, size = 'md', closeLabel = 'Close dialog', footer }: ModalProps) => {
+export const Modal = ({ title, children, onClose, size = 'md', closeLabel = 'Đóng hộp thoại', footer }: ModalProps) => {
     const titleId = useId();
     const panelRef = useRef<HTMLDivElement>(null);
     const sizeClass = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-lg' : 'max-w-md';
@@ -352,10 +352,10 @@ export const Pagination = ({ page, totalPages, onPageChange, summary }: Paginati
     return (
         <div className="flex flex-col gap-3 border-t border-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-text-muted">{summary}</span>
-            <nav className="flex items-center gap-1" aria-label="Pagination">
+            <nav className="flex items-center gap-1" aria-label="Phân trang">
                 <IconButton
-                    aria-label="Previous page"
-                    title="Previous page"
+                    aria-label="Trang trước"
+                    title="Trang trước"
                     icon={<ChevronLeft size={16} />}
                     onClick={() => onPageChange(Math.max(1, page - 1))}
                     disabled={page === 1}
@@ -365,8 +365,8 @@ export const Pagination = ({ page, totalPages, onPageChange, summary }: Paginati
                     {page} / {totalPages}
                 </span>
                 <IconButton
-                    aria-label="Next page"
-                    title="Next page"
+                    aria-label="Trang sau"
+                    title="Trang sau"
                     icon={<ChevronRight size={16} />}
                     onClick={() => onPageChange(Math.min(totalPages, page + 1))}
                     disabled={page === totalPages}

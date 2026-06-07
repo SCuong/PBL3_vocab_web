@@ -1,5 +1,6 @@
 // ── Types ─────────────────────────────────────────────────────────────────────
 import { apiFetch } from './apiClient';
+import type { LearnerDashboard } from './dashboardApi';
 
 export interface AdminUser {
     userId: number;
@@ -12,6 +13,7 @@ export interface AdminUser {
     createdAt: string;
     isDeleted: boolean;
     deletedAt?: string;
+    isHiddenFromLeaderboard: boolean;
 }
 
 export interface AdminTopic {
@@ -46,6 +48,57 @@ export interface AdminLearningOverviewResult {
     totalActiveHours: number;
 }
 
+export interface AdminLearnerDetail {
+    user: AdminUser;
+    learning: LearnerDashboard;
+}
+
+export interface RetentionAnalytics {
+    activeLearners: number;
+    returningLearners: number;
+    retentionRate: number;
+}
+
+export interface ReviewCompletionAnalytics {
+    reviewAttempts: number;
+    successfulReviews: number;
+    dueReviews: number;
+    completionRate: number;
+    successRate: number;
+}
+
+export interface VocabularyDifficultyItem {
+    vocabId: number;
+    word: string;
+    meaningVi: string;
+    topicName: string;
+    attempts: number;
+    failures: number;
+    failureRate: number;
+    averageQuality: number;
+    difficultyScore: number;
+}
+
+export interface ExerciseFailureItem {
+    exerciseId: number;
+    vocabId: number;
+    word: string;
+    exerciseType: string;
+    matchMode?: string;
+    attempts: number;
+    failures: number;
+    failureRate: number;
+    lastFailedAt?: string;
+}
+
+export interface DailyLearningTrend {
+    date: string;
+    activeLearners: number;
+    sessionCount: number;
+    wordsStudied: number;
+    averageScore: number;
+}
+
 export interface LearningOverviewParams {
     userId?: number;
     topicId?: number;
@@ -73,6 +126,27 @@ export interface AdminUpdateUserPayload {
     password?: string;
     role: string;
     status: string;
+}
+
+export interface AdminXpAdjustmentPayload {
+    amount: number;
+    reason: string;
+}
+
+export interface AdminResetProgressPayload {
+    scope: 'all' | 'topic';
+    topicId?: number;
+    reason: string;
+}
+
+export interface AdminDeleteLearningDataPayload {
+    reason: string;
+    confirmationText: string;
+}
+
+export interface AdminLeaderboardVisibilityPayload {
+    hidden: boolean;
+    reason: string;
 }
 
 export interface AdminCreateTopicPayload {
@@ -159,7 +233,8 @@ export interface AdminUpdateExamplePayload {
 
 async function adminFetch<T>(
     url: string,
-    options?: RequestInit
+    options?: RequestInit,
+    emptyBodyMessage = 'Không thể tải dữ liệu quản trị. Vui lòng thử lại.'
 ): Promise<T & { succeeded: boolean; message?: string }> {
     const response = await apiFetch(url, {
         ...options,
@@ -168,9 +243,21 @@ async function adminFetch<T>(
             ...options?.headers,
         },
     });
-    const data = (await response.json()) as T & { succeeded: boolean; message?: string };
+
+    const rawBody = await response.text();
+    if (!rawBody.trim()) {
+        throw new Error(emptyBodyMessage);
+    }
+
+    let data: T & { succeeded: boolean; message?: string };
+    try {
+        data = JSON.parse(rawBody) as T & { succeeded: boolean; message?: string };
+    } catch {
+        throw new Error(emptyBodyMessage);
+    }
+
     if (!response.ok || !data.succeeded) {
-        throw new Error(data.message ?? `Request failed (${response.status})`);
+        throw new Error(data.message ?? `Yêu cầu thất bại (${response.status})`);
     }
     return data;
 }
@@ -189,7 +276,7 @@ export const adminApi = {
             method: 'POST',
             body: JSON.stringify(payload),
         });
-        if (!data.user) throw new Error('Server did not return the created user.');
+        if (!data.user) throw new Error('Máy chủ không trả về người dùng vừa tạo.');
         return data.user;
     },
 
@@ -206,6 +293,44 @@ export const adminApi = {
         });
     },
 
+    getLearnerDetail: async (id: number): Promise<AdminLearnerDetail> => {
+        const data = await adminFetch<{ user?: AdminUser; learning?: LearnerDashboard }>(
+            `/api/admin/users/${id}/learning-detail`,
+            undefined,
+            'Không thể tải chi tiết học tập. Vui lòng thử lại.'
+        );
+        if (!data.user || !data.learning) throw new Error('Máy chủ không trả về chi tiết học tập.');
+        return { user: data.user, learning: data.learning };
+    },
+
+    adjustXp: async (id: number, payload: AdminXpAdjustmentPayload): Promise<void> => {
+        await adminFetch(`/api/admin/users/${id}/xp-adjustments`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    resetProgress: async (id: number, payload: AdminResetProgressPayload): Promise<void> => {
+        await adminFetch(`/api/admin/users/${id}/reset-progress`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    deleteLearningData: async (id: number, payload: AdminDeleteLearningDataPayload): Promise<void> => {
+        await adminFetch(`/api/admin/users/${id}/delete-learning-data`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
+    setLeaderboardVisibility: async (id: number, payload: AdminLeaderboardVisibilityPayload): Promise<void> => {
+        await adminFetch(`/api/admin/users/${id}/leaderboard-visibility`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    },
+
     // Topics
     getTopics: async (): Promise<AdminTopic[]> => {
         const data = await adminFetch<{ topics: AdminTopic[] }>('/api/admin/topics');
@@ -217,7 +342,7 @@ export const adminApi = {
             method: 'POST',
             body: JSON.stringify(payload),
         });
-        if (!data.topic) throw new Error('Server did not return the created topic.');
+        if (!data.topic) throw new Error('Máy chủ không trả về chủ đề vừa tạo.');
         return data.topic;
     },
 
@@ -254,7 +379,7 @@ export const adminApi = {
             method: 'POST',
             body: JSON.stringify(payload),
         });
-        if (!data.vocabulary) throw new Error('Server did not return the created vocabulary.');
+        if (!data.vocabulary) throw new Error('Máy chủ không trả về từ vựng vừa tạo.');
         return data.vocabulary;
     },
 
@@ -277,7 +402,7 @@ export const adminApi = {
             method: 'POST',
             body: JSON.stringify(payload),
         });
-        if (!data.example) throw new Error('Server did not return the created example.');
+        if (!data.example) throw new Error('Máy chủ không trả về ví dụ vừa tạo.');
         return data.example;
     },
 
@@ -311,4 +436,44 @@ export const adminApi = {
         );
         return data;
     },
+
+    getRetentionAnalytics: async (fromDate?: string, toDate?: string): Promise<RetentionAnalytics> => {
+        const query = dateRangeQuery(fromDate, toDate);
+        return adminFetch<RetentionAnalytics>(`/api/admin/analytics/retention${query}`);
+    },
+
+    getReviewCompletionAnalytics: async (fromDate?: string, toDate?: string): Promise<ReviewCompletionAnalytics> => {
+        const query = dateRangeQuery(fromDate, toDate);
+        return adminFetch<ReviewCompletionAnalytics>(`/api/admin/analytics/review-completion${query}`);
+    },
+
+    getVocabularyDifficultyAnalytics: async (limit = 5): Promise<VocabularyDifficultyItem[]> => {
+        const data = await adminFetch<{ items: VocabularyDifficultyItem[] }>(
+            `/api/admin/analytics/vocabulary-difficulty?limit=${limit}`
+        );
+        return data.items;
+    },
+
+    getExerciseFailureAnalytics: async (limit = 5): Promise<ExerciseFailureItem[]> => {
+        const data = await adminFetch<{ items: ExerciseFailureItem[] }>(
+            `/api/admin/analytics/exercise-failures?limit=${limit}`
+        );
+        return data.items;
+    },
+
+    getDailyLearningTrends: async (fromDate?: string, toDate?: string): Promise<DailyLearningTrend[]> => {
+        const query = dateRangeQuery(fromDate, toDate);
+        const data = await adminFetch<{ items: DailyLearningTrend[] }>(
+            `/api/admin/analytics/daily-trends${query}`
+        );
+        return data.items;
+    },
 };
+
+function dateRangeQuery(fromDate?: string, toDate?: string): string {
+    const query = new URLSearchParams();
+    if (fromDate) query.set('fromDate', fromDate);
+    if (toDate) query.set('toDate', toDate);
+    const value = query.toString();
+    return value ? `?${value}` : '';
+}

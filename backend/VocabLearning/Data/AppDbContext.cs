@@ -27,6 +27,8 @@ namespace VocabLearning.Data
         public DbSet<StickyNote> StickyNotes { get; set; }
         public DbSet<LearningSession> LearningSessions { get; set; }
         public DbSet<LearningSessionItem> LearningSessionItems { get; set; }
+        public DbSet<XpAdjustment> XpAdjustments { get; set; }
+        public DbSet<AdminAuditLog> AdminAuditLogs { get; set; }
 
         // Backs ASP.NET Core DataProtection key persistence (IDataProtectionKeyContext).
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
@@ -87,6 +89,10 @@ namespace VocabLearning.Data
 
                 entity.Property(user => user.DeletedAt)
                     .HasColumnName("deleted_at");
+
+                entity.Property(user => user.IsHiddenFromLeaderboard)
+                    .HasColumnName("is_hidden_from_leaderboard")
+                    .HasDefaultValue(false);
 
                 entity.HasIndex(user => user.Username).IsUnique();
                 entity.HasIndex(user => user.Email).IsUnique();
@@ -541,6 +547,39 @@ namespace VocabLearning.Data
 
                 entity.HasIndex(item => item.VocabId)
                     .HasDatabaseName("ix_learning_session_item_vocab_id");
+            });
+
+            modelBuilder.Entity<XpAdjustment>(entity =>
+            {
+                entity.ToTable("xp_adjustment", table =>
+                    table.HasCheckConstraint("ck_xp_adjustment_amount", "amount <> 0"));
+                entity.HasKey(item => item.AdjustmentId);
+                entity.Property(item => item.AdjustmentId).HasColumnName("adjustment_id").ValueGeneratedOnAdd();
+                entity.Property(item => item.UserId).HasColumnName("user_id");
+                entity.Property(item => item.Amount).HasColumnName("amount");
+                entity.Property(item => item.Reason).HasColumnName("reason");
+                entity.Property(item => item.CreatedByAdminId).HasColumnName("created_by_admin_id");
+                entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql(currentTimestampSql);
+                entity.HasOne<Users>().WithMany().HasForeignKey(item => item.UserId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasOne<Users>().WithMany().HasForeignKey(item => item.CreatedByAdminId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasIndex(item => new { item.UserId, item.CreatedAt });
+            });
+
+            modelBuilder.Entity<AdminAuditLog>(entity =>
+            {
+                entity.ToTable("admin_audit_log");
+                entity.HasKey(item => item.AuditId);
+                entity.Property(item => item.AuditId).HasColumnName("audit_id").ValueGeneratedOnAdd();
+                entity.Property(item => item.AdminUserId).HasColumnName("admin_user_id");
+                entity.Property(item => item.TargetUserId).HasColumnName("target_user_id");
+                entity.Property(item => item.Action).HasColumnName("action").HasMaxLength(80);
+                entity.Property(item => item.Reason).HasColumnName("reason");
+                entity.Property(item => item.MetadataJson).HasColumnName("metadata_json");
+                entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql(currentTimestampSql);
+                entity.HasOne<Users>().WithMany().HasForeignKey(item => item.AdminUserId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasOne<Users>().WithMany().HasForeignKey(item => item.TargetUserId).OnDelete(DeleteBehavior.NoAction);
+                entity.HasIndex(item => new { item.AdminUserId, item.CreatedAt });
+                entity.HasIndex(item => new { item.TargetUserId, item.CreatedAt });
             });
         }
     }

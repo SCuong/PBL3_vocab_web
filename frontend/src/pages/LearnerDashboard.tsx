@@ -97,10 +97,14 @@ const LearnerDashboard = () => {
             return dashboard.recentActivity.slice(0, 5).map((activity) => ({
                 id: String(activity.sessionId ?? activity.date),
                 title: `Đã học ${activity.wordsStudied || 0} từ`,
-                meta: new Date(activity.date).toLocaleDateString('vi-VN', {
+                // Full timestamp so separate real sessions on the same day read distinctly.
+                meta: new Date(activity.date).toLocaleString('vi-VN', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
                 }),
                 detail: activity.topicName?.trim() ? activity.topicName : 'Đã ghi nhận phiên học',
             }));

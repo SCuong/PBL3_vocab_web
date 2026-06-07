@@ -289,7 +289,9 @@ namespace VocabLearning.Services
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
-                    item => item.Email == normalizedEmail && item.Status == UserStatuses.Active,
+                    item => item.Email == normalizedEmail
+                        && item.Status == UserStatuses.Active
+                        && !item.IsDeleted,
                     cancellationToken);
 
             if (user is null)
@@ -445,7 +447,9 @@ namespace VocabLearning.Services
             var normalizedEmail = NormalizeEmail(cleanEmail);
             var user = await dbContext.Users
                 .SingleOrDefaultAsync(
-                    item => item.Email == normalizedEmail && item.Status == UserStatuses.Active,
+                    item => item.Email == normalizedEmail
+                        && item.Status == UserStatuses.Active
+                        && !item.IsDeleted,
                     cancellationToken);
 
             if (user is null)
