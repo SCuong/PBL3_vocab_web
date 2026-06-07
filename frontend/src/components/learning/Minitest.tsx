@@ -10,9 +10,11 @@ type MinitestProps = {
   learnedWords: any[];
   topicWords: any[];
   onFinish: (score: number, total: number, detail?: any) => void;
+  hideProgressCard?: boolean;
+  onProgressChange?: (answered: number, total: number) => void;
 };
 
-export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish }: MinitestProps) => {
+export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish, hideProgressCard = false, onProgressChange }: MinitestProps) => {
   const [fillAnswers, setFillAnswers] = useState<string[]>([]);
   const [translationAnswers, setTranslationAnswers] = useState<(number | string | null)[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -43,6 +45,11 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
     fillAnswers.filter((a) => a !== "").length +
     translationAnswers.filter((a) => a !== null && a !== "").length;
   const totalQuestions = fillQuestions.length + translationQuestions.length;
+
+  // Report live progress so a host (fullscreen top bar) can show it.
+  useEffect(() => {
+    onProgressChange?.(answeredCount, totalQuestions);
+  }, [answeredCount, totalQuestions, onProgressChange]);
 
   const handleSubmit = () => {
     setIsSubmitted(true);

@@ -47,8 +47,8 @@ namespace VocabLearning.Services
             {
                 var keywordPattern = $"%{normalizedSearch}%";
                 query = query.Where(vocabulary =>
-                    EF.Functions.Like(vocabulary.Word ?? string.Empty, keywordPattern)
-                    || EF.Functions.Like(vocabulary.MeaningVi ?? string.Empty, keywordPattern));
+                    EF.Functions.ILike(vocabulary.Word ?? string.Empty, keywordPattern)
+                    || EF.Functions.ILike(vocabulary.MeaningVi ?? string.Empty, keywordPattern));
             }
 
             if (!string.IsNullOrWhiteSpace(normalizedCefr))

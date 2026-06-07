@@ -107,10 +107,10 @@ const Home = () => {
     return (
         <div ref={fadeRef}>
             {/* ── HERO ── */}
-            <section className="min-h-[calc(100vh-64px)] px-8 py-16 sm:py-20 lg:py-24 flex items-center">
+            <section className="min-h-[calc(100dvh-64px)] px-4 py-10 sm:px-8 sm:py-20 lg:py-24 flex items-center">
                 <div className="max-w-[1200px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Text */}
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-5 sm:gap-6">
                         <div className="home-fade-in inline-flex items-center gap-3 bg-primary-light/80 text-primary text-sm sm:text-base font-semibold px-5 py-2.5 rounded-full border border-primary/15 w-fit shadow-[0_1px_2px_var(--shadow-color)]" style={{ transitionDelay: '0ms' }}>
                             <Star size={18} fill="currentColor" strokeWidth={1.75} className="text-[#F5B82E] shrink-0" />
                             Học thông minh – Nhớ lâu hơn
@@ -127,17 +127,17 @@ const Home = () => {
                             Phương pháp lặp lại ngắt quãng kết hợp trò chơi thú vị giúp bạn ghi nhớ từ vựng tự nhiên và bền vững.
                         </p>
 
-                        <div className="home-fade-in flex items-center gap-4 flex-wrap" style={{ transitionDelay: '420ms' }}>
+                        <div className="home-fade-in flex items-center gap-3 flex-wrap sm:gap-4" style={{ transitionDelay: '420ms' }}>
                             <button
                                 onClick={() => navigate(PATHS.learning)}
-                                className="btn-primary !px-8 !py-4 !text-sm !font-bold"
+                                className="btn-primary w-full justify-center !px-8 !py-4 !text-sm !font-bold sm:w-auto"
                             >
                                 Bắt đầu học ngay
                                 <ChevronRight size={16} />
                             </button>
                             <button
                                 onClick={() => navigate(PATHS.vocabulary)}
-                                className="btn-secondary !px-5 !py-3 !text-sm !font-semibold inline-flex items-center gap-3"
+                                className="btn-secondary w-full justify-center !px-5 !py-3 !text-sm !font-semibold inline-flex items-center gap-3 sm:w-auto"
                             >
                                 <span className="w-7 h-7 bg-primary-light rounded-full flex items-center justify-center text-primary flex-shrink-0">
                                     <Play size={14} fill="currentColor" />
@@ -155,12 +155,12 @@ const Home = () => {
             </section>
 
             {/* ── FEATURES STRIP ── */}
-            <section className="home-feature-strip border-t border-b border-primary/10 py-14 px-8 flex justify-center" aria-label="Tính năng nổi bật">
+            <section className="home-feature-strip border-t border-b border-primary/10 py-10 px-4 flex justify-center sm:px-8 sm:py-14" aria-label="Tính năng nổi bật">
                 <div className="w-full max-w-[1280px] grid grid-cols-1 md:grid-cols-3 items-stretch">
                     {features.map((feat, i) => (
                         <div key={i} className="flex items-center">
                             {i > 0 && <div className="hidden md:block w-px h-16 bg-primary/15 mx-0" />}
-                            <div className="home-fade-in flex-1 flex items-center gap-5 px-7 lg:px-12 py-4 text-left" style={{ transitionDelay: `${i * 180}ms` }}>
+                            <div className="home-fade-in flex-1 flex items-center gap-4 px-2 py-4 text-left sm:gap-5 sm:px-7 lg:px-12" style={{ transitionDelay: `${i * 180}ms` }}>
                                 <div className={`home-feature-icon ${feat.tone}`}>
                                     {feat.icon}
                                 </div>
@@ -175,7 +175,7 @@ const Home = () => {
             </section>
 
             {/* ── TOPICS ── */}
-            <section className="px-8 py-16 sm:py-20 lg:py-24">
+            <section className="px-4 py-14 sm:px-8 sm:py-20 lg:py-24">
                 <div className="max-w-[1200px] mx-auto">
                     <div className="home-fade-in text-center mb-12">
                         <h2 className={`${typography.sectionTitle} block w-full text-center`}>
@@ -212,7 +212,7 @@ const Home = () => {
             </section>
 
             {/* ── HOW IT WORKS ── */}
-            <section className="home-defer px-8 py-16 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
+            <section className="home-defer px-4 py-14 sm:px-8 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
                 <div className="max-w-[1200px] mx-auto">
                     <div className="home-fade-in text-center mb-12">
                         <h2 className={`${typography.sectionTitle} block w-full text-center`}>
@@ -241,8 +241,8 @@ const Home = () => {
             </section>
 
             {!currentUser && (
-                <section className="home-cta-section home-defer px-8 py-16 sm:py-20 lg:py-24">
-                    <div className="home-fade-in max-w-[680px] mx-auto px-8 text-center relative z-10">
+                <section className="home-cta-section home-defer px-4 py-14 sm:px-8 sm:py-20 lg:py-24">
+                    <div className="home-fade-in max-w-[680px] mx-auto px-0 text-center relative z-10 sm:px-8">
                         <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
                             📚
                         </div>
@@ -252,16 +252,16 @@ const Home = () => {
                         <p className="text-base sm:text-lg text-text-secondary mb-8 leading-relaxed">
                             Đăng ký miễn phí và khám phá toàn bộ kho từ vựng ngay hôm nay.
                         </p>
-                        <div className="flex justify-center items-center gap-4 flex-wrap">
+                        <div className="flex flex-col justify-center items-center gap-3 sm:flex-row sm:gap-4">
                             <button
                                 onClick={() => navigate(PATHS.register)}
-                                className="inline-flex items-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 hover:shadow-[0_10px_34px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-[transform,filter,box-shadow] duration-200 px-10 py-4 cursor-pointer"
+                                className="inline-flex w-full items-center justify-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 hover:shadow-[0_10px_34px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-[transform,filter,box-shadow] duration-200 px-6 py-4 cursor-pointer sm:w-auto sm:px-10"
                             >
                                 Tạo tài khoản miễn phí
                             </button>
                             <button
                                 onClick={() => navigate(PATHS.vocabulary)}
-                                className="inline-flex items-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-[transform,background-color,border-color] duration-200 px-8 py-4 cursor-pointer"
+                                className="inline-flex w-full items-center justify-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-[transform,background-color,border-color] duration-200 px-6 py-4 cursor-pointer sm:w-auto sm:px-8"
                             >
                                 Xem từ vựng trước
                             </button>

@@ -52,13 +52,13 @@ const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({
     const isFocusedDark = appearance === 'focusedDark';
 
     return (
-        <div className="mt-6 w-full max-w-2xl mx-auto">
-            <p className={`mb-3 text-center text-sm font-semibold uppercase tracking-wide ${
+        <div className="mt-4 w-full max-w-2xl mx-auto sm:mt-6">
+            <p className={`mb-2 text-center text-[11px] font-semibold uppercase tracking-wide sm:mb-3 sm:text-sm ${
                 isFocusedLight ? 'text-[#6f6185]' : isFocusedDark ? 'text-[#cbbce2]' : 'text-text-muted'
             }`}>
                 Bạn nhớ từ này ở mức nào?
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {BUTTON_CONFIG.map((config) => {
                     const { quality, emoji, label } = config;
                     const option = getOption(quality);
@@ -75,7 +75,7 @@ const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({
                             type="button"
                             disabled={isSubmitting}
                             onClick={() => onSelect(quality)}
-                            className={`flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3
+                            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border-2 px-1 py-2.5 sm:rounded-2xl sm:px-2 sm:py-3
                                 transition-all duration-150 cursor-pointer
                                 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1
                                 disabled:opacity-40 disabled:cursor-not-allowed
@@ -87,11 +87,11 @@ const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({
                                 }
                                 ${colorClasses}`}
                         >
-                            <span className="text-2xl leading-none">{emoji}</span>
-                            <span className={`text-sm font-bold leading-tight ${
+                            <span className="text-xl leading-none sm:text-2xl">{emoji}</span>
+                            <span className={`text-[11px] font-bold leading-tight sm:text-sm ${
                                 isFocusedLight ? 'text-[#2b2140]' : isFocusedDark ? 'text-[#f5f0ff]' : 'text-text-primary'
                             }`}>{label}</span>
-                            <span className={`text-[11px] leading-tight ${
+                            <span className={`hidden text-[11px] leading-tight min-[390px]:block ${
                                 isFocusedLight ? 'text-[#76688e]' : isFocusedDark ? 'text-[#cbbce2]' : 'text-text-muted'
                             }`}>{subLabel}</span>
                         </button>

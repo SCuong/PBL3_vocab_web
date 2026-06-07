@@ -145,24 +145,24 @@ const AppShell = () => {
                     <motion.div
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-2xl bg-surface/80 backdrop-blur-xl border-2 border-primary/30 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6"
+                        className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-2xl bg-surface/95 backdrop-blur-xl border-2 border-primary/30 p-3 rounded-card shadow-2xl flex items-center justify-between gap-2 sm:bottom-8 sm:w-[90%] sm:gap-6 sm:p-6"
                     >
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-text-on-accent text-3xl shadow-lg">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="hidden w-14 h-14 rounded-full bg-linear-to-br from-primary to-secondary items-center justify-center text-text-on-accent text-3xl shadow-lg sm:flex">
                                 🎁
                             </div>
                             <div>
-                                <h4 className="signup-banner-title font-bold text-xl mb-1 text-text-primary">
+                                <h4 className="signup-banner-title text-xs font-bold text-text-primary sm:mb-1 sm:text-xl">
                                     Đăng ký để lưu tiến độ!
                                 </h4>
-                                <p className="text-sm text-text-muted">
+                                <p className="hidden text-sm text-text-muted sm:block">
                                     Nhận ngay +100 XP thưởng và mở khóa Streak 🔥
                                 </p>
                             </div>
                         </div>
                         <Button
                             variant="primary"
-                            className="signup-banner-button px-8"
+                            className="signup-banner-button shrink-0 justify-center px-4 text-xs sm:px-8 sm:text-base"
                             onClick={() => navigate(PATHS.register)}
                         >
                             Tham gia Ngay <ChevronRight size={18} />
@@ -171,7 +171,8 @@ const AppShell = () => {
                 )}
             </main>
 
-            {!isAuthPage && <Footer />}
+            {/* Footer only on the public landing page; hidden across the logged-in app. */}
+            {location.pathname === PATHS.home && <Footer />}
 
             <div className="toast-container fixed top-24 right-6 z-[500] pointer-events-none">
                 <AnimatePresence>

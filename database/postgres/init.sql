@@ -362,9 +362,11 @@ CREATE TABLE learning_session_item (
     order_index INTEGER NOT NULL,
     quality INTEGER NULL,
     is_answered BOOLEAN NOT NULL DEFAULT FALSE,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
     answered_at TIMESTAMP WITHOUT TIME ZONE NULL,
     CONSTRAINT ck_learning_session_item_order_index CHECK (order_index >= 0),
     CONSTRAINT ck_learning_session_item_quality CHECK (quality IS NULL OR (quality BETWEEN 0 AND 5)),
+    CONSTRAINT ck_learning_session_item_attempt_count CHECK (attempt_count >= 0),
     CONSTRAINT ck_learning_session_item_answered CHECK (
         (is_answered = FALSE AND answered_at IS NULL AND quality IS NULL)
         OR is_answered = TRUE

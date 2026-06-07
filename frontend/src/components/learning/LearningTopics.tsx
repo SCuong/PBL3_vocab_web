@@ -110,10 +110,10 @@ const LearningTopics = () => {
   }, [mounted, topicGroups]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-4 relative lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
+    <div className="max-w-7xl mx-auto px-4 py-4 relative sm:px-6 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
       {/* Guest Banner */}
       {isGuest && (
-        <div className="mb-4 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex items-center justify-between  border border-text-on-accent/20 shadow-xl animate-fade-in lg:shrink-0">
+        <div className="mb-4 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex flex-col items-stretch gap-3 border border-text-on-accent/20 shadow-xl animate-fade-in sm:flex-row sm:items-center sm:justify-between lg:shrink-0">
           <div className="flex items-center gap-4 text-text-on-accent">
             <div className="w-10 h-10 rounded-full bg-surface/20 flex items-center justify-center text-xl">
               ✨
@@ -124,7 +124,7 @@ const LearningTopics = () => {
           </div>
           <Button
             variant="ghost"
-            className="bg-surface/20 border-text-on-accent/40 text-text-on-accent"
+            className="w-full justify-center bg-surface/20 border-text-on-accent/40 text-text-on-accent sm:w-auto"
             onClick={() => navigate("/register")}
           >
             Đăng ký miễn phí →
@@ -150,7 +150,7 @@ const LearningTopics = () => {
 
       {categoryNavItems.length > 0 && (
         <nav
-          className="lg:hidden mb-8 -mx-6 px-6 overflow-x-auto"
+          className="lg:hidden mb-6 -mx-4 px-4 overflow-x-auto sm:-mx-6 sm:px-6"
           aria-label="Danh mục chủ đề học tập"
         >
           <div className="flex gap-3 min-w-max pb-2">
@@ -210,7 +210,7 @@ const LearningTopics = () => {
                     isCategoryLocked ? "opacity-50" : "hover:border-primary/20"
                   }`}
                 >
-                  <div className={`learning-fade ${mounted ? "is-visible" : ""} z-40 flex flex-col gap-4 rounded-t-card border-b border-primary/10 bg-surface p-5 shadow-[0_12px_30px_var(--shadow-color)] sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:sticky lg:top-0`}>
+                  <div className={`learning-fade ${mounted ? "is-visible" : ""} z-40 flex flex-col gap-3 rounded-t-card border-b border-primary/10 bg-surface p-4 shadow-[0_12px_30px_var(--shadow-color)] sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:sticky lg:top-0`}>
                     <div className="flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-[1.75rem]">
                         {cat.icon ?? "📚"}
@@ -237,11 +237,11 @@ const LearningTopics = () => {
                       </span>
                       {!isGuest && (
                         <>
-                          <span className="rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-green-700">
+                          <span className="hidden rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-green-700 sm:inline-flex">
                             {categoryProgress}% đã học
                           </span>
                           {categoryTotals.review > 0 && (
-                            <span className="rounded-full border border-purple/30 bg-purple/10 px-3 py-1 text-purple">
+                            <span className="hidden rounded-full border border-purple/30 bg-purple/10 px-3 py-1 text-purple sm:inline-flex">
                               {categoryTotals.review} cần ôn
                             </span>
                           )}
@@ -260,7 +260,7 @@ const LearningTopics = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid gap-5 bg-surface/30 p-5 sm:p-6 xl:grid-cols-2">
+                    <div className="grid gap-4 bg-surface/30 p-4 sm:gap-5 sm:p-6 xl:grid-cols-2">
                       {topics.map((topic: any, idx: number) => {
                         const stats = topic.stats ?? { new: 0, review: 0, learned: 0, total: 0 };
                         const isTopicLocked = isGuest && idx >= 3;
@@ -280,7 +280,7 @@ const LearningTopics = () => {
                             style={{ transitionDelay: `${Math.min(idx * 60, 420)}ms` }}
                           >
                           <article
-                            className={`learning-card relative flex h-full min-h-[18rem] flex-col p-5 transition-all sm:p-6 ${
+                            className={`learning-card relative flex h-full min-h-0 flex-col p-4 transition-all sm:min-h-[18rem] sm:p-6 ${
                               isTopicLocked
                                 ? "pointer-events-none blur-[2px] opacity-70"
                                 : "hover:-translate-y-1 hover:border-primary/40"
@@ -313,7 +313,7 @@ const LearningTopics = () => {
                                 </Badge>
                               )}
                               {!isGuest && (
-                                <div className="flex flex-wrap justify-end gap-2">
+                                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
                                   <Badge
                                     variant="cyan"
                                     className="text-[10px] px-1.5"
@@ -464,28 +464,28 @@ const LearningTopics = () => {
 
       {/* Sticky Guest CTA */}
       {isGuest && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-6 flex justify-center pointer-events-none">
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 flex justify-center pointer-events-none sm:p-6">
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            className="pointer-events-auto bg-surface/90  border-2 border-primary/40 p-6 rounded-card shadow-2xl flex flex-col sm:flex-row items-center gap-8 max-w-4xl w-full"
+            className="pointer-events-auto bg-surface/95 border-2 border-primary/40 p-3 rounded-card shadow-2xl flex items-center gap-3 sm:gap-8 max-w-4xl w-full sm:p-4"
           >
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple flex items-center justify-center text-text-on-accent text-3xl shadow-lg ring-4 ring-primary/10">
+            <div className="min-w-0 flex flex-1 items-center gap-6">
+              <div className="hidden w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple items-center justify-center text-text-on-accent text-3xl shadow-lg ring-4 ring-primary/10 sm:flex">
                 🎯
               </div>
               <div>
-                <h4 className="font-bold text-xl mb-1 text-text-primary">
+                <h4 className="text-sm font-bold leading-snug text-text-primary sm:mb-1 sm:text-xl">
                   Mở khóa 44 chủ đề đặc sắc
                 </h4>
-                <p className="text-text-secondary">
+                <p className="hidden text-text-secondary sm:block">
                   Theo dõi tiến trình học tập và nhận ngay 100 XP thưởng! 🔥
                 </p>
               </div>
             </div>
             <Button
               variant="primary"
-              className="px-10 py-4 text-lg ml-auto"
+              className="shrink-0 justify-center px-4 py-3 text-sm sm:ml-auto sm:px-10 sm:py-4 sm:text-lg"
               onClick={() => navigate("/register")}
             >
               Đăng ký miễn phí →

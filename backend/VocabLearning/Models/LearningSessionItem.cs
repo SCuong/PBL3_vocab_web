@@ -14,6 +14,8 @@ namespace VocabLearning.Models
 
         public bool IsAnswered { get; set; }
 
+        public int AttemptCount { get; set; }
+
         public DateTime? AnsweredAt { get; set; }
 
         public LearningSession Session { get; set; } = null!;

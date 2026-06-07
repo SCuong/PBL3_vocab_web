@@ -71,6 +71,7 @@ export type CompleteLearningSessionResponse = {
     status: LearningSessionStatus;
     completedAt: string;
     committedItemCount: number;
+    xpGained: number;
     progress: LearningProgressState;
 };
 
