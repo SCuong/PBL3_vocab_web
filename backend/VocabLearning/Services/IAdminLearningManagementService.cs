@@ -5,6 +5,9 @@ namespace VocabLearning.Services
         Task<(bool Succeeded, string Message)> AdjustXpAsync(
             long adminUserId, long targetUserId, int amount, string reason, CancellationToken cancellationToken);
 
+        Task<(bool Succeeded, string Message)> SetXpTargetAsync(
+            long adminUserId, long targetUserId, int targetTotalXp, string reason, CancellationToken cancellationToken);
+
         Task<(bool Succeeded, string Message)> ResetProgressAsync(
             long adminUserId, long targetUserId, string scope, long? topicId, string reason, CancellationToken cancellationToken);
 

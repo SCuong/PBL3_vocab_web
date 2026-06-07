@@ -426,7 +426,7 @@ const LearnerDetailModal = ({
                 <div>
                     <h3 className="mb-3 font-display font-bold text-text-primary">Công cụ quản trị</h3>
                     <div className="grid gap-2 sm:grid-cols-2">
-                        <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('xp')}>Cộng/trừ XP</Button>
+                        <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('xp')}>Đặt XP</Button>
                         <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('reset')}>Reset tiến độ</Button>
                         <Button variant="danger" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('delete-data')}>Xóa dữ liệu học</Button>
                         <Button variant="secondary" className="justify-start" disabled={detail.user.role.toUpperCase() !== 'LEARNER' || detail.user.isDeleted} onClick={() => onAction('leaderboard')}>
@@ -455,16 +455,16 @@ const LearningActionModal = ({
     saving: boolean;
     error: string | null;
     onClose: () => void;
-    onSubmit: (values: { amount: number; reason: string; scope: 'all' | 'topic'; topicId?: number; confirmationText: string }) => void;
+    onSubmit: (values: { targetTotalXp: number; reason: string; scope: 'all' | 'topic'; topicId?: number; confirmationText: string }) => void;
 }) => {
-    const [amount, setAmount] = useState(0);
+    const [targetTotalXp, setTargetTotalXp] = useState(detail.learning.xp.totalXp);
     const [reason, setReason] = useState('');
     const [scope, setScope] = useState<'all' | 'topic'>('all');
     const [topicId, setTopicId] = useState('');
     const [confirmationText, setConfirmationText] = useState('');
     const hidden = detail.user.isHiddenFromLeaderboard;
     const title = action === 'xp'
-        ? 'Cộng/trừ XP'
+        ? 'Đặt XP người học'
         : action === 'reset'
             ? 'Reset tiến độ'
             : action === 'delete-data'
@@ -472,7 +472,7 @@ const LearningActionModal = ({
                 : hidden ? 'Hiện trên bảng xếp hạng' : 'Ẩn trên bảng xếp hạng';
     const destructive = action === 'reset' || action === 'delete-data';
     const canSubmit = reason.trim().length > 0
-        && (action !== 'xp' || amount !== 0)
+        && (action !== 'xp' || (targetTotalXp >= 0 && targetTotalXp <= 1_000_000))
         && (action !== 'reset' || scope === 'all' || Boolean(topicId))
         && (action !== 'delete-data'
             || confirmationText.trim().toLowerCase() === detail.user.username.toLowerCase()
@@ -482,13 +482,20 @@ const LearningActionModal = ({
         <Modal title={title} onClose={onClose}>
             <div className="space-y-4">
                 {action === 'xp' && (
-                    <Input
-                        label="Số XP điều chỉnh"
-                        type="number"
-                        value={String(amount)}
-                        onChange={event => setAmount(Number(event.target.value))}
-                        placeholder="Ví dụ: 100 hoặc -50"
-                    />
+                    <div className="space-y-2">
+                        <p className="text-sm text-text-muted">
+                            XP hiện tại: <strong className="text-text-primary">{detail.learning.xp.totalXp.toLocaleString('vi-VN')}</strong>
+                        </p>
+                        <Input
+                            label="Tổng XP mong muốn"
+                            type="number"
+                            min={0}
+                            max={1_000_000}
+                            value={String(targetTotalXp)}
+                            onChange={event => setTargetTotalXp(Number(event.target.value))}
+                            placeholder="Từ 0 đến 1.000.000"
+                        />
+                    </div>
                 )}
                 {action === 'reset' && (
                     <>
@@ -520,7 +527,7 @@ const LearningActionModal = ({
                         variant={destructive ? 'danger' : 'primary'}
                         className="flex-1"
                         disabled={!canSubmit || saving}
-                        onClick={() => onSubmit({ amount, reason, scope, topicId: topicId ? Number(topicId) : undefined, confirmationText })}
+                        onClick={() => onSubmit({ targetTotalXp, reason, scope, topicId: topicId ? Number(topicId) : undefined, confirmationText })}
                     >
                         {saving ? <><Loader2 size={16} className="animate-spin" /> Đang xử lý...</> : 'Xác nhận'}
                     </Button>
@@ -615,7 +622,7 @@ const AdminUsers = () => {
     };
 
     const handleLearningAction = async (values: {
-        amount: number;
+        targetTotalXp: number;
         reason: string;
         scope: 'all' | 'topic';
         topicId?: number;
@@ -626,8 +633,11 @@ const AdminUsers = () => {
         setActionError(null);
         try {
             if (learningAction === 'xp') {
-                await adminApi.adjustXp(detail.user.userId, { amount: values.amount, reason: values.reason });
-                addToast('Đã điều chỉnh XP.', 'success');
+                const message = await adminApi.setXpTarget(detail.user.userId, {
+                    targetTotalXp: values.targetTotalXp,
+                    reason: values.reason,
+                });
+                addToast(message, 'success');
             } else if (learningAction === 'reset') {
                 await adminApi.resetProgress(detail.user.userId, {
                     scope: values.scope,

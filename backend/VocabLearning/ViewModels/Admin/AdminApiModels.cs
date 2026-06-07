@@ -28,6 +28,12 @@ namespace VocabLearning.ViewModels.Admin
         public string? Reason { get; set; }
     }
 
+    public sealed class AdminXpTargetRequest
+    {
+        public int TargetTotalXp { get; set; }
+        public string? Reason { get; set; }
+    }
+
     public sealed class AdminResetProgressRequest
     {
         public string? Scope { get; set; }
