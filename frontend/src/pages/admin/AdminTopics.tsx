@@ -84,42 +84,42 @@ const TopicFormModal = ({
     const inputClass = adminInputClass;
 
     return (
-        <Modal title={isEdit ? 'Edit Topic' : 'Create New Topic'} onClose={onClose}>
+        <Modal title={isEdit ? 'Chỉnh sửa chủ đề' : 'Thêm chủ đề'} onClose={onClose}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <Input
-                            label="Topic Name"
+                            label="Tên chủ đề"
                             type="text"
                             value={form.name}
                             onChange={setField('name')}
                             required
                             maxLength={100}
-                            placeholder="e.g. Business English"
+                            placeholder="Ví dụ: Tiếng Anh thương mại"
                             disabled={saving}
                         />
                     </div>
 
                     <div>
                         <TextArea
-                            label="Description"
+                            label="Mô tả"
                             rows={3}
                             value={form.description}
                             onChange={setField('description')}
                             required
                             maxLength={500}
-                            placeholder="Brief description of this topic…"
+                            placeholder="Mô tả ngắn về chủ đề..."
                             disabled={saving}
                         />
                     </div>
 
                     <div>
                         <Select
-                            label={<>Parent Topic <span className="text-text-muted font-normal">(optional)</span></>}
+                            label={<>Chủ đề cha <span className="text-text-muted font-normal">(không bắt buộc)</span></>}
                             value={form.parentTopicId}
                             onChange={setField('parentTopicId')}
                             disabled={saving}
                         >
-                            <option value="">— No parent (top-level) —</option>
+                            <option value="">— Không có chủ đề cha —</option>
                             {parentOptions.map(t => (
                                 <option key={t.topicId} value={String(t.topicId)}>
                                     {t.name}
@@ -143,7 +143,7 @@ const TopicFormModal = ({
                             onClick={onClose}
                             disabled={saving}
                         >
-                            Cancel
+                            Hủy
                         </Button>
                         <Button
                             type="submit"
@@ -153,12 +153,12 @@ const TopicFormModal = ({
                         >
                             {saving ? (
                                 <>
-                                    <Loader2 size={16} className="animate-spin" /> Saving…
+                                    <Loader2 size={16} className="animate-spin" /> Đang lưu...
                                 </>
                             ) : isEdit ? (
-                                'Update Topic'
+                                'Cập nhật chủ đề'
                             ) : (
-                                'Create Topic'
+                                'Thêm chủ đề'
                             )}
                         </Button>
                     </div>
@@ -178,19 +178,19 @@ interface DeleteConfirmProps {
 }
 
 const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: DeleteConfirmProps) => (
-    <Modal title="Delete Topic" onClose={onClose} size="sm">
+    <Modal title="Xóa chủ đề" onClose={onClose} size="sm">
             <div className="flex flex-col items-center text-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
                     <AlertTriangle size={28} className="text-red-500" />
                 </div>
                 <div>
                     <h2 className="text-xl font-display font-bold text-text-primary mb-1">
-                        Delete Topic
+                        Xóa chủ đề
                     </h2>
                     <p className="text-sm text-text-muted">
-                        Delete{' '}
+                        Xóa{' '}
                         <span className="font-bold text-text-primary">{topic.name}</span>?{' '}
-                        All child topics must be re-parented or deleted first.
+                        Cần chuyển hoặc xóa các chủ đề con trước.
                     </p>
                 </div>
 
@@ -208,7 +208,7 @@ const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: Dele
                         onClick={onClose}
                         disabled={deleting}
                     >
-                        Cancel
+                        Hủy
                     </Button>
                     <Button
                         variant="danger"
@@ -218,10 +218,10 @@ const DeleteTopicConfirm = ({ topic, onClose, onConfirm, deleting, error }: Dele
                     >
                         {deleting ? (
                             <>
-                                <Loader2 size={16} className="animate-spin" /> Deleting…
+                                <Loader2 size={16} className="animate-spin" /> Đang xóa...
                             </>
                         ) : (
-                            'Delete'
+                            'Xóa'
                         )}
                     </Button>
                 </div>
@@ -254,7 +254,7 @@ const AdminTopics = () => {
         try {
             setTopics(await adminApi.getTopics());
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to load topics');
+            setError(e instanceof Error ? e.message : 'Không thể tải danh sách chủ đề.');
         } finally {
             setLoading(false);
         }
@@ -296,7 +296,7 @@ const AdminTopics = () => {
                 const created = await adminApi.createTopic(payload);
                 setTopics(prev => [...prev, created]);
                 closeModal();
-                addToast('Topic created successfully.', 'success');
+                addToast('Đã thêm chủ đề.', 'success');
             } else if (modalState?.mode === 'edit') {
                 const payload: AdminUpdateTopicPayload = {
                     name: form.name.trim(),
@@ -306,10 +306,10 @@ const AdminTopics = () => {
                 await adminApi.updateTopic(modalState.topic.topicId, payload);
                 await loadTopics();
                 closeModal();
-                addToast('Topic updated successfully.', 'success');
+                addToast('Đã cập nhật chủ đề.', 'success');
             }
         } catch (e) {
-            setFormError(e instanceof Error ? e.message : 'Operation failed');
+            setFormError(e instanceof Error ? e.message : 'Thao tác thất bại.');
         } finally {
             setSaving(false);
         }
@@ -323,9 +323,9 @@ const AdminTopics = () => {
             await adminApi.deleteTopic(deleteTarget.topicId);
             setTopics(prev => prev.filter(t => t.topicId !== deleteTarget.topicId));
             closeDelete();
-            addToast('Topic deleted.', 'success');
+            addToast('Đã xóa chủ đề.', 'success');
         } catch (e) {
-            setDeleteError(e instanceof Error ? e.message : 'Delete failed');
+            setDeleteError(e instanceof Error ? e.message : 'Xóa chủ đề thất bại.');
         } finally {
             setDeleting(false);
         }
@@ -335,7 +335,7 @@ const AdminTopics = () => {
         return (
             <div className="flex items-center justify-center py-32 gap-3 text-text-muted">
                 <Loader2 size={24} className="animate-spin text-primary" />
-                <span className="font-display font-bold">Loading topics…</span>
+                <span className="font-display font-bold">Đang tải chủ đề...</span>
             </div>
         );
     }
@@ -346,7 +346,7 @@ const AdminTopics = () => {
                 <AlertTriangle size={40} className="text-red-400" />
                 <p className="font-bold text-red-500">{error}</p>
                 <Button variant="secondary" onClick={loadTopics}>
-                    <RefreshCw size={16} /> Retry
+                    <RefreshCw size={16} /> Thử lại
                 </Button>
             </div>
         );
@@ -358,7 +358,7 @@ const AdminTopics = () => {
             <FilterBar
                 actions={
                     <Button variant="primary" onClick={openCreate}>
-                        <Plus size={16} /> Add Topic
+                        <Plus size={16} /> Thêm chủ đề
                     </Button>
                 }
             >
@@ -368,9 +368,9 @@ const AdminTopics = () => {
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
                     />
                     <Input
-                        aria-label="Search topics"
+                        aria-label="Tìm chủ đề"
                         type="text"
-                        placeholder="Search name, description or parent…"
+                        placeholder="Tìm tên, mô tả hoặc chủ đề cha..."
                         className="pl-10 rounded-pill"
                         value={search}
                         onChange={e => { setSearch(e.target.value); setPage(1); }}
@@ -384,7 +384,7 @@ const AdminTopics = () => {
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-primary/10">
-                                {['ID', 'Name', 'Description', 'Parent', ''].map(h => (
+                                {['ID', 'Tên', 'Mô tả', 'Chủ đề cha', ''].map(h => (
                                     <th
                                         key={h}
                                         className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
@@ -402,8 +402,8 @@ const AdminTopics = () => {
                                         className="px-4 py-16 text-center text-text-muted text-sm"
                                     >
                                         {topics.length > 0
-                                            ? 'No topics match your search.'
-                                            : 'No topics found.'}
+                                            ? 'Không có chủ đề phù hợp tìm kiếm.'
+                                            : 'Chưa có chủ đề.'}
                                     </td>
                                 </tr>
                             ) : (
@@ -430,7 +430,7 @@ const AdminTopics = () => {
                                                 </span>
                                             ) : (
                                                 <span className="text-xs text-text-muted italic">
-                                                    top-level
+                                                    Cấp cao nhất
                                                 </span>
                                             )}
                                         </td>
@@ -438,15 +438,15 @@ const AdminTopics = () => {
                                             <div className="flex gap-1 justify-end">
                                                 <IconButton
                                                     onClick={() => openEdit(topic)}
-                                                    aria-label={`Edit ${topic.name}`}
-                                                    title="Edit topic"
+                                                    aria-label={`Chỉnh sửa ${topic.name}`}
+                                                    title="Chỉnh sửa chủ đề"
                                                     tone="primary"
                                                     icon={<Pencil size={14} />}
                                                 />
                                                 <IconButton
                                                     onClick={() => openDelete(topic)}
-                                                    aria-label={`Delete ${topic.name}`}
-                                                    title="Delete topic"
+                                                    aria-label={`Xóa ${topic.name}`}
+                                                    title="Xóa chủ đề"
                                                     tone="danger"
                                                     icon={<Trash2 size={14} />}
                                                 />
@@ -463,7 +463,7 @@ const AdminTopics = () => {
                     page={page}
                     totalPages={totalPages}
                     onPageChange={setPage}
-                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} topics`}
+                    summary={`${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, filtered.length)} trong ${filtered.length} chủ đề`}
                 />
             </DataTable>
 

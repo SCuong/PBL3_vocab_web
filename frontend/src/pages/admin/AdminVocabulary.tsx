@@ -121,40 +121,40 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.word.trim()) { setError('Word is required.'); return; }
-        if (!form.level) { setError('CEFR level is required.'); return; }
+        if (!form.word.trim()) { setError('Từ vựng là bắt buộc.'); return; }
+        if (!form.level) { setError('Cấp độ CEFR là bắt buộc.'); return; }
         setSaving(true);
         setError(null);
         try {
             await onSave(form);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Save failed.');
+            setError(err instanceof Error ? err.message : 'Lưu thất bại.');
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <Modal title={isEdit ? 'Edit Vocabulary' : 'Add Vocabulary'} onClose={onClose} size="lg">
+        <Modal title={isEdit ? 'Chỉnh sửa từ vựng' : 'Thêm từ vựng'} onClose={onClose} size="lg">
                 <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <Input label="Word" value={form.word} onChange={set('word')} placeholder="e.g. eloquent" required autoFocus />
+                            <Input label="Từ vựng" value={form.word} onChange={set('word')} placeholder="Ví dụ: eloquent" required autoFocus />
                         </div>
                         <div>
                             <Input label="IPA" className="font-ipa" value={form.ipa} onChange={set('ipa')} placeholder="/el.o.kwent/" />
                         </div>
                         <div>
-                            <Select label="CEFR Level" value={form.level} onChange={set('level')} required>
+                            <Select label="Cấp độ CEFR" value={form.level} onChange={set('level')} required>
                                 {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                             </Select>
                         </div>
                         <div className="col-span-2">
-                            <Input label="Vietnamese Meaning" value={form.meaningVi} onChange={set('meaningVi')} placeholder="e.g. hung hon, luu loat" />
+                            <Input label="Nghĩa tiếng Việt" value={form.meaningVi} onChange={set('meaningVi')} placeholder="Ví dụ: hùng hồn, lưu loát" />
                         </div>
                         <div className="col-span-2">
-                            <Select label="Topic" value={form.topicId} onChange={set('topicId')}>
-                                <option value="">— No topic —</option>
+                            <Select label="Chủ đề" value={form.topicId} onChange={set('topicId')}>
+                                <option value="">— Không có chủ đề —</option>
                                 {topics.map(t => (
                                     <option key={t.topicId} value={String(t.topicId)}>
                                         {t.parentTopicName ? `${t.parentTopicName} › ` : ''}{t.name}
@@ -163,7 +163,7 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
                             </Select>
                         </div>
                         <div className="col-span-2">
-                            <Input label="Audio URL" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
+                            <Input label="URL âm thanh" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
                         </div>
                     </div>
 
@@ -175,10 +175,10 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
                     )}
 
                     <div className="flex gap-3 pt-2">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Hủy</Button>
                         <Button type="submit" variant="primary" disabled={saving}>
                             {saving && <Loader2 size={14} className="animate-spin" />}
-                            {isEdit ? 'Save Changes' : 'Add Vocabulary'}
+                            {isEdit ? 'Lưu thay đổi' : 'Thêm từ vựng'}
                         </Button>
                     </div>
                 </form>
@@ -210,25 +210,25 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.exampleEn.trim()) { setError('English example is required.'); return; }
-        if (!form.exampleVi.trim()) { setError('Vietnamese translation is required.'); return; }
+        if (!form.exampleEn.trim()) { setError('Ví dụ tiếng Anh là bắt buộc.'); return; }
+        if (!form.exampleVi.trim()) { setError('Bản dịch tiếng Việt là bắt buộc.'); return; }
         setSaving(true);
         setError(null);
         try {
             await onSave(form);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Save failed.');
+            setError(err instanceof Error ? err.message : 'Lưu thất bại.');
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <Modal title={isEdit ? 'Edit Example' : 'Add Example'} onClose={onClose}>
+        <Modal title={isEdit ? 'Chỉnh sửa ví dụ' : 'Thêm ví dụ'} onClose={onClose}>
                 <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                     <div>
                         <TextArea
-                            label="English Sentence"
+                            label="Câu tiếng Anh"
                             rows={3}
                             value={form.exampleEn}
                             onChange={set('exampleEn')}
@@ -238,7 +238,7 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
                         />
                     </div>
                     <div>
-                        <label htmlFor="example-vi" className={labelCls}>Vietnamese Translation *</label>
+                        <label htmlFor="example-vi" className={labelCls}>Bản dịch tiếng Việt *</label>
                         <textarea
                             id="example-vi"
                             className={`${inputCls} resize-none`}
@@ -250,7 +250,7 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
                         />
                     </div>
                     <div>
-                        <Input label="Audio URL" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
+                        <Input label="URL âm thanh" value={form.audioUrl} onChange={set('audioUrl')} placeholder="https://..." />
                     </div>
 
                     {error && (
@@ -261,10 +261,10 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
                     )}
 
                     <div className="flex gap-3 pt-2">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+                        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Hủy</Button>
                         <Button type="submit" variant="primary" disabled={saving}>
                             {saving && <Loader2 size={14} className="animate-spin" />}
-                            {isEdit ? 'Save Changes' : 'Add Example'}
+                            {isEdit ? 'Lưu thay đổi' : 'Thêm ví dụ'}
                         </Button>
                     </div>
                 </form>
@@ -290,7 +290,7 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
         try {
             await onConfirm();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Delete failed.');
+            setError(err instanceof Error ? err.message : 'Xóa thất bại.');
             setDeleting(false);
         }
     };
@@ -302,18 +302,18 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
 
     const warning =
         target.type === 'vocab'
-            ? 'Permanently deletes the word, all examples, exercises, and learning progress.'
-            : 'Permanently removes this example sentence.';
+            ? 'Xóa vĩnh viễn từ, ví dụ, bài tập và toàn bộ tiến độ liên quan.'
+            : 'Xóa vĩnh viễn câu ví dụ này.';
 
     return (
-        <Modal title="Confirm Delete" onClose={onClose} size="sm">
+        <Modal title="Xác nhận xóa" onClose={onClose} size="sm">
                 <div className="flex items-start gap-4 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
                         <Trash2 size={18} className="text-red-500" />
                     </div>
                     <div>
-                        <h2 className="font-display font-bold text-text-primary mb-1">Confirm Delete</h2>
-                        <p className="text-sm text-text-muted break-words">Delete {label}?</p>
+                        <h2 className="font-display font-bold text-text-primary mb-1">Xác nhận xóa</h2>
+                        <p className="text-sm text-text-muted break-words">Xóa {label}?</p>
                         <p className="text-xs text-red-500 mt-2">{warning}</p>
                     </div>
                 </div>
@@ -326,7 +326,7 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
                 )}
 
                 <div className="flex gap-3 justify-end">
-                    <Button variant="ghost" onClick={onClose} disabled={deleting}>Cancel</Button>
+                    <Button variant="ghost" onClick={onClose} disabled={deleting}>Hủy</Button>
                     <button
                         type="button"
                         onClick={() => void handleConfirm()}
@@ -334,7 +334,7 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
                         className={`px-4 py-2 rounded-pill bg-danger-color hover:bg-danger-color/90 text-text-on-accent text-sm font-display font-bold transition-colors disabled:opacity-50 flex items-center gap-2 ${adminFocusRingClass}`}
                     >
                         {deleting && <Loader2 size={14} className="animate-spin" />}
-                        Delete
+                        Xóa
                     </button>
                 </div>
         </Modal>
@@ -357,19 +357,19 @@ const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPane
             <div className="p-4 rounded-2xl bg-primary/[0.04] border border-primary/10">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-display font-bold text-text-muted uppercase tracking-wide">
-                        Examples — <span className="text-primary">{vocab.word}</span>
+                        Ví dụ — <span className="text-primary">{vocab.word}</span>
                     </span>
                     <button
                         type="button"
                         onClick={() => onAdd(vocab.vocabId)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display font-bold text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
                     >
-                        <Plus size={12} /> Add Example
+                        <Plus size={12} /> Thêm ví dụ
                     </button>
                 </div>
 
                 {vocab.examples.length === 0 ? (
-                    <p className="text-sm text-text-muted italic">No examples yet. Add one to enable fill-in-blank exercises.</p>
+                    <p className="text-sm text-text-muted italic">Chưa có ví dụ. Thêm ví dụ để bật bài tập điền từ.</p>
                 ) : (
                     <div className="space-y-2">
                         {vocab.examples.map(ex => (
@@ -387,7 +387,7 @@ const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPane
                                             href={ex.audioUrl}
                                             target="_blank"
                                             rel="noreferrer"
-                                            aria-label={`Play audio for example: ${ex.exampleEn}`}
+                                            aria-label={`Phát âm thanh ví dụ: ${ex.exampleEn}`}
                                             className={`p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
                                         >
                                             <Volume2 size={13} />
@@ -395,15 +395,15 @@ const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPane
                                     )}
                                     <IconButton
                                         onClick={() => onEdit(ex)}
-                                        aria-label="Edit example"
-                                        title="Edit example"
+                                        aria-label="Chỉnh sửa ví dụ"
+                                        title="Chỉnh sửa ví dụ"
                                         tone="primary"
                                         icon={<Pencil size={13} />}
                                     />
                                     <IconButton
                                         onClick={() => onDelete(ex)}
-                                        aria-label="Delete example"
-                                        title="Delete example"
+                                        aria-label="Xóa ví dụ"
+                                        title="Xóa ví dụ"
                                         tone="danger"
                                         icon={<Trash2 size={13} />}
                                     />
@@ -463,7 +463,7 @@ const AdminVocabulary = () => {
             setItems(data.items);
             setPagination({ page: data.page, totalCount: data.totalCount, totalPages: data.totalPages });
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to load vocabulary');
+            setError(e instanceof Error ? e.message : 'Không thể tải danh sách từ vựng.');
         } finally {
             setLoading(false);
         }
@@ -505,7 +505,7 @@ const AdminVocabulary = () => {
         if (vocabModal?.type === 'create') {
             await adminApi.createVocabulary(payload as AdminCreateVocabularyPayload);
             setVocabModal(null);
-            addToast(`"${payload.word}" added.`, 'success');
+            addToast(`Đã thêm "${payload.word}".`, 'success');
             void load(1, searchRef.current, cefrRef.current, topicRef.current);
         } else if (vocabModal?.type === 'edit') {
             const id = vocabModal.vocab.vocabId;
@@ -519,7 +519,7 @@ const AdminVocabulary = () => {
                     : v
             ));
             setVocabModal(null);
-            addToast(`"${payload.word}" updated.`, 'success');
+            addToast(`Đã cập nhật "${payload.word}".`, 'success');
         }
     };
 
@@ -529,7 +529,7 @@ const AdminVocabulary = () => {
         setItems(prev => prev.filter(v => v.vocabId !== deleteTarget.id));
         if (expandedId === deleteTarget.id) setExpandedId(null);
         setDeleteTarget(null);
-        addToast(`"${deleteTarget.word}" deleted.`, 'success');
+        addToast(`Đã xóa "${deleteTarget.word}".`, 'success');
     };
 
     // ── Example CRUD ──────────────────────────────────────────────────────────
@@ -549,7 +549,7 @@ const AdminVocabulary = () => {
                     : v
             ));
             setExampleModal(null);
-            addToast('Example added.', 'success');
+            addToast('Đã thêm ví dụ.', 'success');
         } else if (exampleModal?.type === 'edit') {
             const id = exampleModal.example.exampleId;
             await adminApi.updateExample(id, payload);
@@ -560,7 +560,7 @@ const AdminVocabulary = () => {
                 ),
             })));
             setExampleModal(null);
-            addToast('Example updated.', 'success');
+            addToast('Đã cập nhật ví dụ.', 'success');
         }
     };
 
@@ -572,7 +572,7 @@ const AdminVocabulary = () => {
             examples: v.examples.filter(e => e.exampleId !== deleteTarget.id),
         })));
         setDeleteTarget(null);
-        addToast('Example deleted.', 'success');
+        addToast('Đã xóa ví dụ.', 'success');
     };
 
     const handleDeleteConfirm = async () => {
@@ -592,44 +592,44 @@ const AdminVocabulary = () => {
             <FilterBar
                 actions={
                     <Button variant="primary" onClick={() => setVocabModal({ type: 'create' })}>
-                        <Plus size={15} /> Add Vocabulary
+                        <Plus size={15} /> Thêm từ vựng
                     </Button>
                 }
             >
                 <div className="flex-1 min-w-52">
-                    <label htmlFor="vocab-search" className={`${filterLabelCls} mb-1.5 block`}>Search</label>
+                    <label htmlFor="vocab-search" className={`${filterLabelCls} mb-1.5 block`}>Tìm kiếm</label>
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                         <input
                             id="vocab-search"
                             className={`${filterInputCls} pl-8 w-full`}
-                            placeholder="Word or meaning..."
+                            placeholder="Từ hoặc nghĩa..."
                             value={search}
                             onChange={e => handleSearchChange(e.target.value)}
                         />
                     </div>
                 </div>
                 <div>
-                    <label htmlFor="vocab-cefr-filter" className={`${filterLabelCls} mb-1.5 block`}>CEFR Level</label>
+                    <label htmlFor="vocab-cefr-filter" className={`${filterLabelCls} mb-1.5 block`}>Cấp độ CEFR</label>
                     <select
                         id="vocab-cefr-filter"
                         className={filterInputCls}
                         value={cefrFilter}
                         onChange={e => { setCefrFilter(e.target.value); }}
                     >
-                        <option value="">All Levels</option>
+                        <option value="">Tất cả cấp độ</option>
                         {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label htmlFor="vocab-topic-filter" className={`${filterLabelCls} mb-1.5 block`}>Topic</label>
+                    <label htmlFor="vocab-topic-filter" className={`${filterLabelCls} mb-1.5 block`}>Chủ đề</label>
                     <select
                         id="vocab-topic-filter"
                         className={filterInputCls}
                         value={topicFilter}
                         onChange={e => { setTopicFilter(e.target.value); }}
                     >
-                        <option value="">All Topics</option>
+                        <option value="">Tất cả chủ đề</option>
                         {topics.map(t => (
                             <option key={t.topicId} value={String(t.topicId)}>
                                 {t.parentTopicName ? `${t.parentTopicName} › ` : ''}{t.name}
@@ -644,7 +644,7 @@ const AdminVocabulary = () => {
                 {loading ? (
                     <div className="flex items-center justify-center py-24 gap-3 text-text-muted">
                         <Loader2 size={22} className="animate-spin text-primary" />
-                        <span className="font-display font-bold">Loading…</span>
+                        <span className="font-display font-bold">Đang tải...</span>
                     </div>
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -654,7 +654,7 @@ const AdminVocabulary = () => {
                             variant="secondary"
                             onClick={() => void load(pagination.page, searchRef.current, cefrRef.current, topicRef.current)}
                         >
-                            <RefreshCw size={16} /> Retry
+                            <RefreshCw size={16} /> Thử lại
                         </Button>
                     </div>
                 ) : (
@@ -664,19 +664,19 @@ const AdminVocabulary = () => {
                                 <thead>
                                     <tr className="border-b border-primary/10">
                                         <th className="w-10 px-4 py-3.5" />
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Word</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Từ vựng</th>
                                         <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">IPA</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Level</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Meaning</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Topic</th>
-                                        <th className="px-4 py-3.5 text-right text-xs font-display font-bold text-text-muted uppercase tracking-wide">Actions</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Cấp độ</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Nghĩa</th>
+                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Chủ đề</th>
+                                        <th className="px-4 py-3.5 text-right text-xs font-display font-bold text-text-muted uppercase tracking-wide">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="px-4 py-16 text-center text-text-muted text-sm">
-                                                No vocabulary found.
+                                                Chưa có từ vựng.
                                             </td>
                                         </tr>
                                     ) : (
@@ -690,11 +690,11 @@ const AdminVocabulary = () => {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setExpandedId(isExpanded ? null : vocab.vocabId)}
-                                                                aria-label={isExpanded ? `Collapse examples for ${vocab.word}` : `Expand ${vocab.examples.length} examples for ${vocab.word}`}
+                                                                aria-label={isExpanded ? `Thu gọn ví dụ của ${vocab.word}` : `Mở ${vocab.examples.length} ví dụ của ${vocab.word}`}
                                                                 aria-expanded={isExpanded}
                                                                 aria-controls={examplesPanelId}
                                                                 className={`p-1 rounded-lg text-text-muted hover:text-primary hover:bg-primary/10 transition-colors ${adminFocusRingClass}`}
-                                                                title={isExpanded ? 'Collapse' : `${vocab.examples.length} example(s) — click to manage`}
+                                                                title={isExpanded ? 'Thu gọn' : `${vocab.examples.length} ví dụ — bấm để quản lý`}
                                                             >
                                                                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                             </button>
@@ -707,7 +707,7 @@ const AdminVocabulary = () => {
                                                                         href={vocab.audioUrl}
                                                                         target="_blank"
                                                                         rel="noreferrer"
-                                                                        aria-label={`Play audio for ${vocab.word}`}
+                                                                        aria-label={`Phát âm thanh của ${vocab.word}`}
                                                                         className={`rounded text-text-muted hover:text-primary transition-colors ${adminFocusRingClass}`}
                                                                     >
                                                                         <Volume2 size={12} />
@@ -736,15 +736,15 @@ const AdminVocabulary = () => {
                                                             <div className="flex items-center gap-1 justify-end">
                                                                 <IconButton
                                                                     onClick={() => setVocabModal({ type: 'edit', vocab })}
-                                                                    aria-label={`Edit ${vocab.word}`}
-                                                                    title="Edit"
+                                                                    aria-label={`Chỉnh sửa ${vocab.word}`}
+                                                                    title="Chỉnh sửa"
                                                                     tone="primary"
                                                                     icon={<Pencil size={14} />}
                                                                 />
                                                                 <IconButton
                                                                     onClick={() => setDeleteTarget({ type: 'vocab', id: vocab.vocabId, word: vocab.word })}
-                                                                    aria-label={`Delete ${vocab.word}`}
-                                                                    title="Delete"
+                                                                    aria-label={`Xóa ${vocab.word}`}
+                                                                    title="Xóa"
                                                                     tone="danger"
                                                                     icon={<Trash2 size={14} />}
                                                                 />
@@ -777,7 +777,7 @@ const AdminVocabulary = () => {
                             page={pagination.page}
                             totalPages={pagination.totalPages}
                             onPageChange={handlePageChange}
-                            summary={`Page ${pagination.page} of ${pagination.totalPages} - ${pagination.totalCount} words`}
+                            summary={`Trang ${pagination.page}/${pagination.totalPages} · ${pagination.totalCount} từ`}
                         />
                     </>
                 )}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { loadProfilePreferences } from '../../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../../utils/avatarPresets';
 import { useAppContext } from '../../context/AppContext';
+import { ProfileFrameOverlay } from '../profile/ProfileFrameOverlay';
 import { PATHS } from '../../routes/paths';
 
 type UserWidgetProps = {
@@ -15,7 +16,7 @@ type UserWidgetProps = {
 
 export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidgetProps) => {
     const navigate = useNavigate();
-    const { learnerAnalytics } = useAppContext();
+    const { learnerAnalytics, profileFrameKey } = useAppContext();
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -85,6 +86,7 @@ export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidg
                         user.username[0].toUpperCase()
                     )}
                 </button>
+                <ProfileFrameOverlay frameKey={profileFrameKey} sizeClass="h-[160%] w-[160%]" />
 
                 {dropdownOpen && (
                     <div className="absolute right-0 top-[calc(100%+8px)] z-[60] w-52 overflow-hidden rounded-2xl border border-border bg-surface py-1.5 opacity-100 shadow-[0_12px_32px_var(--shadow-color)] backdrop-blur-none" role="menu">

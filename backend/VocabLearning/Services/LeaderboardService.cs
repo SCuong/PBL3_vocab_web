@@ -32,7 +32,8 @@ namespace VocabLearning.Services
                 .AsNoTracking()
                 .Where(user => !user.IsDeleted
                     && user.Status == UserStatuses.Active
-                    && user.Role == UserRoles.Learner)
+                    && user.Role == UserRoles.Learner
+                    && !user.IsHiddenFromLeaderboard)
                 .Select(user => new { user.UserId, user.Username })
                 .ToListAsync(cancellationToken);
 
@@ -56,13 +57,20 @@ namespace VocabLearning.Services
                 .Select(group => new { UserId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.UserId, item => item.Count, cancellationToken);
 
+            var adjustmentsByUser = await _context.XpAdjustments
+                .AsNoTracking()
+                .GroupBy(item => item.UserId)
+                .Select(group => new { UserId = group.Key, Amount = group.Sum(item => (long)item.Amount) })
+                .ToDictionaryAsync(item => item.UserId, item => item.Amount, cancellationToken);
+
             // Rank in memory: total XP desc, then username asc for a stable tie-break.
             var ranked = users
                 .Select(user =>
                 {
                     var words = wordsByUser.TryGetValue(user.UserId, out var w) ? w : 0;
                     var correct = correctByUser.TryGetValue(user.UserId, out var c) ? c : 0;
-                    var totalXp = Math.Max(0, words * XpPerWord + correct * XpPerCorrectExercise);
+                    var adjustment = adjustmentsByUser.TryGetValue(user.UserId, out var a) ? a : 0;
+                    var totalXp = (int)Math.Clamp((long)words * XpPerWord + (long)correct * XpPerCorrectExercise + adjustment, 0L, int.MaxValue);
                     return new
                     {
                         user.UserId,

@@ -20,7 +20,12 @@ namespace VocabLearning.Tests.Services
 
         public void Dispose() => _context.Dispose();
 
-        private Users AddLearner(long id, string username, string status = UserStatuses.Active, bool isDeleted = false)
+        private Users AddLearner(
+            long id,
+            string username,
+            string status = UserStatuses.Active,
+            bool isDeleted = false,
+            bool isHiddenFromLeaderboard = false)
         {
             var user = new Users
             {
@@ -31,6 +36,7 @@ namespace VocabLearning.Tests.Services
                 Role = UserRoles.Learner,
                 Status = status,
                 IsDeleted = isDeleted,
+                IsHiddenFromLeaderboard = isHiddenFromLeaderboard,
                 CreatedAt = DateTime.Now,
             };
             _context.Users.Add(user);
@@ -156,6 +162,55 @@ namespace VocabLearning.Tests.Services
             result.CurrentUser!.UserId.Should().Be(3);
             result.CurrentUser.Rank.Should().Be(3);
             result.CurrentUser.IsCurrentUser.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task GetLeaderboardAsync_AppliesXpAdjustments_AndClampsAtZero()
+        {
+            AddLearner(1, "AdjustedUp");
+            AddLearner(2, "AdjustedDown");
+            AddLog(1, 4001, 5, DateTime.Now.Date);
+            AddLog(2, 4002, 5, DateTime.Now.Date);
+            _context.XpAdjustments.AddRange(
+                new XpAdjustment
+                {
+                    UserId = 1,
+                    Amount = 100,
+                    Reason = "Reward",
+                    CreatedByAdminId = 99,
+                    CreatedAt = DateTime.Now,
+                },
+                new XpAdjustment
+                {
+                    UserId = 2,
+                    Amount = -100,
+                    Reason = "Correction",
+                    CreatedByAdminId = 99,
+                    CreatedAt = DateTime.Now,
+                });
+            await _context.SaveChangesAsync();
+
+            var result = await _service.GetLeaderboardAsync(currentUserId: 1, topN: 20, CancellationToken.None);
+
+            result.Entries.Single(item => item.UserId == 1).TotalXp.Should().Be(150);
+            result.Entries.Single(item => item.UserId == 2).TotalXp.Should().Be(0);
+        }
+
+        [Fact]
+        public async Task GetLeaderboardAsync_ExcludesHiddenLearner_AndShowsAgainAfterUnhide()
+        {
+            var visible = AddLearner(1, "Visible");
+            var hidden = AddLearner(2, "Hidden", isHiddenFromLeaderboard: true);
+            await _context.SaveChangesAsync();
+
+            var hiddenResult = await _service.GetLeaderboardAsync(currentUserId: visible.UserId, topN: 20, CancellationToken.None);
+            hiddenResult.Entries.Select(item => item.UserId).Should().ContainSingle().Which.Should().Be(visible.UserId);
+
+            hidden.IsHiddenFromLeaderboard = false;
+            await _context.SaveChangesAsync();
+
+            var shownResult = await _service.GetLeaderboardAsync(currentUserId: visible.UserId, topN: 20, CancellationToken.None);
+            shownResult.Entries.Select(item => item.UserId).Should().BeEquivalentTo(new[] { visible.UserId, hidden.UserId });
         }
     }
 }

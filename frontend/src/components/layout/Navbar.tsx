@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { LogOut, Shield } from 'lucide-react';
+import { LogOut, Shield, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, ThemeToggle } from '../ui';
 import { UserWidget } from './UserWidget';
@@ -217,6 +217,32 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                             >
                                 <Shield size={15} />
                                 Admin Dashboard
+                            </button>
+                        </>
+                    )}
+
+                    {/* Mobile account section — logged-in only */}
+                    {currentUser && (
+                        <>
+                            <div className="mx-2 my-1 h-px bg-border" />
+                            <div className="flex items-center gap-3 px-4 py-2">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-secondary text-sm font-display font-bold text-text-on-accent">
+                                    {(currentUser.username?.trim?.()?.[0] ?? '?').toUpperCase()}
+                                </span>
+                                <div className="min-w-0">
+                                    <div className="truncate text-sm font-bold text-text-primary">{currentUser.username || 'Người học'}</div>
+                                    {currentUser.email && (
+                                        <div className="truncate text-xs text-text-muted">{currentUser.email}</div>
+                                    )}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { navigate(PATHS.profile); setMobileOpen(false); }}
+                                className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 ${
+                                    activePath === PATHS.profile ? 'text-primary bg-primary-light font-semibold' : 'text-text-muted hover:bg-primary-light'
+                                }`}
+                            >
+                                <User size={16} /> Hồ sơ cá nhân
                             </button>
                         </>
                     )}
