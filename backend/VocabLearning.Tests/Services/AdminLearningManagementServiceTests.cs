@@ -16,7 +16,7 @@ namespace VocabLearning.Tests.Services
         public AdminLearningManagementServiceTests()
         {
             _context = TestDbContextFactory.Create();
-            _service = new AdminLearningManagementService(_context);
+            _service = new AdminLearningManagementService(_context, new DashboardAnalyticsService(_context));
             _context.Users.AddRange(
                 CreateUser(1, "admin", UserRoles.Admin),
                 CreateUser(2, "learner", UserRoles.Learner),
@@ -101,6 +101,68 @@ namespace VocabLearning.Tests.Services
             var clamped = await dashboard.GetLearnerDashboardAsync(2, CancellationToken.None);
             clamped.Xp.TotalXp.Should().Be(0);
             clamped.Xp.Level.Should().Be(1);
+        }
+
+        [Fact]
+        public async Task SetXpTargetAsync_CreatesDeltaToReachDesiredTotalAndAuditLog()
+        {
+            await _service.AdjustXpAsync(1, 2, 170, "Initial XP", CancellationToken.None);
+
+            var result = await _service.SetXpTargetAsync(1, 2, 500, "Set desired total", CancellationToken.None);
+
+            result.Succeeded.Should().BeTrue();
+            result.Message.Should().Be("Đã đặt XP người học.");
+            var adjustments = await _context.XpAdjustments.OrderBy(item => item.AdjustmentId).ToListAsync();
+            adjustments.Should().HaveCount(2);
+            adjustments.Last().Amount.Should().Be(330);
+            var dashboard = await new DashboardAnalyticsService(_context).GetLearnerDashboardAsync(2, CancellationToken.None);
+            dashboard.Xp.TotalXp.Should().Be(500);
+            var audit = await _context.AdminAuditLogs.OrderBy(item => item.AuditId).LastAsync();
+            audit.Action.Should().Be("XP_TARGET_SET");
+            audit.MetadataJson.Should().Contain("\"currentTotalXp\":170");
+            audit.MetadataJson.Should().Contain("\"targetTotalXp\":500");
+            audit.MetadataJson.Should().Contain("\"adjustmentAmount\":330");
+        }
+
+        [Fact]
+        public async Task SetXpTargetAsync_LowerTargetCreatesNegativeDelta()
+        {
+            await _service.AdjustXpAsync(1, 2, 170, "Initial XP", CancellationToken.None);
+
+            var result = await _service.SetXpTargetAsync(1, 2, 100, "Correct total", CancellationToken.None);
+
+            result.Succeeded.Should().BeTrue();
+            (await _context.XpAdjustments.OrderBy(item => item.AdjustmentId).LastAsync()).Amount.Should().Be(-70);
+            var dashboard = await new DashboardAnalyticsService(_context).GetLearnerDashboardAsync(2, CancellationToken.None);
+            dashboard.Xp.TotalXp.Should().Be(100);
+        }
+
+        [Fact]
+        public async Task SetXpTargetAsync_SameTargetReturnsFriendlyMessageWithoutNewRows()
+        {
+            await _service.AdjustXpAsync(1, 2, 170, "Initial XP", CancellationToken.None);
+            var adjustmentCount = await _context.XpAdjustments.CountAsync();
+            var auditCount = await _context.AdminAuditLogs.CountAsync();
+
+            var result = await _service.SetXpTargetAsync(1, 2, 170, "No change", CancellationToken.None);
+
+            result.Succeeded.Should().BeTrue();
+            result.Message.Should().Be("XP hiện tại đã bằng XP mong muốn.");
+            (await _context.XpAdjustments.CountAsync()).Should().Be(adjustmentCount);
+            (await _context.AdminAuditLogs.CountAsync()).Should().Be(auditCount);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(1_000_001)]
+        public async Task SetXpTargetAsync_InvalidTargetFails(int targetTotalXp)
+        {
+            var result = await _service.SetXpTargetAsync(1, 2, targetTotalXp, "Invalid target", CancellationToken.None);
+
+            result.Succeeded.Should().BeFalse();
+            result.Message.Should().Be("Tổng XP mong muốn phải từ 0 đến 1.000.000.");
+            _context.XpAdjustments.Should().BeEmpty();
+            _context.AdminAuditLogs.Should().BeEmpty();
         }
 
         private static Users CreateUser(long id, string username, string role) => new()
