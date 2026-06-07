@@ -149,15 +149,23 @@ export const MiniBarChart = ({
     data,
     tone = 'primary',
     height = 96,
+    maxVisibleLabels,
 }: {
     data: { label: string; value: number }[];
     tone?: Tone;
     height?: number;
+    maxVisibleLabels?: number;
 }) => {
     const max = Math.max(1, ...data.map(item => item.value));
+    const labelStep = maxVisibleLabels && data.length > maxVisibleLabels
+        ? Math.ceil((data.length - 1) / Math.max(1, maxVisibleLabels - 1))
+        : 1;
+    const shouldShowLabel = (index: number) =>
+        index === 0 || index === data.length - 1 || index % labelStep === 0;
+
     return (
         <div className="flex items-end gap-2" style={{ height }}>
-            {data.map(item => (
+            {data.map((item, index) => (
                 <div key={item.label} className="flex min-w-0 flex-1 flex-col items-center gap-2">
                     <div className="flex w-full items-end rounded-md bg-surface-hover" style={{ height: height - 22 }}>
                         <div
@@ -166,7 +174,12 @@ export const MiniBarChart = ({
                             aria-label={`${item.label}: ${item.value}`}
                         />
                     </div>
-                    <span className="max-w-full truncate text-[10px] text-text-muted">{item.label}</span>
+                    <span
+                        className="min-h-3 max-w-full truncate text-[10px] text-text-muted"
+                        title={shouldShowLabel(index) ? item.label : undefined}
+                    >
+                        {shouldShowLabel(index) ? item.label : ''}
+                    </span>
                 </div>
             ))}
         </div>

@@ -12,11 +12,9 @@ import {
     adminApi,
     type AdminLearningOverviewResult,
     type DailyLearningTrend,
-    type ExerciseFailureItem,
     type LearningOverviewRow,
     type RetentionAnalytics,
     type ReviewCompletionAnalytics,
-    type VocabularyDifficultyItem,
 } from '../../services/adminApi';
 
 type SortKey = 'user' | 'topic' | 'sessions' | 'words' | 'activeminutes' | 'firstactivity' | 'lastactivity';
@@ -37,8 +35,6 @@ const AdminOverview = () => {
     const [overview, setOverview] = useState<AdminLearningOverviewResult | null>(null);
     const [retention, setRetention] = useState<RetentionAnalytics | null>(null);
     const [review, setReview] = useState<ReviewCompletionAnalytics | null>(null);
-    const [difficulty, setDifficulty] = useState<VocabularyDifficultyItem[]>([]);
-    const [failures, setFailures] = useState<ExerciseFailureItem[]>([]);
     const [trends, setTrends] = useState<DailyLearningTrend[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -51,7 +47,7 @@ const AdminOverview = () => {
         setError(null);
         try {
             const range = [currentFilters.fromDate || undefined, currentFilters.toDate || undefined] as const;
-            const [overviewResult, retentionResult, reviewResult, difficultyResult, failureResult, trendResult] = await Promise.all([
+            const [overviewResult, retentionResult, reviewResult, trendResult] = await Promise.all([
                 adminApi.getLearningOverview({
                     fromDate: range[0],
                     toDate: range[1],
@@ -62,15 +58,11 @@ const AdminOverview = () => {
                 }),
                 adminApi.getRetentionAnalytics(...range),
                 adminApi.getReviewCompletionAnalytics(...range),
-                adminApi.getVocabularyDifficultyAnalytics(5),
-                adminApi.getExerciseFailureAnalytics(5),
                 adminApi.getDailyLearningTrends(...range),
             ]);
             setOverview(overviewResult);
             setRetention(retentionResult);
             setReview(reviewResult);
-            setDifficulty(difficultyResult);
-            setFailures(failureResult);
             setTrends(trendResult);
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : 'Không thể tải dữ liệu tổng quan.');
@@ -157,46 +149,8 @@ const AdminOverview = () => {
 
                 <DashboardCard title="Xu hướng học theo ngày" subtitle="Số từ học theo ngày trong khoảng đã chọn.">
                     {chartData.some(item => item.value > 0)
-                        ? <MiniBarChart data={chartData} tone="accent" />
+                        ? <MiniBarChart data={chartData} tone="accent" height={112} maxVisibleLabels={5} />
                         : <EmptyState icon={<BarChart3 size={20} />} title="Chưa có dữ liệu xu hướng" description="Dữ liệu xuất hiện sau khi người học hoàn thành phiên học." />}
-                </DashboardCard>
-            </div>
-
-            <div className="mb-8 grid gap-4 lg:grid-cols-2">
-                <DashboardCard title="Phân tích từ vựng khó" subtitle="Xếp hạng theo tỷ lệ sai và chất lượng trả lời.">
-                    {difficulty.length === 0 ? (
-                        <EmptyState icon={<AlertTriangle size={20} />} title="Chưa có dữ liệu độ khó từ vựng" description="Cần kết quả bài tập để xác định từ khó." />
-                    ) : (
-                        <div className="space-y-3">
-                            {difficulty.map(item => (
-                                <div key={item.vocabId} className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
-                                    <div className="min-w-0">
-                                        <p className="truncate font-display font-bold text-text-primary">{item.word}</p>
-                                        <p className="truncate text-xs text-text-muted">{item.topicName || 'Chưa có chủ đề'} · {item.failures}/{item.attempts} lượt sai</p>
-                                    </div>
-                                    <span className="shrink-0 text-sm font-bold text-danger-color">{item.failureRate}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </DashboardCard>
-
-                <DashboardCard title="Bài tập sai nhiều nhất" subtitle="Xếp hạng theo tỷ lệ trả lời sai.">
-                    {failures.length === 0 ? (
-                        <EmptyState icon={<BookMarked size={20} />} title="Chưa có dữ liệu bài tập sai" description="Cần kết quả bài tập để tạo thống kê." />
-                    ) : (
-                        <div className="space-y-3">
-                            {failures.map(item => (
-                                <div key={item.exerciseId} className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
-                                    <div className="min-w-0">
-                                        <p className="truncate font-display font-bold text-text-primary">{item.word}</p>
-                                        <p className="truncate text-xs text-text-muted">{item.exerciseType} · {item.failures}/{item.attempts} lượt sai</p>
-                                    </div>
-                                    <span className="shrink-0 text-sm font-bold text-danger-color">{item.failureRate}%</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </DashboardCard>
             </div>
 

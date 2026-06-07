@@ -128,8 +128,8 @@ export interface AdminUpdateUserPayload {
     status: string;
 }
 
-export interface AdminXpAdjustmentPayload {
-    amount: number;
+export interface AdminXpTargetPayload {
+    targetTotalXp: number;
     reason: string;
 }
 
@@ -257,7 +257,13 @@ async function adminFetch<T>(
     }
 
     if (!response.ok || !data.succeeded) {
-        throw new Error(data.message ?? `Yêu cầu thất bại (${response.status})`);
+        const backendMsg = typeof data.message === 'string' ? data.message.trim() : '';
+        // Backend validation failures are 4xx with a safe Vietnamese message -> show it.
+        // 5xx / empty / the generic English middleware message -> Vietnamese fallback.
+        if (response.status >= 500 || !backendMsg || backendMsg === 'An unexpected error occurred.') {
+            throw new Error('Không thể thực hiện thao tác. Vui lòng thử lại.');
+        }
+        throw new Error(backendMsg);
     }
     return data;
 }
@@ -303,11 +309,12 @@ export const adminApi = {
         return { user: data.user, learning: data.learning };
     },
 
-    adjustXp: async (id: number, payload: AdminXpAdjustmentPayload): Promise<void> => {
-        await adminFetch(`/api/admin/users/${id}/xp-adjustments`, {
+    setXpTarget: async (id: number, payload: AdminXpTargetPayload): Promise<string> => {
+        const data = await adminFetch(`/api/admin/users/${id}/xp-target`, {
             method: 'POST',
             body: JSON.stringify(payload),
         });
+        return data.message ?? 'Đã đặt XP người học.';
     },
 
     resetProgress: async (id: number, payload: AdminResetProgressPayload): Promise<void> => {

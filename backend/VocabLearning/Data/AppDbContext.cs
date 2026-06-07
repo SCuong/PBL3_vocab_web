@@ -574,7 +574,9 @@ namespace VocabLearning.Data
                 entity.Property(item => item.TargetUserId).HasColumnName("target_user_id");
                 entity.Property(item => item.Action).HasColumnName("action").HasMaxLength(80);
                 entity.Property(item => item.Reason).HasColumnName("reason");
-                entity.Property(item => item.MetadataJson).HasColumnName("metadata_json");
+                entity.Property(item => item.MetadataJson)
+                    .HasColumnName("metadata_json")
+                    .HasColumnType("text");
                 entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql(currentTimestampSql);
                 entity.HasOne<Users>().WithMany().HasForeignKey(item => item.AdminUserId).OnDelete(DeleteBehavior.NoAction);
                 entity.HasOne<Users>().WithMany().HasForeignKey(item => item.TargetUserId).OnDelete(DeleteBehavior.NoAction);
