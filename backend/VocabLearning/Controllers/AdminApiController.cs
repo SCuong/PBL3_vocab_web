@@ -14,13 +14,19 @@ namespace VocabLearning.Controllers
     {
         private readonly ICustomAuthenticationService _authService;
         private readonly IAdminDataService _adminDataService;
+        private readonly IDashboardAnalyticsService _analyticsService;
+        private readonly IAdminLearningManagementService _learningManagementService;
 
         public AdminApiController(
             ICustomAuthenticationService authService,
-            IAdminDataService adminDataService)
+            IAdminDataService adminDataService,
+            IDashboardAnalyticsService analyticsService,
+            IAdminLearningManagementService learningManagementService)
         {
             _authService = authService;
             _adminDataService = adminDataService;
+            _analyticsService = analyticsService;
+            _learningManagementService = learningManagementService;
         }
 
         // ── Users ─────────────────────────────────────────────────────────────
@@ -129,6 +135,78 @@ namespace VocabLearning.Controllers
                 return BadRequest(Fail(result.ErrorMessage ?? "User could not be deleted."));
 
             return Ok(new AdminApiResponse { Succeeded = true, Message = "User deleted successfully." });
+        }
+
+        [HttpGet("users/{userId:long}/learning-detail")]
+        public async Task<ActionResult<AdminLearnerDetailApiResponse>> GetLearnerDetail(
+            long userId,
+            CancellationToken cancellationToken)
+        {
+            var user = await _authService.GetUserByIdAsync(userId, cancellationToken);
+            if (user is null)
+            {
+                return NotFound(new AdminLearnerDetailApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Không tìm thấy người dùng.",
+                });
+            }
+
+            var learning = await _analyticsService.GetLearnerDashboardAsync(userId, cancellationToken);
+            return Ok(new AdminLearnerDetailApiResponse
+            {
+                Succeeded = true,
+                User = MapUser(user),
+                Learning = learning,
+            });
+        }
+
+        [HttpPost("users/{userId:long}/xp-adjustments")]
+        public async Task<ActionResult<AdminApiResponse>> AdjustXp(
+            long userId, [FromBody] AdminXpAdjustmentRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null) return BadRequest(Fail("Yêu cầu không hợp lệ."));
+            var adminUserId = await ResolveCurrentAdminIdAsync(cancellationToken);
+            if (adminUserId is null) return Unauthorized(Fail("Phiên quản trị không hợp lệ."));
+            var result = await _learningManagementService.AdjustXpAsync(
+                adminUserId.Value, userId, request.Amount, request.Reason ?? string.Empty, cancellationToken);
+            return result.Succeeded ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message }) : BadRequest(Fail(result.Message));
+        }
+
+        [HttpPost("users/{userId:long}/reset-progress")]
+        public async Task<ActionResult<AdminApiResponse>> ResetProgress(
+            long userId, [FromBody] AdminResetProgressRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null) return BadRequest(Fail("Yêu cầu không hợp lệ."));
+            var adminUserId = await ResolveCurrentAdminIdAsync(cancellationToken);
+            if (adminUserId is null) return Unauthorized(Fail("Phiên quản trị không hợp lệ."));
+            var result = await _learningManagementService.ResetProgressAsync(
+                adminUserId.Value, userId, request.Scope ?? string.Empty, request.TopicId, request.Reason ?? string.Empty, cancellationToken);
+            return result.Succeeded ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message }) : BadRequest(Fail(result.Message));
+        }
+
+        [HttpPost("users/{userId:long}/delete-learning-data")]
+        public async Task<ActionResult<AdminApiResponse>> DeleteLearningData(
+            long userId, [FromBody] AdminDeleteLearningDataRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null) return BadRequest(Fail("Yêu cầu không hợp lệ."));
+            var adminUserId = await ResolveCurrentAdminIdAsync(cancellationToken);
+            if (adminUserId is null) return Unauthorized(Fail("Phiên quản trị không hợp lệ."));
+            var result = await _learningManagementService.DeleteLearningDataAsync(
+                adminUserId.Value, userId, request.ConfirmationText ?? string.Empty, request.Reason ?? string.Empty, cancellationToken);
+            return result.Succeeded ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message }) : BadRequest(Fail(result.Message));
+        }
+
+        [HttpPost("users/{userId:long}/leaderboard-visibility")]
+        public async Task<ActionResult<AdminApiResponse>> SetLeaderboardVisibility(
+            long userId, [FromBody] AdminLeaderboardVisibilityRequest? request, CancellationToken cancellationToken)
+        {
+            if (request is null) return BadRequest(Fail("Yêu cầu không hợp lệ."));
+            var adminUserId = await ResolveCurrentAdminIdAsync(cancellationToken);
+            if (adminUserId is null) return Unauthorized(Fail("Phiên quản trị không hợp lệ."));
+            var result = await _learningManagementService.SetLeaderboardVisibilityAsync(
+                adminUserId.Value, userId, request.Hidden, request.Reason ?? string.Empty, cancellationToken);
+            return result.Succeeded ? Ok(new AdminApiResponse { Succeeded = true, Message = result.Message }) : BadRequest(Fail(result.Message));
         }
 
         // ── Topics ────────────────────────────────────────────────────────────
@@ -291,6 +369,7 @@ namespace VocabLearning.Controllers
             CreatedAt = user.CreatedAt,
             IsDeleted = user.IsDeleted,
             DeletedAt = user.DeletedAt,
+            IsHiddenFromLeaderboard = user.IsHiddenFromLeaderboard,
         };
 
         private static AdminTopicResponse MapTopic(Topic topic, string? parentName) => new()

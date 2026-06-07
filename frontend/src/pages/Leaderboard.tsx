@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Crown, Medal, Flame, CheckCircle2, Trophy, RotateCcw } from 'lucide-react';
 import { PageTitle } from '../components/ui';
+import { ProfileFrameOverlay } from '../components/profile/ProfileFrameOverlay';
+import { useAppContext } from '../context/AppContext';
+import { loadProfilePreferences } from '../utils/profilePreferences';
+import { normalizeAvatarUrl } from '../utils/avatarPresets';
 import { leaderboardApi, type LeaderboardEntry } from '../services/leaderboardApi';
 
 const initialOf = (username: string) => (username?.trim()?.[0] ?? '?').toUpperCase();
@@ -21,6 +25,16 @@ const rankBadgeTone = (rank: number) => {
 };
 
 const Leaderboard = () => {
+    const { profileFrameKey, currentUser: authUser } = useAppContext();
+    // Avatar is a local preference (per browser) — only the current user's is known
+    // client-side. Other rows fall back to the initial.
+    const currentUserAvatar = authUser?.userId
+        ? normalizeAvatarUrl(loadProfilePreferences(authUser.userId).avatarUrl)
+        : undefined;
+    const renderAvatarInner = (u: LeaderboardEntry) =>
+        u.isCurrentUser && currentUserAvatar
+            ? <img src={currentUserAvatar} alt="" className="h-full w-full rounded-full object-cover" />
+            : initialOf(u.username);
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [currentUser, setCurrentUser] = useState<LeaderboardEntry | null>(null);
     const [loading, setLoading] = useState(true);
@@ -93,8 +107,11 @@ const Leaderboard = () => {
                     <span className="flex w-8 justify-center font-mono text-sm font-bold text-text-muted sm:w-10 sm:text-base">{u.rank}</span>
                 )}
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-display font-bold text-primary sm:h-11 sm:w-11">
-                {initialOf(u.username)}
+            <div className="relative shrink-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-base font-display font-bold text-primary sm:h-11 sm:w-11">
+                    {renderAvatarInner(u)}
+                </div>
+                {u.isCurrentUser && <ProfileFrameOverlay frameKey={profileFrameKey} sizeClass="h-[165%] w-[165%]" />}
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -128,9 +145,10 @@ const Leaderboard = () => {
                 <div className="relative mb-2">
                     <div className={`rounded-full border-4 ${s.ring} p-1 shadow-lg ${big ? 'h-24 w-24' : 'h-20 w-20'}`}>
                         <div className={`flex h-full w-full items-center justify-center rounded-full bg-linear-to-br ${s.avatar} font-display font-bold text-text-on-accent ${big ? 'text-2xl' : 'text-xl'}`}>
-                            {initialOf(u.username)}
+                            {renderAvatarInner(u)}
                         </div>
                     </div>
+                    {u.isCurrentUser && <ProfileFrameOverlay frameKey={profileFrameKey} sizeClass="h-[150%] w-[150%]" />}
                     <Icon size={big ? 28 : 20} className={`absolute -top-3 left-1/2 -translate-x-1/2 ${s.icon} drop-shadow`} aria-hidden />
                 </div>
                 <div className="max-w-full truncate px-1 text-sm font-bold text-text-primary">
@@ -155,8 +173,9 @@ const Leaderboard = () => {
             >
                 <div className="relative shrink-0">
                     <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br ${s.avatar} text-xl font-display font-bold text-text-on-accent`}>
-                        {initialOf(u.username)}
+                        {renderAvatarInner(u)}
                     </div>
+                    {u.isCurrentUser && <ProfileFrameOverlay frameKey={profileFrameKey} sizeClass="h-[150%] w-[150%]" />}
                     <Icon size={18} className={`absolute -top-1.5 -right-1.5 ${s.icon} drop-shadow`} aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">

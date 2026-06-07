@@ -6,6 +6,7 @@ import { dashboardApi, type LearnerDashboard } from '../services/dashboardApi';
 import { EMPTY_CURRENT_USER_GAME_DATA } from '../constants/appConstants';
 import { buildLearningTopicGroups } from '../utils/learningTopicGroups';
 import { loadCurrentUserGameData, saveCurrentUserGameData } from '../utils/gameDataStorage';
+import { profileFrameStorageKey } from '../utils/profileFrames';
 import { useToasts } from '../hooks/useToasts';
 import { useGameProgress, type XpFloatItem } from '../hooks/useGameProgress';
 import {
@@ -35,6 +36,8 @@ interface AppContextValue {
     learnedWordIds: number[];
     totalReviewCount: number;
     learnerAnalytics: LearnerDashboard | null;
+    profileFrameKey: string | null;
+    setProfileFrame: (key: string | null) => void;
     applyLearningProgress: (state: LearningProgressState) => void;
     refreshLearnerAnalytics: () => Promise<LearnerDashboard | null>;
     handleWordsLearned: (topicId: number, wordIds: number[]) => Promise<void>;
@@ -61,6 +64,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [isLoading, setIsLoading] = useState(true);
     const { toasts, addToast, removeToast } = useToasts();
     const { gameData, setGameData, xpFloats, addXP, triggerStreakCheck } = useGameProgress(addToast);
+
+    // Selected cosmetic profile frame (local-only, per user). Shared app-wide so
+    // Profile / Navbar / Leaderboard all show the same frame and react to changes.
+    const [profileFrameKey, setProfileFrameKey] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!currentUser?.userId) {
+            setProfileFrameKey(null);
+            return;
+        }
+        try {
+            const stored = localStorage.getItem(profileFrameStorageKey(currentUser.userId));
+            setProfileFrameKey(stored && stored.trim() ? stored : null);
+        } catch {
+            setProfileFrameKey(null);
+        }
+    }, [currentUser?.userId]);
+
+    const setProfileFrame = useCallback((key: string | null) => {
+        setProfileFrameKey(key);
+        const id = currentUser?.userId;
+        if (!id) return;
+        try {
+            if (key) localStorage.setItem(profileFrameStorageKey(id), key);
+            else localStorage.removeItem(profileFrameStorageKey(id));
+        } catch {
+            /* ignore storage errors */
+        }
+    }, [currentUser?.userId]);
 
     const syncUserGameData = useCallback((user: AuthenticatedUser | null) => {
         setCurrentUser(user);
@@ -220,6 +252,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
         learnerAnalytics,
+        profileFrameKey, setProfileFrame,
         applyLearningProgress, refreshLearnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal, setShowStreakModal,
@@ -232,6 +265,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,
         totalReviewCount,
         learnerAnalytics,
+        profileFrameKey, setProfileFrame,
         applyLearningProgress, refreshLearnerAnalytics,
         handleWordsLearned, handleRecordStudyHistory,
         showStreakModal,

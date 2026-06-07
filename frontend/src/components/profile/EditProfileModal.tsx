@@ -16,6 +16,9 @@ type EditProfileModalProps = {
     initialAvatarUrl: string | undefined;
     onProfileSaved: (user: AuthenticatedUser, avatarUrl: string | undefined) => void;
     onAddToast?: ToastFn;
+    frameOptions: { key: string; label: string; img: string; unlocked: boolean }[];
+    selectedFrameKey: string | null;
+    onSelectFrame: (key: string | null) => void;
 };
 
 // Modal owns every draft field locally so typing never rerenders the parent
@@ -29,6 +32,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     initialAvatarUrl,
     onProfileSaved,
     onAddToast,
+    frameOptions,
+    selectedFrameKey,
+    onSelectFrame,
 }) => {
     const [username, setUsername] = useState(initialUsername);
     const [email, setEmail] = useState(initialEmail);
@@ -97,7 +103,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
                 <div className="profile-modal-body space-y-8">
                     <section className="space-y-4">
-                        <h4 className="font-bold text-sm uppercase tracking-wide text-text-muted">Thông tin tài khoản & Avatar</h4>
+                        <h4 className="font-bold text-sm uppercase tracking-wide text-text-muted">Thông tin tài khoản &amp; hiển thị</h4>
                         <div className="flex items-center gap-4">
                             {avatarUrl ? (
                                 <img
@@ -138,6 +144,52 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                                 ))}
                             </div>
                         )}
+
+                        {/* Profile frame picker (cosmetic, localStorage; unlock derived from badges) */}
+                        <div className="space-y-2">
+                            <h5 className="text-sm font-bold text-text-primary">Khung hồ sơ</h5>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectFrame(null)}
+                                    className={`flex flex-col items-center rounded-xl border-2 p-2 text-center transition-colors ${
+                                        selectedFrameKey === null ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
+                                    }`}
+                                >
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-border text-text-muted">✕</span>
+                                    <span className="mt-1 text-xs font-bold text-text-primary">Không khung</span>
+                                    <span className="text-[10px] text-text-muted">{selectedFrameKey === null ? 'Đang dùng' : 'Mặc định'}</span>
+                                </button>
+                                {frameOptions.map((frame) => {
+                                    const active = selectedFrameKey === frame.key;
+                                    return (
+                                        <button
+                                            key={frame.key}
+                                            type="button"
+                                            disabled={!frame.unlocked}
+                                            onClick={() => frame.unlocked && onSelectFrame(frame.key)}
+                                            className={`flex flex-col items-center rounded-xl border-2 p-2 text-center transition-colors ${
+                                                active
+                                                    ? 'border-primary bg-primary/5'
+                                                    : frame.unlocked
+                                                        ? 'border-border hover:border-primary/30 cursor-pointer'
+                                                        : 'border-border opacity-60 cursor-not-allowed'
+                                            }`}
+                                        >
+                                            <img
+                                                src={frame.img}
+                                                alt=""
+                                                className={`h-14 w-14 object-contain ${frame.unlocked ? '' : 'grayscale opacity-70'}`}
+                                            />
+                                            <span className="mt-1 text-xs font-bold text-text-primary">{frame.label}</span>
+                                            <span className="text-[10px] text-text-muted">
+                                                {frame.unlocked ? (active ? 'Đang dùng' : 'Đã mở khóa') : 'Chưa mở khóa'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
                         <input
                             type="text"

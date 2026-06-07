@@ -23,5 +23,7 @@ namespace VocabLearning.Models
         public bool IsDeleted { get; set; }
 
         public DateTime? DeletedAt { get; set; }
+
+        public bool IsHiddenFromLeaderboard { get; set; }
     }
 }

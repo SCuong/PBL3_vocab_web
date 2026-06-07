@@ -26,6 +26,8 @@ import { dashboardApi, type LearnerDashboard as LearnerDashboardData } from '../
 import { loadProfilePreferences } from '../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../utils/avatarPresets';
 import { useAppContext } from '../context/AppContext';
+import { PROFILE_FRAMES } from '../utils/profileFrames';
+import { ProfileFrameOverlay } from '../components/profile/ProfileFrameOverlay';
 import { PATHS } from '../routes/paths';
 
 const format2Digits = (value: number) => (value < 10 ? `0${value}` : String(value));
@@ -65,6 +67,9 @@ const Profile = () => {
         handleLogout,
         addToast: onAddToast,
         handleUserUpdated: onUserUpdated,
+        learnerAnalytics,
+        profileFrameKey,
+        setProfileFrame,
     } = useAppContext();
     const navigate = useNavigate();
 
@@ -131,6 +136,18 @@ const Profile = () => {
             setTagline(DEFAULT_TAGLINE);
         }
     }, [user?.userId]);
+
+    // Selected frame lives in AppContext (local-only, shared with Navbar/Leaderboard).
+    // Unlock state is derived from the dashboard badges (never faked).
+    const frameUnlockedMap = useMemo(() => {
+        const map = new Map<string, boolean>();
+        (learnerAnalytics?.badges ?? []).forEach((badge) => map.set(badge.key, Boolean(badge.unlocked)));
+        return map;
+    }, [learnerAnalytics]);
+    const isFrameUnlocked = (key: string) => frameUnlockedMap.get(key) === true;
+    // If the saved frame isn't unlocked, fall back to no frame.
+    const effectiveFrameKey = profileFrameKey && isFrameUnlocked(profileFrameKey) ? profileFrameKey : null;
+    const frameOptions = PROFILE_FRAMES.map((frame) => ({ ...frame, unlocked: isFrameUnlocked(frame.key) }));
 
     const handleProfileSaved = (updatedUser: AuthenticatedUser, nextAvatarUrl: string | undefined) => {
         setAvatarUrl(nextAvatarUrl);
@@ -471,6 +488,7 @@ const Profile = () => {
                                         {initials}
                                     </div>
                                 )}
+                                <ProfileFrameOverlay frameKey={effectiveFrameKey} />
                                 <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary border-2 border-surface flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
                                     ✦
                                 </span>
@@ -876,6 +894,9 @@ const Profile = () => {
                 initialAvatarUrl={avatarUrl}
                 onProfileSaved={handleProfileSaved}
                 onAddToast={onAddToast}
+                frameOptions={frameOptions}
+                selectedFrameKey={effectiveFrameKey}
+                onSelectFrame={setProfileFrame}
             />
 
             <DeleteAccountModal
