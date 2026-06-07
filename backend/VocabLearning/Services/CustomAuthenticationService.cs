@@ -764,33 +764,33 @@ namespace VocabLearning.Services
                 return (false, "Email is already registered.");
             }
 
-            var isRemovingAdminPrivilege = string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase)
-                && normalizedRole != UserRoles.Admin;
-            var isDeactivatingAdmin = string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase)
-                && normalizedStatus != UserStatuses.Active;
+            var isTargetAdmin = string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase);
+            var isSelf = user.UserId == currentUserId;
+            var isRoleChanged = !string.Equals(normalizedRole, user.Role, StringComparison.OrdinalIgnoreCase);
+            var isDeactivating = !string.Equals(normalizedStatus, UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
 
-            if (user.UserId == currentUserId && normalizedRole != UserRoles.Admin)
+            // An admin cannot change their own role or disable their own account.
+            if (isSelf && isRoleChanged)
             {
-                return (false, "You cannot remove your own admin role.");
+                return (false, "Không thể thay đổi quyền của chính bạn.");
             }
 
-            if (user.UserId == currentUserId && normalizedStatus != UserStatuses.Active)
+            if (isSelf && isDeactivating)
             {
-                return (false, "You cannot deactivate your own account.");
+                return (false, "Không thể vô hiệu hóa chính tài khoản của bạn.");
             }
 
-            if (isRemovingAdminPrivilege || isDeactivatingAdmin)
+            // No SUPER_ADMIN role exists -> admin accounts are not manageable
+            // destructively from the admin UI/API. Block demotion and deactivation
+            // of any admin (manual DB change required). Harmless edits still allowed.
+            if (isTargetAdmin && isRoleChanged)
             {
-                var adminCount = await dbContext.Users
-                    .CountAsync(
-                        item => item.Role == UserRoles.Admin
-                            && item.Status == UserStatuses.Active,
-                        cancellationToken);
+                return (false, "Không thể thay đổi quyền của tài khoản quản trị.");
+            }
 
-                if (adminCount <= 1)
-                {
-                    return (false, "At least one active admin account must remain.");
-                }
+            if (isTargetAdmin && isDeactivating)
+            {
+                return (false, "Không thể vô hiệu hóa tài khoản quản trị.");
             }
 
             user.Username = cleanUsername;
@@ -825,24 +825,14 @@ namespace VocabLearning.Services
 
             if (user.UserId == currentUserId)
             {
-                return (false, "You cannot delete your own account.");
+                return (false, "Không thể xóa chính tài khoản của bạn.");
             }
 
-            var isActiveAdmin = string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(user.Status, UserStatuses.Active, StringComparison.OrdinalIgnoreCase);
-
-            if (isActiveAdmin)
+            // Admin accounts cannot be deleted from the admin UI/API. No SUPER_ADMIN
+            // role exists, so admin removal must be done manually in the database.
+            if (string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase))
             {
-                var adminCount = await dbContext.Users
-                    .CountAsync(
-                        item => item.Role == UserRoles.Admin
-                            && item.Status == UserStatuses.Active,
-                        cancellationToken);
-
-                if (adminCount <= 1)
-                {
-                    return (false, "At least one active admin account must remain.");
-                }
+                return (false, "Không thể xóa tài khoản quản trị.");
             }
 
             var userVocabularies = await dbContext.UserVocabularies

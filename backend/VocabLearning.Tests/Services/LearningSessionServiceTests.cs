@@ -207,12 +207,51 @@ namespace VocabLearning.Tests.Services
             var savedItem = _context.LearningSessionItems.First(i => i.SessionId == session.SessionId && i.VocabId == 100);
             savedItem.IsAnswered.Should().BeTrue();
             savedItem.Quality.Should().Be(5);
+            savedItem.AttemptCount.Should().Be(1);
             savedItem.AnsweredAt.Should().NotBeNull();
 
             _context.Progresses.Count(p => p.UserId == UserId).Should().Be(progressBefore);
             _context.UserVocabularies.Count(uv => uv.UserId == UserId).Should().Be(userVocabBefore);
             _context.Progresses.Any(p => p.UserId == UserId && p.VocabId == 100).Should().BeFalse();
             _context.UserVocabularies.Any(uv => uv.UserId == UserId && uv.VocabId == 100).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task ReviewSession_AnswerAndAbandon_DoesNotCommitOfficialProgressOrLog()
+        {
+            var session = await CreateInProgressSessionAsync(LearningSessionModes.Review);
+
+            await _service.SaveSessionAnswerAsync(
+                UserId,
+                session.SessionId,
+                new SaveLearningSessionAnswerRequest { VocabId = 100, Quality = 5 },
+                CancellationToken.None);
+            await _service.AbandonSessionAsync(UserId, session.SessionId, CancellationToken.None);
+
+            _context.Progresses.Any(p => p.UserId == UserId && p.VocabId == 100).Should().BeFalse();
+            _context.UserVocabularies.Any(uv => uv.UserId == UserId && uv.VocabId == 100).Should().BeFalse();
+            _context.LearningLogs.Any(log => log.UserId == UserId).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task ReviewSession_Complete_CommitsOfficialProgressAndOneReviewLog()
+        {
+            var session = await CreateInProgressSessionAsync(LearningSessionModes.Review);
+
+            await _service.SaveSessionAnswerAsync(
+                UserId,
+                session.SessionId,
+                new SaveLearningSessionAnswerRequest { VocabId = 100, Quality = 5 },
+                CancellationToken.None);
+
+            _context.Progresses.Any(p => p.UserId == UserId && p.VocabId == 100).Should().BeFalse();
+            _context.LearningLogs.Any(log => log.UserId == UserId).Should().BeFalse();
+
+            await _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
+
+            _context.Progresses.Any(p => p.UserId == UserId && p.VocabId == 100).Should().BeTrue();
+            var log = _context.LearningLogs.Single(item => item.UserId == UserId);
+            log.ActivityType.Should().Be(LearningActivityTypes.Review);
         }
 
         [Fact]
@@ -308,6 +347,32 @@ namespace VocabLearning.Tests.Services
             _context.UserVocabularies.Any(uv => uv.UserId == UserId && uv.VocabId == 102).Should().BeFalse();
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(3)]
+        public async Task CompleteSessionAsync_RepeatedFirstExposure_SchedulesTomorrow(int finalQuality)
+        {
+            var session = await CreateInProgressSessionAsync();
+
+            await _service.SaveSessionAnswerAsync(UserId, session.SessionId,
+                new SaveLearningSessionAnswerRequest { VocabId = 100, Quality = 0 }, CancellationToken.None);
+            await _service.SaveSessionAnswerAsync(UserId, session.SessionId,
+                new SaveLearningSessionAnswerRequest { VocabId = 100, Quality = finalQuality }, CancellationToken.None);
+
+            await _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
+
+            var sessionItems = _context.LearningSessionItems
+                .Where(item => item.SessionId == session.SessionId && item.VocabId == 100)
+                .ToList();
+            sessionItems.Should().ContainSingle();
+            sessionItems[0].AttemptCount.Should().Be(2);
+
+            var progress = _context.Progresses.Single(item => item.UserId == UserId && item.VocabId == 100);
+            progress.IntervalDays.Should().Be(1);
+            progress.LastReviewDate.Should().NotBeNull();
+            progress.NextReviewDate.Should().Be(progress.LastReviewDate!.Value.AddDays(1));
+        }
+
         [Fact]
         public async Task CompleteSessionAsync_NoAnsweredItems_Throws()
         {
@@ -319,16 +384,18 @@ namespace VocabLearning.Tests.Services
         }
 
         [Fact]
-        public async Task CompleteSessionAsync_AlreadyCompleted_Throws()
+        public async Task CompleteSessionAsync_AlreadyCompleted_ReturnsCompletedState()
         {
             var session = await CreateInProgressSessionAsync();
             await _service.SaveSessionAnswerAsync(UserId, session.SessionId,
                 new SaveLearningSessionAnswerRequest { VocabId = 100, Quality = 4 }, CancellationToken.None);
-            await _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
+            var first = await _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
 
-            var act = () => _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
+            var second = await _service.CompleteSessionAsync(UserId, session.SessionId, CancellationToken.None);
 
-            await act.Should().ThrowAsync<InvalidOperationException>();
+            second.SessionId.Should().Be(first.SessionId);
+            second.Status.Should().Be(LearningSessionStatuses.Completed);
+            _context.Progresses.Count(item => item.UserId == UserId && item.VocabId == 100).Should().Be(1);
         }
 
         [Fact]
@@ -377,6 +444,7 @@ namespace VocabLearning.Tests.Services
             _context.UserVocabularies.Count(uv => uv.UserId == UserId).Should().Be(userVocabBefore);
             _context.Progresses.Any(p => p.UserId == UserId && p.VocabId == 100).Should().BeFalse();
             _context.UserVocabularies.Any(uv => uv.UserId == UserId && uv.VocabId == 100).Should().BeFalse();
+            _context.LearningLogs.Any(log => log.UserId == UserId).Should().BeFalse();
         }
 
         [Fact]

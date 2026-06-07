@@ -494,6 +494,9 @@ namespace VocabLearning.Data
                         "ck_learning_session_item_order_index",
                         "order_index >= 0");
                     t.HasCheckConstraint(
+                        "ck_learning_session_item_attempt_count",
+                        "attempt_count >= 0");
+                    t.HasCheckConstraint(
                         "ck_learning_session_item_answered",
                         "(is_answered = FALSE AND answered_at IS NULL AND quality IS NULL) OR is_answered = TRUE");
                 });
@@ -512,6 +515,10 @@ namespace VocabLearning.Data
                 entity.Property(item => item.IsAnswered)
                     .HasColumnName("is_answered")
                     .HasDefaultValue(false);
+
+                entity.Property(item => item.AttemptCount)
+                    .HasColumnName("attempt_count")
+                    .HasDefaultValue(0);
 
                 entity.Property(item => item.AnsweredAt).HasColumnName("answered_at");
 

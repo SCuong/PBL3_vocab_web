@@ -536,6 +536,7 @@ namespace VocabLearning.Services
             var now = DateTime.UtcNow;
             item.Quality = request.Quality;
             item.IsAnswered = true;
+            item.AttemptCount += 1;
             item.AnsweredAt = now;
 
             var nextIndex = item.OrderIndex + 1;
@@ -575,6 +576,21 @@ namespace VocabLearning.Services
                 if (session.UserId != userId)
                 {
                     throw new UnauthorizedAccessException("Session does not belong to the current user.");
+                }
+                if (session.Status == LearningSessionStatuses.Completed)
+                {
+                    // Idempotent: session already finalized. Report the same XP this
+                    // session is worth (committed words * XpPerWord) — no new award, no new log.
+                    var committedItemCount = session.Items.Count(item => item.IsAnswered && item.Quality.HasValue);
+                    return new CompleteLearningSessionResponse
+                    {
+                        SessionId = session.SessionId,
+                        Status = session.Status,
+                        CompletedAt = session.CompletedAt ?? session.UpdatedAt,
+                        CommittedItemCount = committedItemCount,
+                        XpGained = committedItemCount * DashboardAnalyticsService.XpPerWord,
+                        Progress = GetLearningProgressState(userId)
+                    };
                 }
                 if (session.Status != LearningSessionStatuses.InProgress)
                 {
@@ -623,7 +639,7 @@ namespace VocabLearning.Services
                             quality,
                             now,
                             isFirstExposure,
-                            isRepeatedThisSession: false);
+                            isRepeatedThisSession: item.AttemptCount > 1);
 
                         ApplySm2Plan(progress, plan);
 
@@ -713,6 +729,9 @@ namespace VocabLearning.Services
                     Status = session.Status,
                     CompletedAt = session.CompletedAt ?? now,
                     CommittedItemCount = answeredItems.Count,
+                    // XP is derived (ΣLearningLog.WordsStudied * XpPerWord). This completion
+                    // adds one log with WordsStudied = answeredItems.Count, so its XP delta is:
+                    XpGained = answeredItems.Count * DashboardAnalyticsService.XpPerWord,
                     Progress = GetLearningProgressState(userId)
                 };
             });

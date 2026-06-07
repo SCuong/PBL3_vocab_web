@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge, Button, NoteIcon } from "../ui";
@@ -16,7 +16,6 @@ import { SM2ReviewButtons } from "./SM2ReviewButtons";
 import { useStickyNotes } from "../layout";
 import { useAppContext } from "../../context/AppContext";
 import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
-import type { LearningSession } from "../../services/learningProgressApi";
 import { PATHS } from "../../routes/paths";
 import studySessionBg from "../../assets/study-session-bg.svg";
 import { useTheme } from "../../hooks/useTheme";
@@ -76,36 +75,21 @@ const StudySession = () => {
   const {
     learningTopicGroups: topicGroups,
     learningProgressState,
-    addXP: onAddXP,
-    triggerStreakCheck: onStreakCheck,
     addToast: onAddToast,
-    handleWordsLearned: onWordsLearned,
+    applyLearningProgress,
+    refreshLearnerAnalytics,
     handleRecordStudyHistory: onRecordStudyHistory,
   } = useAppContext();
 
   const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
 
-  // Restore from sessionStorage when page is refreshed (F5) and locationState is lost.
-  // STUDY mode: no resume — interrupted server-side LearningSession must restart from scratch
-  // (product rule). REVIEW mode keeps the legacy resume behavior.
-  const [savedSession] = useState<{
-    topicId: number; words: any[]; mode: string | null;
-    tab: string; learnStep: number; selectedWordIds: number[]; currentIndex: number; ts: number;
-  } | null>(() => {
-    if (locationState?.topicId) return null;
-    try {
-      const raw = sessionStorage.getItem('ss_study_v1');
-      if (!raw) return null;
-      const s = JSON.parse(raw);
-      if (Date.now() - s.ts > 7_200_000) { sessionStorage.removeItem('ss_study_v1'); return null; }
-      if (s.mode !== 'review') { sessionStorage.removeItem('ss_study_v1'); return null; }
-      return s;
-    } catch { return null; }
-  });
-
-  const topicId = locationState?.topicId ?? savedSession?.topicId;
-  const studyWords = locationState?.words ?? savedSession?.words;
-  const isReviewMode = (locationState?.mode ?? savedSession?.mode ?? null) === 'review';
+  // In-progress learning state is intentionally memory-only. Only a fresh client
+  // navigation (PUSH) enters study; reload / back / direct URL (POP / REPLACE)
+  // returns to selection.
+  const navigationType = useNavigationType();
+  const topicId = locationState?.topicId;
+  const studyWords = locationState?.words;
+  const isReviewMode = locationState?.mode === 'review';
 
   const onFinish = useCallback((score?: number, total?: number, detail?: any) => {
     if (score !== undefined && total !== undefined) {
@@ -116,18 +100,20 @@ const StudySession = () => {
   }, [navigate]);
 
   const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
-    (savedSession?.tab as "flashcard" | "learn" | "minitest" | undefined) ?? (isReviewMode ? "learn" : "flashcard"),
+    isReviewMode ? "learn" : "flashcard",
   );
-  const [learnStep, setLearnStep] = useState<1 | 2 | 3>((savedSession?.learnStep as 1 | 2 | 3 | undefined) ?? 1);
+  const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
   const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
-  const [selectedWordIds, setSelectedWordIds] = useState<number[]>(savedSession?.selectedWordIds ?? []);
+  const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
   const [reviewPage, setReviewPage] = useState(0);
   const [smartPage, setSmartPage] = useState(0);
   const [customNewPage, setCustomNewPage] = useState(0);
-  const hasAutoSelectedReview = useRef(Boolean(savedSession?.selectedWordIds?.length));
+  const hasAutoSelectedReview = useRef(false);
   const [matchType, setMatchType] = useState<"word" | "ipa" | null>(null);
+  const [showMinitestConfirm, setShowMinitestConfirm] = useState(false);
+  const [isMinitestActive, setIsMinitestActive] = useState(false);
   const [ipaFallbackNotice, setIpaFallbackNotice] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(savedSession?.currentIndex ?? 0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flashcardSearch, setFlashcardSearch] = useState('');
   const [showWordList, setShowWordList] = useState(false);
@@ -139,7 +125,18 @@ const StudySession = () => {
   const reviewOptionsRequestIdRef = useRef(0);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [sessionEnsuring, setSessionEnsuring] = useState(false);
-  const sessionEnsureRequestIdRef = useRef(0);
+  const [sessionAbandoning, setSessionAbandoning] = useState(false);
+  const [matchingCompleting, setMatchingCompleting] = useState(false);
+  const [matchingCompletionError, setMatchingCompletionError] = useState<string | null>(null);
+  const [pendingMatchingResult, setPendingMatchingResult] = useState<{
+    correct: number;
+    total: number;
+    time: number;
+  } | null>(null);
+
+  useEffect(() => {
+    sessionStorage.removeItem('ss_study_v1');
+  }, []);
 
   // Study words come only from route/session state (real backend vocabulary).
   // No mock fallback — an empty list yields the empty/error state below.
@@ -314,69 +311,9 @@ const StudySession = () => {
     setRecentIndices(prev => [currentIndex, ...prev.filter(i => i !== currentIndex)].slice(0, 6));
   }, [currentIndex, tab]);
 
-  // Persist session state so F5 refresh can resume from current position.
-  // STUDY mode is excluded — interrupted sessions must restart per product rule.
-  const sessionMode = locationState?.mode ?? savedSession?.mode ?? null;
+  // Keep the server session through practice so MatchingGame can finalize it.
   useEffect(() => {
-    if (!topicId || !studyWords || studyWords.length === 0 || tab !== 'learn' || learnStep < 2) return;
-    if (sessionMode !== 'review') return;
-    try {
-      sessionStorage.setItem('ss_study_v1', JSON.stringify({
-        topicId, words: studyWords, mode: sessionMode,
-        tab, learnStep, selectedWordIds, currentIndex, ts: Date.now(),
-      }));
-    } catch {}
-  }, [topicId, studyWords, sessionMode, tab, learnStep, selectedWordIds, currentIndex]);
-
-  // Ensure a server-side LearningSession exists once the learner enters step 2.
-  // STUDY mode only. Policy: always abandon any leftover IN_PROGRESS session and start a
-  // fresh one. No resume — interrupted sessions do not count toward official Progress.
-  useEffect(() => {
-    if (tab !== 'learn' || learnStep !== 2) return;
-    if (isReviewMode) return;
-    if (!topicId) return;
-    if (selectedWordIds.length === 0) return;
-    if (sessionId != null) return;
-    if (sessionEnsuring) return;
-
-    const requestId = ++sessionEnsureRequestIdRef.current;
-    setSessionEnsuring(true);
-    (async () => {
-      let resolvedSession: LearningSession | null = null;
-      try {
-        // Abandon any leftover IN_PROGRESS session for this user/topic/mode.
-        try {
-          const stale = await learningProgressApi.getActiveLearningSession('STUDY', topicId);
-          if (stale) {
-            try { await learningProgressApi.abandonLearningSession(stale.sessionId); } catch {}
-          }
-        } catch {}
-
-        // Deduplicate vocab ids so item count equals unique selected vocab count.
-        const uniqueVocabIds = Array.from(new Set(selectedWordIds));
-        resolvedSession = await learningProgressApi.startLearningSession({
-          mode: 'STUDY',
-          topicId,
-          vocabIds: uniqueVocabIds,
-        });
-      } catch (err) {
-        if (requestId === sessionEnsureRequestIdRef.current) {
-          const message = err instanceof Error ? err.message : 'Không thể bắt đầu phiên học.';
-          onAddToast(message, 'error');
-        }
-      }
-
-      if (requestId !== sessionEnsureRequestIdRef.current) return;
-      if (resolvedSession) {
-        setSessionId(resolvedSession.sessionId);
-      }
-      setSessionEnsuring(false);
-    })();
-  }, [tab, learnStep, isReviewMode, topicId, selectedWordIds, sessionId, sessionEnsuring, onAddToast]);
-
-  // Clear sessionId when leaving learn step 2.
-  useEffect(() => {
-    if (learnStep !== 2) {
+    if (learnStep === 1) {
       setSessionId(null);
     }
   }, [learnStep]);
@@ -432,25 +369,16 @@ const StudySession = () => {
     // Phase C (review mode) uses backend scheduling only, never current queue reinsertion.
     const shouldReinsert = !isReviewMode && !isDueReviewWord && !isPhaseB && (quality === 0 || quality === 3);
 
-    // STUDY mode requires a server-side LearningSession — never fall back to legacy per-word
-    // commit, which would write Progress immediately and defeat the draft flow.
-    if (!isReviewMode && sessionId == null) {
+    // Every mode requires a server-side draft. Never fall back to per-word progress writes.
+    if (sessionId == null) {
       onAddToast("Đang khởi tạo phiên học. Vui lòng thử lại sau giây lát.", "error");
       return;
     }
 
     setReviewSubmitting(true);
     try {
-      // STUDY mode: save draft only, defer Progress commit until session completes.
-      // REVIEW mode still uses legacy per-word commit (review migration out of scope).
       // Phase B repeat: same vocabId — backend updates the same LearningSessionItem row.
-      if (!isReviewMode) {
-        await learningProgressApi.saveLearningSessionAnswer(sessionId!, normalizedWordId, quality);
-        // STUDY draft saves are silent on success — avoid toast spam across many answers.
-      } else {
-        await learningProgressApi.submitSingleReview(normalizedWordId, topicId, quality, isPhaseB);
-        onAddToast("Đã lưu tiến trình học tập", "success");
-      }
+      await learningProgressApi.saveLearningSessionAnswer(sessionId, normalizedWordId, quality);
 
       const updatedSubmittedIds = new Set([...sessionSubmittedIds, normalizedWordId]);
       setSessionSubmittedIds(updatedSubmittedIds);
@@ -478,18 +406,7 @@ const StudySession = () => {
         setCurrentIndex(index + 1);
         setIsFlipped(false);
       } else {
-        // Last attempt (Phase A or Phase B) — commit draft session before advancing.
-        // STUDY mode must NOT advance if completion fails: official Progress was not written.
-        if (!isReviewMode) {
-          try {
-            await learningProgressApi.completeLearningSession(sessionId!);
-            onAddToast("Đã hoàn tất phiên học.", "success");
-          } catch (err) {
-            const message = err instanceof Error ? err.message : 'Không thể hoàn tất phiên học. Vui lòng thử lại.';
-            onAddToast(message, "error");
-            return;
-          }
-        }
+        // Flashcards are draft study work. Final progress/XP commits after practice.
         onLast();
       }
     } catch {
@@ -497,7 +414,15 @@ const StudySession = () => {
     } finally {
       setReviewSubmitting(false);
     }
-  }, [reviewSubmitting, topicId, onAddToast, sessionSubmittedIds, isReviewMode, reviewWordIdSet, sessionId]);
+  }, [
+    reviewSubmitting,
+    topicId,
+    onAddToast,
+    sessionSubmittedIds,
+    isReviewMode,
+    reviewWordIdSet,
+    sessionId,
+  ]);
 
   const addMoreNewWords = useCallback((count: number) => {
     setSelectedWordIds((prev) => {
@@ -519,12 +444,39 @@ const StudySession = () => {
     setReviewPage(0);
   }, [reviewWords]);
 
-  const startSelectedStudyQueue = useCallback(() => {
-    setLearnStep(2);
-    setCurrentIndex(0);
-    setSessionQueue([...selectedWords]);
-    setSessionSubmittedIds(new Set());
-  }, [selectedWords]);
+  const startSelectedStudyQueue = useCallback(async () => {
+    if (selectedWords.length === 0 || sessionEnsuring) return;
+
+    if (!topicId) return;
+
+    setSessionEnsuring(true);
+    try {
+      const mode = isReviewMode ? 'REVIEW' : 'STUDY';
+      try {
+        const stale = await learningProgressApi.getActiveLearningSession(mode, topicId);
+        if (stale) {
+          try { await learningProgressApi.abandonLearningSession(stale.sessionId); } catch {}
+        }
+      } catch {}
+
+      const session = await learningProgressApi.startLearningSession({
+        mode,
+        topicId,
+        vocabIds: Array.from(new Set(selectedWordIds)),
+      });
+
+      setSessionId(session.sessionId);
+      setLearnStep(2);
+      setCurrentIndex(0);
+      setSessionQueue([...selectedWords]);
+      setSessionSubmittedIds(new Set());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể bắt đầu phiên học.';
+      onAddToast(message, 'error');
+    } finally {
+      setSessionEnsuring(false);
+    }
+  }, [selectedWords, sessionEnsuring, isReviewMode, topicId, selectedWordIds, onAddToast]);
 
   const pagedReviewWords = useMemo(
     () => reviewWords.slice(reviewPage * REVIEW_PAGE_SIZE, (reviewPage + 1) * REVIEW_PAGE_SIZE),
@@ -557,48 +509,142 @@ const StudySession = () => {
   );
   const isActiveFullscreenSession = tab === "learn" && learnStep === 2;
   const isDarkFocusedSession = isActiveFullscreenSession && theme === "dark";
+  // Actual matching exercise (after the practice type is chosen) gets its own
+  // focused fullscreen, reusing the study-mode SVG background.
+  const isMatchingFullscreen = tab === "learn" && learnStep === 3 && matchType !== null;
+  const isMatchingDark = isMatchingFullscreen && theme === "dark";
+  // Active minitest gets the same focused fullscreen (entered via a confirm modal).
+  const isMinitestFullscreen = tab === "minitest" && isMinitestActive;
+  const isMinitestDark = isMinitestFullscreen && theme === "dark";
+
+  // Leaving the minitest tab clears the active flag so the confirm shows again next time.
+  useEffect(() => {
+    if (tab !== "minitest") setIsMinitestActive(false);
+  }, [tab]);
 
   useEffect(() => {
-    setStickyNotesLauncherHidden(isActiveFullscreenSession);
+    setStickyNotesLauncherHidden(isActiveFullscreenSession || isMatchingFullscreen || isMinitestFullscreen);
     return () => setStickyNotesLauncherHidden(false);
-  }, [isActiveFullscreenSession, setStickyNotesLauncherHidden]);
+  }, [isActiveFullscreenSession, isMatchingFullscreen, isMinitestFullscreen, setStickyNotesLauncherHidden]);
 
-  const handleFinishMatching = async (
+  const clearLocalDraft = useCallback(() => {
+    setSelectedWordIds([]);
+    setSessionQueue([]);
+    setSessionSubmittedIds(new Set());
+    setSessionId(null);
+    setCurrentIndex(0);
+    setMatchType(null);
+    setIpaFallbackNotice(false);
+    setPendingMatchingResult(null);
+    setMatchingCompletionError(null);
+  }, []);
+
+  const handleExit = useCallback(async () => {
+    if (sessionAbandoning || matchingCompleting) return;
+
+    const hasActiveDraft = tab === 'learn' && learnStep >= 2 && sessionId != null;
+    if (hasActiveDraft && !window.confirm('Thoát phiên học? Tiến trình chưa hoàn tất sẽ không được lưu.')) {
+      return;
+    }
+
+    if (hasActiveDraft) {
+      setSessionAbandoning(true);
+      try {
+        await learningProgressApi.abandonLearningSession(sessionId);
+      } catch {
+        // The draft remains harmless and is abandoned before the next session starts.
+      } finally {
+        setSessionAbandoning(false);
+      }
+    }
+
+    clearLocalDraft();
+    onFinish();
+  }, [
+    sessionAbandoning,
+    matchingCompleting,
+    tab,
+    learnStep,
+    sessionId,
+    clearLocalDraft,
+    onFinish,
+  ]);
+
+  const handleFinishMatching = useCallback(async (
     correct: number,
     total: number,
     time: number,
   ) => {
-    sessionStorage.removeItem('ss_study_v1');
-    const gainedXp = correct * 5;
+    if (matchingCompleting) return;
 
-    if (topicId && selectedWordIds.length > 0) {
-      await onWordsLearned(topicId, selectedWordIds);
+    const result = { correct, total, time };
+    setPendingMatchingResult(result);
+    setMatchingCompletionError(null);
+    setMatchingCompleting(true);
 
-      onRecordStudyHistory?.({
-        topicId,
-        topicTitle,
-        xp: gainedXp,
-        words: selectedWords.map((word: any) => ({
-          id: word.id,
-          word: word.word,
-          meaning: word.meaning,
-        })),
-        timeSpentSeconds: time,
-      });
+    try {
+      if (sessionId == null) {
+        throw new Error("Không tìm thấy phiên học để hoàn tất.");
+      }
+
+      const completion = await learningProgressApi.completeLearningSession(sessionId);
+      applyLearningProgress(completion.progress);
+      const analytics = await refreshLearnerAnalytics();
+
+      if (topicId && selectedWordIds.length > 0) {
+        onRecordStudyHistory?.({
+          topicId,
+          topicTitle,
+          xp: 0,
+          words: selectedWords.map((word: any) => ({
+            id: word.id,
+            word: word.word,
+            meaning: word.meaning,
+          })),
+          timeSpentSeconds: time,
+        });
+      }
+
+      setSelectedWordIds([]);
+      setSessionQueue([]);
+      setSessionSubmittedIds(new Set());
+      setSessionId(null);
+      setMatchType(null);
+      setIpaFallbackNotice(false);
+      setPendingMatchingResult(null);
+      const xpGained = completion.xpGained;
+      const streak = analytics?.streak;
+      onAddToast(
+        typeof xpGained === "number" && xpGained > 0
+          ? typeof streak === "number" && streak > 0
+            ? `Hoàn thành! +${xpGained} XP · Chuỗi ${streak} ngày 🔥`
+            : `Hoàn thành! +${xpGained} XP 🎉`
+          : "Đã hoàn tất phiên học 🎉",
+        "success",
+      );
+      onFinish();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Không thể hoàn tất phiên học. Vui lòng thử lại.";
+      setMatchingCompletionError(message);
+      onAddToast(message, "error");
+    } finally {
+      setMatchingCompleting(false);
     }
+  }, [
+    matchingCompleting,
+    sessionId,
+    applyLearningProgress,
+    refreshLearnerAnalytics,
+    topicId,
+    selectedWordIds,
+    onRecordStudyHistory,
+    topicTitle,
+    selectedWords,
+    onAddToast,
+    onFinish,
+  ]);
 
-    onAddXP(gainedXp);
-    onStreakCheck();
-    onAddToast(
-      `Hoàn thành! +${gainedXp} XP 🎉`,
-      "success",
-    );
-    setMatchType(null);
-    setIpaFallbackNotice(false);
-    setLearnStep(1);
-  };
-
-  if (!topicId || !studyWords) return <Navigate to={PATHS.learning} replace />;
+  if (navigationType !== "PUSH" || !topicId || !studyWords) return <Navigate to={PATHS.learning} replace />;
 
   if (words.length === 0)
     return (
@@ -611,32 +657,32 @@ const StudySession = () => {
     );
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      {!isActiveFullscreenSession && (
+    <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
+      {!isActiveFullscreenSession && !isMatchingFullscreen && !isMinitestFullscreen && (
         <>
-      <nav className="flex items-center gap-2 text-sm text-text-muted mb-6">
+      <nav className="flex items-center gap-2 overflow-hidden text-sm text-text-muted mb-5 sm:mb-6">
         <button
-          onClick={() => onFinish()}
+          onClick={handleExit}
           className="hover:text-primary transition-colors cursor-pointer active:scale-95"
         >
           Học tập
         </button>
         <ChevronRight size={14} />
         <button
-          onClick={() => onFinish()}
+          onClick={handleExit}
           className="hover:text-primary transition-colors cursor-pointer active:scale-95"
         >
           {breadcrumbCategoryTitle}
         </button>
         <ChevronRight size={14} />
-        <span className="text-primary font-bold">{breadcrumbTopicTitle}</span>
+        <span className="truncate text-primary font-bold">{breadcrumbTopicTitle}</span>
       </nav>
 
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8 sm:mb-12">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
-            onClick={() => onFinish()}
+            onClick={handleExit}
             className="p-2 rounded-full min-h-0"
           >
             <ArrowLeft size={24} />
@@ -666,16 +712,20 @@ const StudySession = () => {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 p-1 bg-surface rounded-pill border-2 border-primary/10">
+        <div className="-mx-4 flex gap-1 overflow-x-auto bg-surface px-4 py-1 border-y-2 border-primary/10 sm:mx-0 sm:gap-2 sm:overflow-visible sm:rounded-pill sm:border-2 sm:px-1">
           {(["flashcard", "learn", "minitest"] as const).map((t) => (
             <button
               key={t}
               onClick={() => {
+                if (t === "minitest") {
+                  setShowMinitestConfirm(true);
+                  return;
+                }
                 setTab(t);
                 setCurrentIndex(0);
                 setIsFlipped(false);
               }}
-              className={`h-12 px-6 rounded-pill font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap ${tab === t ? "bg-primary text-text-on-accent shadow-xl" : "text-text-muted hover:text-primary"}`}
+              className={`h-10 px-4 rounded-pill text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap sm:h-12 sm:px-6 sm:text-base ${tab === t ? "bg-primary text-text-on-accent shadow-xl" : "text-text-muted hover:text-primary"}`}
             >
               {t === "flashcard" && "📇 Flashcard"}
               {t === "learn" && "📖 Học"}
@@ -699,22 +749,22 @@ const StudySession = () => {
             <div className="w-full">
 
               {/* ── Flashcard carousel ────────────────────────────── */}
-              <div className="flex items-center justify-center gap-6 mb-8 max-w-4xl mx-auto">
+              <div className="mb-6 flex items-center justify-center gap-6 max-w-4xl mx-auto sm:mb-8">
                 {/* Left arrow */}
                 <button
                   type="button"
                   disabled={currentIndex === 0}
                   onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="hidden flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer sm:flex"
                 >
                   <ArrowLeft size={24} />
                 </button>
 
                 {/* CARD with search + flashcard */}
-                <div className="relative rounded-3xl border-2 border-primary/10 bg-surface p-5 pb-6 flex-1">
+                <div className="relative min-w-0 rounded-3xl border-2 border-primary/10 bg-surface p-3 pb-4 flex-1 sm:p-5 sm:pb-6">
 
                   {/* Search bar row — top of card */}
-                  <div className="flex items-center justify-center gap-3 mb-6">
+                  <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6">
                     <div className="relative w-full max-w-[260px] md:max-w-[320px]">
                       <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                       <input
@@ -729,7 +779,7 @@ const StudySession = () => {
                   </div>
 
                 {/* Flashcard */}
-                <div className="relative h-[480px] perspective-1000">
+                <div className="relative h-[min(62dvh,430px)] min-h-[340px] perspective-1000 sm:h-[480px]">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={`flashcard-${currentIndex}`}
@@ -745,14 +795,14 @@ const StudySession = () => {
                         transition={{ duration: 0.5, ease: "easeInOut" }}
                         className="w-full h-full relative preserve-3d cursor-pointer"
                       >
-                        <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-12 text-center h-full border-4 border-primary/20 bg-surface">
-                          <Badge variant="purple" className="mb-12 scale-125">
+                        <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-5 text-center h-full border-4 border-primary/20 bg-surface sm:p-12">
+                          <Badge variant="purple" className="mb-6 sm:mb-12 sm:scale-125">
                             Thẻ từ vựng
                           </Badge>
-                          <div className="text-[4.5rem] font-display font-extrabold mb-4 text-primary leading-none">
+                          <div className="max-w-full break-words text-[clamp(2.25rem,13vw,4rem)] font-display font-extrabold mb-4 text-primary leading-[1.05] sm:text-[4.5rem]">
                             {words[currentIndex].word}
                           </div>
-                          <div className="text-2xl text-text-muted font-ipa bg-purple/5 px-6 py-2 rounded-xl mb-12">
+                          <div className="max-w-full break-words text-base text-text-muted font-ipa bg-purple/5 px-3 py-2 rounded-xl mb-6 sm:px-6 sm:text-2xl sm:mb-12">
                             {words[currentIndex].transcription}
                           </div>
                           <div className="flex items-center gap-3">
@@ -771,17 +821,17 @@ const StudySession = () => {
                             </Button>
                             <Button
                               variant="secondary"
-                              className="px-10 py-4 text-lg"
+                              className="whitespace-nowrap px-5 py-3 text-sm sm:px-10 sm:py-4 sm:text-lg"
                             >
                               Xem nghĩa ▼
                             </Button>
                           </div>
                         </div>
-                        <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-12 text-center h-full">
-                          <Badge variant="pink" className="mb-12 scale-125">
+                        <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-5 text-center h-full sm:p-12">
+                          <Badge variant="pink" className="mb-6 sm:mb-12 sm:scale-125">
                             Nghĩa
                           </Badge>
-                          <div className="text-[2rem] sm:text-[2.5rem] font-bold mb-10 text-text-primary leading-tight">
+                          <div className="text-2xl sm:text-[2.5rem] font-bold mb-6 sm:mb-10 text-text-primary leading-tight">
                             {words[currentIndex].meaning}
                           </div>
                           <Button
@@ -797,8 +847,8 @@ const StudySession = () => {
                           >
                             <Volume2 size={18} />
                           </Button>
-                          <div className="bg-surface/70 p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
-                            <p className="italic font-serif text-xl leading-loose">"{words[currentIndex].example}"</p>
+                          <div className="bg-surface/70 p-4 sm:p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
+                            <p className="italic font-serif text-base leading-relaxed sm:text-xl sm:leading-loose">"{words[currentIndex].example}"</p>
                             {words[currentIndex].translation && (
                               <p className="text-sm text-text-muted mt-3">"{words[currentIndex].translation}"</p>
                             )}
@@ -815,9 +865,28 @@ const StudySession = () => {
                   type="button"
                   disabled={currentIndex === words.length - 1}
                   onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
-                  className="flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer"
+                  className="hidden flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer sm:flex"
                 >
                   <ArrowRight size={24} />
+                </button>
+              </div>
+
+              <div className="mb-5 flex items-center justify-between gap-3 sm:hidden">
+                <button
+                  type="button"
+                  disabled={currentIndex === 0}
+                  onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-primary/20 bg-surface px-4 text-sm font-bold text-text-secondary disabled:opacity-30"
+                >
+                  <ArrowLeft size={18} /> Trước
+                </button>
+                <button
+                  type="button"
+                  disabled={currentIndex === words.length - 1}
+                  onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-primary/20 bg-surface px-4 text-sm font-bold text-text-secondary disabled:opacity-30"
+                >
+                  Tiếp <ArrowRight size={18} />
                 </button>
               </div>
 
@@ -838,12 +907,12 @@ const StudySession = () => {
 
               {/* ── Word list modal ──────────────────────────────── */}
               {showWordList && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+                <div className="fixed inset-0 z-50 flex items-end justify-center px-0 pt-8 sm:items-center sm:px-4 sm:py-8">
                   <div
                     className="absolute inset-0 bg-black/40"
                     onClick={() => setShowWordList(false)}
                   />
-                  <div className="relative w-full max-w-lg bg-surface rounded-3xl shadow-2xl border border-border overflow-hidden">
+                  <div className="relative w-full max-w-lg max-h-[88dvh] bg-surface rounded-t-3xl shadow-2xl border border-border overflow-hidden sm:rounded-3xl">
                     <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                       <div className="font-bold text-text-primary">Danh sách từ vựng</div>
                       <button
@@ -867,7 +936,7 @@ const StudySession = () => {
                         />
                       </div>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto px-4 pb-4">
+                    <div className="max-h-[calc(88dvh-8.5rem)] overflow-y-auto px-4 pb-4 sm:max-h-[60vh]">
                       {!flashcardSearch.trim() && recentIndices.filter(i => i !== currentIndex).length > 0 && (
                         <div className="pt-4 pb-2">
                           <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted mb-2">🕐 Gần đây</p>
@@ -924,7 +993,7 @@ const StudySession = () => {
             exit={{ opacity: 0 }}
             key="learn-tab"
           >
-            {learnStep !== 2 && <div className="max-w-3xl mx-auto mb-16">
+            {learnStep !== 2 && !isMatchingFullscreen && <div className="max-w-3xl mx-auto mb-16">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-500 ${learnStep >= 1 ? "bg-primary border-primary text-text-on-accent" : "bg-surface border-primary/10 text-text-muted"}`}>
@@ -1004,10 +1073,10 @@ const StudySession = () => {
                       <div className="flex gap-3">
                         <Button
                           variant="primary"
-                          disabled={selectedWordIds.length === 0}
+                          disabled={selectedWordIds.length === 0 || sessionEnsuring}
                           onClick={startSelectedStudyQueue}
                         >
-                          Bắt đầu học →
+                          {sessionEnsuring ? "Đang khởi tạo..." : "Bắt đầu học →"}
                         </Button>
                         <Button variant="ghost" onClick={() => setSelectedWordIds([])}>
                           Bỏ chọn tất cả
@@ -1226,10 +1295,14 @@ const StudySession = () => {
                       <Button
                         variant="primary"
                         className="w-full"
-                        disabled={selectedWordIds.length === 0}
+                        disabled={selectedWordIds.length === 0 || sessionEnsuring}
                         onClick={startSelectedStudyQueue}
                       >
-                        {isReviewMode ? "Bắt đầu ôn tập" : "Bắt đầu học"}
+                        {sessionEnsuring
+                          ? "Đang khởi tạo..."
+                          : isReviewMode
+                            ? "Bắt đầu ôn tập"
+                            : "Bắt đầu học"}
                       </Button>
 
                       {isReviewMode && (
@@ -1327,7 +1400,8 @@ const StudySession = () => {
                     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:grid-cols-[1fr_minmax(240px,480px)_1fr] sm:gap-6">
                       <button
                         type="button"
-                        onClick={() => onFinish()}
+                        onClick={handleExit}
+                        disabled={sessionAbandoning}
                         className={`flex h-10 shrink-0 items-center justify-self-start rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
                           isDarkFocusedSession
                             ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5] hover:text-[#dac5f7]"
@@ -1402,12 +1476,12 @@ const StudySession = () => {
                             }`}>
                               Thẻ từ vựng
                             </Badge>
-                            <div className={`mb-3 text-5xl font-display font-extrabold leading-none sm:text-[4rem] ${
+                            <div className={`mb-3 max-w-full break-words text-[clamp(2.5rem,14vw,4rem)] font-display font-extrabold leading-[1.05] sm:text-[4rem] ${
                               isDarkFocusedSession ? "text-[#d2b6f4]" : "text-[#7440a8]"
                             }`}>
                               {activeSessionWords[currentIndex].word}
                             </div>
-                            <div className={`mb-6 rounded-xl px-5 py-2 font-ipa text-xl sm:mb-8 sm:text-2xl ${
+                            <div className={`mb-6 max-w-full break-words rounded-xl px-3 py-2 font-ipa text-base sm:mb-8 sm:px-5 sm:text-2xl ${
                               isDarkFocusedSession ? "bg-[#302742] text-[#cbbce2]" : "bg-[#f3ecff] text-[#6f6185]"
                             }`}>
                               {activeSessionWords[currentIndex].transcription}
@@ -1504,7 +1578,7 @@ const StudySession = () => {
                             },
                           )
                         }
-                        isSubmitting={reviewSubmitting}
+                        isSubmitting={reviewSubmitting || sessionId == null}
                       />
                     </div>
                   </div>
@@ -1512,73 +1586,249 @@ const StudySession = () => {
               </div>
             )}
 
-            {learnStep === 3 && (
+            {/* Practice-type chooser stays in the normal topic detail layout. */}
+            {learnStep === 3 && !matchType && (
               <div className="max-w-4xl mx-auto text-center">
-                {!matchType ? (
-                  <div className="py-12">
-                    <h3 className="text-3xl font-bold mb-8">
-                      Chọn kiểu luyện tập
-                    </h3>
-                    <div className="flex justify-center gap-6">
-                      <Button
-                        variant="primary"
-                        className="px-10 py-5 text-lg"
-                        onClick={() => setMatchType("word")}
-                      >
-                        Từ ↔ Nghĩa
-                      </Button>
+                <div className="py-12">
+                  <h3 className="text-3xl font-bold mb-8">
+                    Chọn kiểu luyện tập
+                  </h3>
+                  <div className="flex justify-center gap-6">
+                    <Button
+                      variant="primary"
+                      className="px-10 py-5 text-lg"
+                      disabled={sessionId == null}
+                      onClick={() => setMatchType("word")}
+                    >
+                      Từ ↔ Nghĩa
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="px-10 py-5 text-lg"
+                      disabled={sessionId == null}
+                      onClick={() => {
+                        if (ipaValidWords.length < 3) {
+                          setMatchType("word");
+                          setIpaFallbackNotice(true);
+                        } else {
+                          setMatchType("ipa");
+                          setIpaFallbackNotice(false);
+                        }
+                      }}
+                    >
+                      IPA ↔ Nghĩa
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Actual matching exercise: focused fullscreen on the study SVG bg. */}
+            {learnStep === 3 && matchType && (
+              <div
+                className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
+                  isMatchingDark ? "text-[#f5f0ff]" : "text-[#2b2140]"
+                }`}
+                style={{
+                  backgroundImage: `url(${studySessionBg})`,
+                  backgroundColor: isMatchingDark ? "#332942" : "#f3ecff",
+                  backgroundBlendMode: isMatchingDark ? "multiply" : "normal",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "cover",
+                }}
+              >
+                <header
+                  className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+                    isMatchingDark
+                      ? "border-[#584a70] bg-[#302742]/95"
+                      : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+                  }`}
+                >
+                  <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                    <button
+                      type="button"
+                      onClick={handleExit}
+                      disabled={sessionAbandoning || matchingCompleting}
+                      className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                        isMatchingDark
+                          ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
+                          : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                      }`}
+                      aria-label="Thoát phiên học"
+                    >
+                      <X size={20} />
+                      <span className="ml-2 hidden sm:inline">Thoát</span>
+                    </button>
+                    <span
+                      className={`font-display text-base font-bold ${
+                        isMatchingDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                      }`}
+                    >
+                      Nối từ
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openStickyNotes}
+                      className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                        isMatchingDark
+                          ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
+                          : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                      }`}
+                      aria-label="Ghi chú"
+                    >
+                      <NoteIcon className="h-4 w-4" />
+                      <span className="ml-2 hidden sm:inline">Ghi chú</span>
+                    </button>
+                  </div>
+                </header>
+
+                <div className="relative z-10 flex-1 overflow-y-auto px-3 py-6 sm:px-6 sm:py-8">
+                  {ipaFallbackNotice && (
+                    <p className="mx-auto mb-4 max-w-3xl text-center text-sm text-text-secondary">
+                      Đã chuyển sang chế độ từ vựng vì chưa đủ dữ liệu IPA.
+                    </p>
+                  )}
+                  <MatchingGame
+                    words={matchType === "ipa" ? ipaValidWords : selectedWords}
+                    type={matchType}
+                    onFinish={handleFinishMatching}
+                  />
+                  {matchingCompleting && (
+                    <p className="mt-4 text-center text-sm font-semibold text-text-secondary">
+                      Đang hoàn tất phiên học...
+                    </p>
+                  )}
+                  {matchingCompletionError && pendingMatchingResult && (
+                    <div className="mx-auto mt-4 flex max-w-md flex-col items-center gap-3 rounded-2xl border border-red-300/60 bg-red-50/80 p-4 text-sm text-red-700">
+                      <p>{matchingCompletionError}</p>
                       <Button
                         variant="secondary"
-                        className="px-10 py-5 text-lg"
-                        onClick={() => {
-                          if (ipaValidWords.length < 3) {
-                            setMatchType("word");
-                            setIpaFallbackNotice(true);
-                          } else {
-                            setMatchType("ipa");
-                            setIpaFallbackNotice(false);
-                          }
-                        }}
+                        disabled={matchingCompleting}
+                        onClick={() =>
+                          handleFinishMatching(
+                            pendingMatchingResult.correct,
+                            pendingMatchingResult.total,
+                            pendingMatchingResult.time,
+                          )
+                        }
                       >
-                        IPA ↔ Nghĩa
+                        Thử hoàn tất lại
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <>
-                    {ipaFallbackNotice && (
-                      <p className="mb-4 text-sm text-text-secondary text-center">
-                        Đã chuyển sang chế độ từ vựng vì chưa đủ dữ liệu IPA.
-                      </p>
-                    )}
-                    <MatchingGame
-                      words={matchType === "ipa" ? ipaValidWords : selectedWords}
-                      type={matchType}
-                      onFinish={handleFinishMatching}
-                    />
-                  </>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </motion.div>
         )}
 
-        {tab === "minitest" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            key="minitest-tab"
+        {tab === "minitest" && isMinitestActive && (
+          <div
+            className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
+              isMinitestDark ? "text-[#f5f0ff]" : "text-[#2b2140]"
+            }`}
+            style={{
+              backgroundImage: `url(${studySessionBg})`,
+              backgroundColor: isMinitestDark ? "#332942" : "#f3ecff",
+              backgroundBlendMode: isMinitestDark ? "multiply" : "normal",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              backgroundSize: "cover",
+            }}
           >
-            <Minitest
-              topicId={topicId}
-              learnedWords={learnedWordsForMinitest}
-              topicWords={words}
-              onFinish={onFinish}
-            />
-          </motion.div>
+            <header
+              className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+                isMinitestDark
+                  ? "border-[#584a70] bg-[#302742]/95"
+                  : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+              }`}
+            >
+              <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+                <button
+                  type="button"
+                  onClick={handleExit}
+                  disabled={sessionAbandoning}
+                  className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                    isMinitestDark
+                      ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
+                      : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                  }`}
+                  aria-label="Thoát bài kiểm tra"
+                >
+                  <X size={20} />
+                  <span className="ml-2 hidden sm:inline">Thoát</span>
+                </button>
+                <span
+                  className={`font-display text-base font-bold ${
+                    isMinitestDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                  }`}
+                >
+                  Kiểm tra
+                </span>
+                <button
+                  type="button"
+                  onClick={openStickyNotes}
+                  className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                    isMinitestDark
+                      ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
+                      : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                  }`}
+                  aria-label="Ghi chú"
+                >
+                  <NoteIcon className="h-4 w-4" />
+                  <span className="ml-2 hidden sm:inline">Ghi chú</span>
+                </button>
+              </div>
+            </header>
+
+            <div className="relative z-10 flex-1 overflow-y-auto px-3 py-6 sm:px-6 sm:py-8">
+              <Minitest
+                topicId={topicId}
+                learnedWords={learnedWordsForMinitest}
+                topicWords={words}
+                onFinish={onFinish}
+              />
+            </div>
+          </div>
         )}
       </AnimatePresence>
+
+      {/* Confirm before starting the test. Only shown on the Kiểm tra tab click,
+          never while the test is already active. */}
+      {showMinitestConfirm && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowMinitestConfirm(false)}
+          />
+          <div className="relative w-full max-w-sm rounded-3xl border border-primary/15 bg-surface p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-3xl">
+              🧪
+            </div>
+            <h3 className="font-display text-xl font-bold text-text-primary">
+              Bạn có muốn bắt đầu bài kiểm tra không?
+            </h3>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+              <Button variant="ghost" onClick={() => setShowMinitestConfirm(false)}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowMinitestConfirm(false);
+                  setTab("minitest");
+                  setCurrentIndex(0);
+                  setIsFlipped(false);
+                  setIsMinitestActive(true);
+                }}
+              >
+                Bắt đầu kiểm tra
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
