@@ -1,0 +1,15 @@
+# VocabLearning
+
+> VocabLearning là nền tảng học từ vựng tiếng Anh theo chủ đề, dùng cơ chế game hoá (XP, streak, mini-test) và ôn tập ngắt quãng để ghi nhớ lâu.
+
+## Chính
+
+- [Trang chủ](https://vocablearning.online/): Giới thiệu và bắt đầu học.
+- [Học theo chủ đề](https://vocablearning.online/learning): Danh sách chủ đề từ vựng.
+- [Từ vựng](https://vocablearning.online/vocabulary): Tra cứu và ôn tập từ.
+- [Bảng xếp hạng](https://vocablearning.online/leaderboard): Xếp hạng người học theo XP.
+
+## Ghi chú
+
+- Ứng dụng SPA (React). Nội dung động cần đăng nhập.
+- API backend tại /api/*.

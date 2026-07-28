@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Coiny&family=Nunito:wght@700;800;900&family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Quicksand:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Mono&display=swap');
+/* Google Fonts are loaded non-render-blocking via <link> in index.html. */
 @import "tailwindcss";
 
 :root {
@@ -9,7 +9,9 @@
     --surface-hover: #f8f0ff;
     --text-primary: #1e1b4b;
     --text-secondary: #5b5697;
-    --text-muted: #7c69c8;
+    /* Darkened from #7c69c8 to reach WCAG AA (~5.4:1 on light bg); the old value
+       measured ~4.2:1 and failed the Lighthouse contrast audit on muted text. */
+    --text-muted: #6959aa;
     --text-on-accent: #ffffff;
     --border-color: #e9d5ff;
     --accent-color: #9333ea;
