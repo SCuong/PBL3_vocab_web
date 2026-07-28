@@ -5,7 +5,7 @@ type LogoProps = {
 
 export const Logo = ({ size = 36, className = '' }: LogoProps) => (
     <img
-        src="/logo.png"
+        src="/logo.webp"
         width={size}
         height={size}
         alt="VocabLearning logo"
