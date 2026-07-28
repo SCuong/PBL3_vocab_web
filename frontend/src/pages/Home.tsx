@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Brain, Activity, ChevronRight, Play, Volume2, Star } from 'lucide-react';
+import {
+    ChevronRight, Play, Volume2, Star,
+    MessageCircle, Briefcase, HeartPulse, Plane, House, Smile, Microscope, Library,
+    Target, BookOpen, Gamepad2,
+} from 'lucide-react';
 import { PATHS } from '../routes/paths';
 import { typography } from '../components/ui';
 import { useAppContext } from '../context/AppContext';
@@ -56,29 +60,30 @@ const HeroVisual = () => (
     </div>
 );
 
-/* ── Feature data ───────────────────────────────────────────────────── */
-const features = [
-    { icon: <Layers size={22} />, tone: 'text-primary bg-primary/10', title: 'Lặp lại ngắt quãng', desc: 'Ghi nhớ thông minh với thuật toán khoa học' },
-    { icon: <Brain size={22} />, tone: 'text-accent bg-accent/10', title: 'Spaced Repetition', desc: 'Ôn đúng lúc bạn sắp quên để ghi nhớ lâu dài' },
-    { icon: <Activity size={22} />, tone: 'text-cyan bg-cyan/10', title: 'Theo dõi tiến độ', desc: 'Thống kê chi tiết giúp bạn tiến bộ mỗi ngày' },
-];
-
 /* ── Topics data ────────────────────────────────────────────────────── */
 const topics = [
-    { emoji: '💬', name: 'Giao tiếp hàng ngày', count: '10 chủ đề', tone: 'hover:border-primary' },
-    { emoji: '💼', name: 'Công việc & Học tập', count: '9 chủ đề', tone: 'hover:border-cyan' },
-    { emoji: '🏥', name: 'Sức khoẻ', count: '5 chủ đề', tone: 'hover:border-success-color' },
-    { emoji: '✈️', name: 'Giải trí & Du lịch', count: '5 chủ đề', tone: 'hover:border-warning-color' },
-    { emoji: '🏠', name: 'Cuộc sống hàng ngày', count: '10 chủ đề', tone: 'hover:border-accent' },
-    { emoji: '💭', name: 'Cảm xúc & Ý kiến', count: '5 chủ đề', tone: 'hover:border-primary' },
-    { emoji: '🔬', name: 'Văn hoá & Khoa học', count: '6 chủ đề', tone: 'hover:border-cyan' },
+    { icon: MessageCircle, name: 'Giao tiếp hàng ngày', count: '10 chủ đề' },
+    { icon: Briefcase, name: 'Công việc & Học tập', count: '9 chủ đề' },
+    { icon: House, name: 'Cuộc sống hàng ngày', count: '10 chủ đề' },
+    { icon: Microscope, name: 'Văn hoá & Khoa học', count: '6 chủ đề' },
+    { icon: HeartPulse, name: 'Sức khoẻ', count: '5 chủ đề' },
+    { icon: Plane, name: 'Giải trí & Du lịch', count: '5 chủ đề' },
+    { icon: Smile, name: 'Cảm xúc & Ý kiến', count: '5 chủ đề' },
 ];
 
 /* ── Steps data ─────────────────────────────────────────────────────── */
 const steps = [
-    { num: '01', icon: '🎯', title: 'Chọn chủ đề', desc: 'Chọn chủ đề bạn muốn học từ 50+ chủ đề được phân loại rõ ràng theo cấp độ CEFR.' },
-    { num: '02', icon: '🃏', title: 'Học flashcard', desc: 'Học từ vựng qua flashcard 3D kết hợp với phát âm chuẩn IPA và ví dụ thực tế.' },
-    { num: '03', icon: '🎮', title: 'Luyện tập & Ôn tập', desc: 'Củng cố kiến thức qua trò chơi matching, quiz và hệ thống nhắc ôn tập thông minh.' },
+    { num: '01', icon: Target, title: 'Chọn chủ đề', desc: 'Từ 50+ chủ đề phân loại theo cấp độ CEFR.' },
+    { num: '02', icon: BookOpen, title: 'Học flashcard', desc: 'Thẻ lật 3D kèm phát âm IPA và ví dụ thực tế.' },
+    { num: '03', icon: Gamepad2, title: 'Luyện tập & ôn lại', desc: 'Trò chơi ghép từ, quiz, và nhắc ôn đúng lúc.' },
+];
+
+/* ── Spaced-repetition schedule (the method, not a claim) ───────────── */
+const schedule = [
+    { label: 'Ngày 1', note: 'Học lần đầu' },
+    { label: 'Ngày 3', note: 'Nhắc lại' },
+    { label: 'Ngày 7', note: 'Củng cố' },
+    { label: 'Ngày 21', note: 'Ghi nhớ dài hạn' },
 ];
 
 /* ── IntersectionObserver hook for fade-in ───────────────────────────── */
@@ -90,7 +95,7 @@ function useFadeIn() {
         const items = el.querySelectorAll('.home-fade-in');
         const obs = new IntersectionObserver(
             entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } }),
-            { threshold: 0.22, rootMargin: '0px 0px -18% 0px' }
+            { threshold: 0.18, rootMargin: '0px 0px -12% 0px' }
         );
         items.forEach(item => obs.observe(item));
         return () => obs.disconnect();
@@ -154,115 +159,115 @@ const Home = () => {
                 </div>
             </section>
 
-            {/* ── FEATURES STRIP ── */}
-            <section className="home-feature-strip border-t border-b border-primary/10 py-10 px-4 flex justify-center sm:px-8 sm:py-14" aria-label="Tính năng nổi bật">
-                <div className="w-full max-w-[1280px] grid grid-cols-1 md:grid-cols-3 items-stretch">
-                    {features.map((feat, i) => (
-                        <div key={i} className="flex items-center">
-                            {i > 0 && <div className="hidden md:block w-px h-16 bg-primary/15 mx-0" />}
-                            <div className="home-fade-in flex-1 flex items-center gap-4 px-2 py-4 text-left sm:gap-5 sm:px-7 lg:px-12" style={{ transitionDelay: `${i * 180}ms` }}>
-                                <div className={`home-feature-icon ${feat.tone}`}>
-                                    {feat.icon}
+            {/* ── CÁCH HOẠT ĐỘNG ── */}
+            <section className="ss-row ss-row--flip ss-band home-defer">
+                <div className="ss-proof home-fade-in" style={{ transitionDelay: '0ms' }}>
+                    <ol className="ss-stepper">
+                        {steps.map(step => (
+                            <li key={step.num} className="ss-step">
+                                <span className="ss-step-mark">
+                                    <step.icon size={20} strokeWidth={1.75} />
+                                </span>
+                                <div className="min-w-0">
+                                    <div className="ss-step-num">{step.num}</div>
+                                    <h3 className="ss-step-title">{step.title}</h3>
+                                    <p className="ss-step-desc">{step.desc}</p>
                                 </div>
-                                <div>
-                                    <div className="font-display font-extrabold text-lg lg:text-xl leading-tight text-text-primary">{feat.title}</div>
-                                    <div className="text-[0.9375rem] lg:text-base text-text-secondary mt-1 leading-relaxed">{feat.desc}</div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── TOPICS ── */}
-            <section className="px-4 py-14 sm:px-8 sm:py-20 lg:py-24">
-                <div className="max-w-[1200px] mx-auto">
-                    <div className="home-fade-in text-center mb-12">
-                        <h2 className={`${typography.sectionTitle} block w-full text-center`}>
-                            Khám phá chủ đề
-                        </h2>
-                        <p className="text-base sm:text-lg text-text-secondary mt-3 text-center block w-full mx-auto">
-                            2,400+ từ vựng được phân loại theo 7 chủ đề chính và 50+ chủ đề nhỏ
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {topics.map((topic, i) => (
-                            <button
-                                key={i}
-                                onClick={() => navigate(PATHS.vocabulary)}
-                                className={`home-fade-in home-topic-card group text-left ${topic.tone}`}
-                                style={{ transitionDelay: `${i * 110}ms` }}
-                            >
-                                <span className="text-[28px] relative z-10">{topic.emoji}</span>
-                                <span className="font-bold text-sm text-text-primary relative z-10">{topic.name}</span>
-                                <span className="text-xs text-text-muted relative z-10">{topic.count}</span>
-                            </button>
+                            </li>
                         ))}
-                        <button
-                            onClick={() => navigate(PATHS.vocabulary)}
-                            className="home-fade-in home-topic-card text-left"
-                            style={{ transitionDelay: `${topics.length * 110}ms`, borderStyle: 'dashed' }}
-                        >
-                            <span className="text-[28px] relative z-10">📚</span>
-                            <span className="font-bold text-sm text-text-primary relative z-10">Xem tất cả</span>
-                            <span className="text-xs text-text-muted relative z-10">50+ chủ đề →</span>
+                    </ol>
+                </div>
+
+                <div className="ss-text home-fade-in" style={{ transitionDelay: '120ms' }}>
+                    <h2 className={typography.sectionTitle}>Ba bước, rồi bạn vào việc</h2>
+                    <p className="ss-lede">
+                        Không có bảng điều khiển rắc rối. Chọn một chủ đề, lật vài tấm thẻ,
+                        rồi để hệ thống nhắc bạn ôn đúng lúc.
+                    </p>
+                    <div className="ss-actions">
+                        <button onClick={() => navigate(PATHS.learning)} className="ss-chip">
+                            Bắt đầu học
+                            <ChevronRight size={14} className="shrink-0" />
                         </button>
                     </div>
                 </div>
             </section>
 
-            {/* ── HOW IT WORKS ── */}
-            <section className="home-defer px-4 py-14 sm:px-8 sm:py-20 lg:py-24 bg-bg-light border-t border-b border-border">
-                <div className="max-w-[1200px] mx-auto">
-                    <div className="home-fade-in text-center mb-12">
-                        <h2 className={`${typography.sectionTitle} block w-full text-center`}>
-                            Cách hoạt động
-                        </h2>
-                        <p className="text-base sm:text-lg text-text-secondary mt-3 text-center block w-full mx-auto">
-                            Ba bước đơn giản để bắt đầu hành trình học từ vựng
-                        </p>
+            {/* ── CHỦ ĐỀ ── */}
+            <section className="ss-row home-defer">
+                <div className="ss-text home-fade-in" style={{ transitionDelay: '0ms' }}>
+                    <h2 className={typography.sectionTitle}>Chọn thứ bạn thật sự cần nói</h2>
+                    <p className="ss-lede">
+                        2.400+ từ vựng, chia theo 7 nhóm chính và hơn 50 chủ đề nhỏ — từ hội thoại
+                        hằng ngày tới công việc, sức khoẻ và du lịch.
+                    </p>
+                    <div className="ss-actions">
+                        <button onClick={() => navigate(PATHS.vocabulary)} className="ss-chip">
+                            <Library size={14} className="shrink-0" />
+                            Xem tất cả chủ đề
+                        </button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-6">
-                        {steps.map((step, i) => (
-                            <div key={i} className="contents">
-                                {i > 0 && (
-                                    <div className="hidden md:flex justify-center text-[2.75rem] text-primary/40 font-display">→</div>
-                                )}
-                                <div className="home-fade-in home-step-card" style={{ transitionDelay: `${i * 160}ms` }}>
-                                    <div className="text-xs font-bold text-primary tracking-[0.1em] mb-3">{step.num}</div>
-                                    <div className="text-[40px] mb-4">{step.icon}</div>
-                                    <h3 className="font-display font-bold text-xl text-text-primary mb-3">{step.title}</h3>
-                                    <p className="text-sm text-text-muted leading-relaxed">{step.desc}</p>
-                                </div>
-                            </div>
+                </div>
+
+                <div className="ss-proof home-fade-in" style={{ transitionDelay: '120ms' }}>
+                    <ul className="ss-topics">
+                        {topics.map(topic => (
+                            <li key={topic.name}>
+                                <button onClick={() => navigate(PATHS.vocabulary)} className="ss-topic">
+                                    <span className="ss-topic-icon">
+                                        <topic.icon size={18} strokeWidth={1.75} />
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="ss-topic-name">{topic.name}</span>
+                                        <span className="ss-topic-count">{topic.count}</span>
+                                    </span>
+                                </button>
+                            </li>
                         ))}
-                    </div>
+                    </ul>
                 </div>
             </section>
 
+            {/* ── GHI NHỚ ── */}
+            <section className="ss-row ss-row--flip ss-band home-defer">
+                <div className="ss-proof home-fade-in" style={{ transitionDelay: '0ms' }}>
+                    <ol className="ss-schedule">
+                        {schedule.map((slot, i) => (
+                            <li key={slot.label} className="ss-slot" style={{ ['--slot-fill' as string]: `${28 + i * 24}%` }}>
+                                <span className="ss-slot-label">{slot.label}</span>
+                                <span className="ss-slot-track" aria-hidden="true"><span className="ss-slot-fill" /></span>
+                                <span className="ss-slot-note">{slot.note}</span>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+
+                <div className="ss-text home-fade-in" style={{ transitionDelay: '120ms' }}>
+                    <h2 className={typography.sectionTitle}>Ôn đúng lúc bạn sắp quên</h2>
+                    <p className="ss-lede">
+                        Lặp lại ngắt quãng giãn dần khoảng cách giữa các lần ôn. Mỗi lần nhớ lại
+                        thành công, từ đó được đẩy xa hơn — nên bạn ôn ít đi mà nhớ lâu hơn.
+                    </p>
+                    <p className="ss-note">
+                        Chuỗi ngày học và tiến độ từng chủ đề được ghi lại, để bạn thấy mình
+                        đang đi tới đâu.
+                    </p>
+                </div>
+            </section>
+
+            {/* ── KẾT TRANG ── */}
             {!currentUser && (
-                <section className="home-cta-section home-defer px-4 py-14 sm:px-8 sm:py-20 lg:py-24">
-                    <div className="home-fade-in max-w-[680px] mx-auto px-0 text-center relative z-10 sm:px-8">
-                        <div className="home-cta-bounce text-[3rem] mb-4 block" aria-hidden="true">
-                            📚
-                        </div>
-                        <h2 className={`${typography.sectionTitle} text-text-primary mb-4`}>
-                            Sẵn sàng bắt đầu chưa?
-                        </h2>
-                        <p className="text-base sm:text-lg text-text-secondary mb-8 leading-relaxed">
-                            Đăng ký miễn phí và khám phá toàn bộ kho từ vựng ngay hôm nay.
+                <section className="ss-close home-defer">
+                    <div className="home-fade-in">
+                        <p className="ss-close-line">Sẵn sàng bắt đầu chưa?</p>
+                        <p className="ss-close-sub">
+                            Đăng ký miễn phí và mở khoá toàn bộ kho từ vựng ngay hôm nay.
                         </p>
-                        <div className="flex flex-col justify-center items-center gap-3 sm:flex-row sm:gap-4">
-                            <button
-                                onClick={() => navigate(PATHS.register)}
-                                className="inline-flex w-full items-center justify-center font-display font-bold text-base text-text-on-accent bg-linear-to-r from-primary to-accent rounded-full shadow-[0_4px_24px_var(--shadow-color)] hover:brightness-105 hover:-translate-y-0.5 hover:shadow-[0_10px_34px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-[transform,filter,box-shadow] duration-200 px-6 py-4 cursor-pointer sm:w-auto sm:px-10"
-                            >
+                        <div className="ss-actions ss-actions--close">
+                            <button onClick={() => navigate(PATHS.register)} className="btn-primary !px-10 !py-4 !text-base">
                                 Tạo tài khoản miễn phí
                             </button>
-                            <button
-                                onClick={() => navigate(PATHS.vocabulary)}
-                                className="inline-flex w-full items-center justify-center font-display font-bold text-sm text-primary bg-surface border-2 border-primary/20 rounded-full hover:border-primary/35 hover:bg-primary-light hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-[transform,background-color,border-color] duration-200 px-6 py-4 cursor-pointer sm:w-auto sm:px-8"
-                            >
+                            <button onClick={() => navigate(PATHS.vocabulary)} className="ss-chip">
                                 Xem từ vựng trước
                             </button>
                         </div>

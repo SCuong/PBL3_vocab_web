@@ -36,3 +36,7 @@ database/ImportVocabularyPBL3/
 
 # Ignore SQL dump
 database/init.sql
+
+# Local test output
+frontend/playwright-report/
+frontend/test-results/
