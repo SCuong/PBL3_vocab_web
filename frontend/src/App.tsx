@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
@@ -10,12 +10,29 @@ import { AdminRoute } from './routes/guards/AdminRoute';
 import { ProtectedRoute } from './routes/guards/ProtectedRoute';
 import { PublicOnlyRoute } from './routes/guards/PublicOnlyRoute';
 import { AuthNavbar, Footer, Navbar, StickyNotesProvider, StickyNotesWidget } from './components/layout';
-import { LearningTopics } from './components/learning/LearningTopics';
-import { StudySession } from './components/learning/StudySession';
 import { StreakModal } from './components/learning/streak';
 import { Button, Toast } from './components/ui';
 import { Logo } from './assets/Logo';
-import { AdminDashboard, Auth, Home, LearnerDashboard, Leaderboard, MinitestResult, MinitestReview, Profile, VerifyEmail, VerifyEmailSent, Vocabulary } from './pages';
+import Home from './pages/Home';
+
+// Route-level code splitting: keep Home (landing/LCP) eager, lazy-load the rest
+// so the initial bundle stays small and admin/study code only ships when needed.
+const Auth = lazy(() => import('./pages/Auth'));
+const LearnerDashboard = lazy(() => import('./pages/LearnerDashboard'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const MinitestResult = lazy(() => import('./pages/MinitestResult'));
+const MinitestReview = lazy(() => import('./pages/MinitestReview'));
+const Profile = lazy(() => import('./pages/Profile'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const VerifyEmailSent = lazy(() => import('./pages/VerifyEmailSent'));
+const Vocabulary = lazy(() => import('./pages/Vocabulary'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const LearningTopics = lazy(() =>
+    import('./components/learning/LearningTopics').then(m => ({ default: m.LearningTopics })),
+);
+const StudySession = lazy(() =>
+    import('./components/learning/StudySession').then(m => ({ default: m.StudySession })),
+);
 
 const AUTH_PATHS: string[] = [PATHS.login, PATHS.register, PATHS.verifyEmail, PATHS.verifyEmailSent];
 
@@ -87,6 +104,7 @@ const AppShell = () => {
                         transition={{ duration: 0.15 }}
                         className="w-full"
                     >
+                        <Suspense fallback={null}>
                         <Routes>
                             <Route path="/" element={<Navigate to={PATHS.home} replace />} />
                             <Route path={PATHS.home} element={<Home />} />
@@ -138,6 +156,7 @@ const AppShell = () => {
                             />
                             <Route path="*" element={<Navigate to={PATHS.home} replace />} />
                         </Routes>
+                        </Suspense>
                     </motion.div>
                 </AnimatePresence>
 
@@ -152,9 +171,9 @@ const AppShell = () => {
                                 🎁
                             </div>
                             <div>
-                                <h4 className="signup-banner-title text-xs font-bold text-text-primary sm:mb-1 sm:text-xl">
+                                <p className="signup-banner-title text-xs font-bold text-text-primary sm:mb-1 sm:text-xl">
                                     Đăng ký để lưu tiến độ!
-                                </h4>
+                                </p>
                                 <p className="hidden text-sm text-text-muted sm:block">
                                     Nhận ngay +100 XP thưởng và mở khóa Streak 🔥
                                 </p>
