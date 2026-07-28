@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Gift } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { primeAntiforgery } from './services/apiClient';
@@ -167,15 +167,15 @@ const AppShell = () => {
                         className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-2xl bg-surface/95 backdrop-blur-xl border-2 border-primary/30 p-3 rounded-card shadow-2xl flex items-center justify-between gap-2 sm:bottom-8 sm:w-[90%] sm:gap-6 sm:p-6"
                     >
                         <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="hidden w-14 h-14 rounded-full bg-linear-to-br from-primary to-secondary items-center justify-center text-text-on-accent text-3xl shadow-lg sm:flex">
-                                🎁
+                            <div className="hidden w-14 h-14 rounded-full bg-primary items-center justify-center text-text-on-accent shadow-lg sm:flex">
+                                <Gift size={24} strokeWidth={1.75} />
                             </div>
                             <div>
                                 <p className="signup-banner-title text-xs font-bold text-text-primary sm:mb-1 sm:text-xl">
                                     Đăng ký để lưu tiến độ!
                                 </p>
                                 <p className="hidden text-sm text-text-muted sm:block">
-                                    Nhận ngay +100 XP thưởng và mở khóa Streak 🔥
+                                    Nhận ngay +100 XP thưởng và mở khóa Streak
                                 </p>
                             </div>
                         </div>

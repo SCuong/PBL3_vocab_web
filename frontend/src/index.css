@@ -68,6 +68,11 @@
 }
 
 @theme {
+    /* Named easings — use these instead of the browser default `ease` or any
+       bounce/overshoot curve, which reads as dated on UI state changes. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     --font-decorative: "Coiny", "Nunito", "Be Vietnam Pro", sans-serif;
     --font-display: "Nunito", "Fredoka", "Be Vietnam Pro", sans-serif;
     --font-sans: "Plus Jakarta Sans", "Quicksand", "Be Vietnam Pro", sans-serif;
@@ -237,26 +242,20 @@
         @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer;
     }
 
+    /* Gradient fill kept at the owner's request — it is the established brand
+       look for the primary action across the app. */
     .btn-primary {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-on-accent shadow-md relative overflow-hidden;
+        @apply rounded-pill px-8 py-3 font-bold flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-on-accent relative;
         background: linear-gradient(135deg, var(--accent-color), var(--accent-secondary));
         box-shadow: 0 4px 24px var(--shadow-color);
+        transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), filter 200ms var(--ease-out);
     }
 
     .btn-primary:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 32px var(--shadow-color);
-        filter: brightness(1.05);
+        filter: brightness(1.06);
     }
-
-        .btn-primary::after {
-            content: '';
-            @apply absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-500;
-        }
-
-        .btn-primary:hover::after {
-            @apply translate-x-full;
-        }
 
     .btn-secondary {
         @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted;
@@ -1015,129 +1014,277 @@
         opacity: 0.7;
     }
 
-    /* ── Topic card ── */
-    .home-topic-card {
+    /* ═══ Landing sections ═══════════════════════════════════════════
+       Split rows: each block divides into a written half and a proof
+       half, alternating direction down the page. The halves are set
+       apart by a gutter rather than a rule. */
+    .ss-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 3rem;
+        align-items: center;
+        max-width: 1180px;
+        margin-inline: auto;
+        padding: 4.5rem 1.25rem;
+    }
+    @media (min-width: 1024px) {
+        .ss-row {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 5.5rem;
+            padding-inline: 2rem;
+        }
+    }
+    /* Rhythm: sections are deliberately not all padded the same. */
+    .ss-row--hero { padding-top: 3.5rem; padding-bottom: 5.5rem; }
+    @media (min-width: 1024px) {
+        .ss-row--hero {
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            padding-block: 5rem 7rem;
+        }
+        .ss-row--flip { padding-block: 6.5rem; }
+    }
+    /* On narrow screens the written half always leads, whatever the DOM order. */
+    .ss-row--flip .ss-text { order: -1; }
+    @media (min-width: 1024px) {
+        .ss-row--flip .ss-text { order: 0; }
+    }
+
+    .ss-band {
+        background: color-mix(in srgb, var(--accent-soft) 46%, var(--surface));
+        border-block: 1px solid color-mix(in srgb, var(--accent-color) 9%, transparent);
+    }
+
+    .ss-text > h2 { max-width: 18ch; }
+
+    .ss-lede {
+        margin-top: 1.25rem;
+        max-width: 46ch;
+        font-size: 1.0625rem;
+        line-height: 1.7;
+        color: var(--text-secondary);
+    }
+    .ss-note {
+        margin-top: 1rem;
+        max-width: 44ch;
+        font-size: 0.9375rem;
+        line-height: 1.7;
+        color: var(--text-muted);
+    }
+
+    .ss-actions {
+        margin-top: 2rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.875rem;
+    }
+    .ss-actions--close { justify-content: center; margin-top: 2.25rem; }
+
+    /* Split Studio button voice: an outlined chip beneath the written half. */
+    .ss-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        padding: 0.875rem 1.5rem;
+        border-radius: 9999px;
+        border: 1.5px solid color-mix(in srgb, var(--accent-color) 30%, var(--border-color));
         background: var(--surface);
-        border: 1.5px solid var(--border-color);
-        border-radius: var(--radius-xl);
-        padding: 1.5rem;
+        color: var(--accent-color);
+        font-weight: 700;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: border-color 200ms var(--ease-out), background-color 200ms var(--ease-out);
+    }
+    .ss-chip:hover {
+        border-color: var(--accent-color);
+        background: color-mix(in srgb, var(--accent-color) 7%, var(--surface));
+    }
+    .ss-chip:active { transform: translateY(1px); }
+    .ss-chip:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
+        outline-offset: 2px;
+    }
+
+    /* ── Stepper (process proof) ── */
+    .ss-stepper {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        transition: border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+        gap: 2rem;
         position: relative;
-        overflow: hidden;
-        cursor: pointer;
+        padding-left: 0.25rem;
     }
-    .home-topic-card > span:first-child {
-        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .home-topic-card:hover {
-        transform: translateY(-4px);
-        border-color: color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
-        box-shadow: 0 14px 32px var(--shadow-color), 0 0 0 1px color-mix(in srgb, var(--accent-color) 14%, transparent);
-    }
-    .home-topic-card:hover > span:first-child {
-        transform: scale(1.14) rotate(-5deg);
-    }
-    .home-topic-card:active {
-        transform: translateY(-1px) scale(0.99);
-    }
-    .home-topic-card:focus-visible {
-        outline: none;
-        border-color: color-mix(in srgb, var(--accent-color) 55%, var(--border-color));
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 24%, transparent);
-    }
-
-    /* ── Step card ── */
-    .home-step-card {
-        background: var(--surface);
-        border: 1.5px solid var(--border-color);
-        border-radius: var(--radius-xl);
-        padding: 2rem;
-        text-align: center;
-        transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: 0 4px 20px var(--shadow-color);
-    }
-    .home-step-card > div:nth-child(2) {
-        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .home-step-card:hover {
-        border-color: var(--accent-color);
-        box-shadow: 0 12px 28px var(--shadow-color), 0 2px 6px var(--shadow-color);
-        transform: translateY(-4px);
-    }
-    .home-step-card:hover > div:nth-child(2) {
-        transform: scale(1.12) translateY(-2px);
-    }
-
-    /* ── CTA Section ── */
-    .home-cta-section {
-        background:
-            radial-gradient(
-                circle at 50% 0%,
-                color-mix(in srgb, var(--accent-secondary) 16%, transparent) 0%,
-                transparent 42%
-            ),
-            linear-gradient(
-                180deg,
-                color-mix(in srgb, var(--surface) 72%, var(--bg-primary)) 0%,
-                color-mix(in srgb, var(--accent-soft) 78%, var(--surface)) 100%
-            );
-        border-top: 1px solid color-mix(in srgb, var(--accent-color) 10%, transparent);
-        border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 10%, transparent);
-        position: relative;
-        overflow: hidden;
-    }
-    .home-cta-section::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239333ea' fill-opacity='0.045'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/svg%3E");
-    }
-
-    /* ── Features strip ── */
-    .home-feature-strip {
-        background:
-            radial-gradient(
-                circle at 50% -20%,
-                color-mix(in srgb, var(--accent-color) 10%, transparent) 0%,
-                transparent 44%
-            ),
-            linear-gradient(
-                180deg,
-                color-mix(in srgb, var(--surface) 86%, var(--accent-soft)) 0%,
-                color-mix(in srgb, var(--accent-soft) 62%, var(--surface)) 100%
-            );
-    }
-
-    .home-feature-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 1.25rem;
+    .ss-step {
         display: flex;
+        gap: 1.25rem;
+        align-items: flex-start;
+        position: relative;
+    }
+    .ss-step:not(:last-child)::before {
+        content: "";
+        position: absolute;
+        left: 1.375rem;
+        top: 3rem;
+        bottom: -2rem;
+        width: 1.5px;
+        background: color-mix(in srgb, var(--accent-color) 22%, transparent);
+    }
+    .ss-step-mark {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 0.875rem;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 10px 28px color-mix(in srgb, var(--accent-color) 12%, transparent);
-        transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1);
+        color: var(--accent-color);
+        background: color-mix(in srgb, var(--accent-color) 10%, var(--surface));
+        border: 1px solid color-mix(in srgb, var(--accent-color) 18%, transparent);
     }
-    .home-feature-strip .home-fade-in:hover .home-feature-icon {
-        transform: scale(1.08) rotate(-3deg);
-        box-shadow: 0 14px 32px color-mix(in srgb, var(--accent-color) 20%, transparent);
+    .ss-step-num {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: color-mix(in srgb, var(--accent-color) 78%, var(--text-muted));
+    }
+    .ss-step-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.125rem;
+        line-height: 1.3;
+        color: var(--text-primary);
+        margin-top: 0.125rem;
+    }
+    .ss-step-desc {
+        margin-top: 0.375rem;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        color: var(--text-muted);
+        max-width: 34ch;
     }
 
-    .home-feature-icon svg {
-        width: 30px;
-        height: 30px;
-        stroke-width: 2.25;
+    /* ── Topic list (catalogue proof) ── */
+    .ss-topics {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.5rem;
+    }
+    @media (min-width: 640px) {
+        .ss-topics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .ss-topic {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        text-align: left;
+        padding: 0.875rem 1rem;
+        border-radius: 0.875rem;
+        border: 1px solid transparent;
+        background: var(--surface);
+        cursor: pointer;
+        transition: border-color 200ms var(--ease-out), background-color 200ms var(--ease-out);
+    }
+    .ss-topic:hover {
+        border-color: color-mix(in srgb, var(--accent-color) 28%, transparent);
+        background: color-mix(in srgb, var(--accent-color) 5%, var(--surface));
+    }
+    .ss-topic:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
+        outline-offset: 2px;
+    }
+    .ss-topic-icon {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.625rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--accent-color);
+        background: color-mix(in srgb, var(--accent-color) 9%, transparent);
+    }
+    .ss-topic-name {
+        display: block;
+        font-weight: 700;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        line-height: 1.35;
+    }
+    .ss-topic-count {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.125rem;
+    }
+
+    /* ── Spaced-repetition schedule (method proof) ── */
+    .ss-schedule {
+        display: flex;
+        flex-direction: column;
+        gap: 1.125rem;
+    }
+    .ss-slot {
+        display: grid;
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.5rem 1rem;
+    }
+    .ss-slot-label {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 0.9375rem;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+    }
+    .ss-slot-track {
+        height: 0.5rem;
+        border-radius: 9999px;
+        background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+        overflow: hidden;
+    }
+    .ss-slot-fill {
+        display: block;
+        height: 100%;
+        width: var(--slot-fill, 40%);
+        border-radius: inherit;
+        background: var(--accent-color);
+    }
+    .ss-slot-note {
+        grid-column: 2;
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+    }
+
+    /* ── Closing statement ── */
+    .ss-close {
+        max-width: 640px;
+        margin-inline: auto;
+        padding: 6rem 1.5rem 7rem;
+        text-align: center;
+    }
+    .ss-close-line {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(1.75rem, 4vw, 2.5rem);
+        line-height: 1.15;
+        color: var(--text-primary);
+        overflow-wrap: anywhere;
+    }
+    .ss-close-sub {
+        margin-top: 1rem;
+        font-size: 1.0625rem;
+        line-height: 1.7;
+        color: var(--text-secondary);
     }
 
     /* ── Fade-in animation ── */
+    /* Reveal is deliberately quick and shallow: a long, deep, heavily-staggered
+       fade on every element makes the page feel like it never settles. */
     .home-fade-in {
         opacity: 0;
-        transform: translate3d(0, 26px, 0);
-        transition: opacity 1000ms cubic-bezier(0.22, 1, 0.36, 1), transform 1000ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform: translate3d(0, 10px, 0);
+        transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
         will-change: opacity, transform;
     }
     .home-fade-in.visible {
@@ -1161,16 +1308,6 @@
         animation: home-slide-in-right 600ms ease 200ms both;
     }
 
-    /* ── CTA bounce (replaces infinite framer-motion RAF) ── */
-    @keyframes home-cta-bounce {
-        0%, 100% { transform: translateY(0); }
-        50%      { transform: translateY(-10px); }
-    }
-    .home-cta-bounce {
-        animation: home-cta-bounce 3s ease-in-out infinite;
-        will-change: transform;
-    }
-
     /* ── Deferred paint for below-the-fold home sections ── */
     .home-defer {
         content-visibility: auto;
@@ -1181,7 +1318,6 @@
     @media (prefers-reduced-motion: reduce) {
         .home-hero-slide-left,
         .home-hero-slide-right,
-        .home-cta-bounce,
         .hv-main-card,
         .hv-streak,
         .hv-review,
@@ -1201,19 +1337,13 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .home-topic-card,
-        .home-topic-card > span:first-child,
-        .home-step-card,
-        .home-step-card > div:nth-child(2),
-        .home-feature-icon {
+        .ss-topic,
+        .ss-chip {
             transition: none !important;
         }
-        .home-topic-card:hover,
-        .home-topic-card:active,
-        .home-topic-card:hover > span:first-child,
-        .home-step-card:hover,
-        .home-step-card:hover > div:nth-child(2),
-        .home-feature-strip .home-fade-in:hover .home-feature-icon {
+        .ss-topic:hover,
+        .ss-chip:hover,
+        .ss-chip:active {
             transform: none !important;
         }
     }
