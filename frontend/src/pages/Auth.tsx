@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, typography } from '../components/ui';
 import { authApi } from '../services/authApi';
@@ -167,6 +167,14 @@ const Auth = () => {
         }
     }, [addToast, isGoogleSubmitting, navigate, syncUserGameData]);
 
+    // Keep the latest credential handler in a ref so Google Identity Services can
+    // be initialized exactly once (below) while still calling the current handler.
+    const googleCredentialHandlerRef = useRef(handleGoogleCredential);
+    useEffect(() => {
+        googleCredentialHandlerRef.current = handleGoogleCredential;
+    }, [handleGoogleCredential]);
+    const googleInitializedRef = useRef(false);
+
     useEffect(() => {
         const nextLogin = initialMode !== 'register';
         setIsLogin(nextLogin);
@@ -225,14 +233,17 @@ const Auth = () => {
                 return;
             }
 
-            window.google.accounts.id.initialize({
-                client_id: googleClientId,
-                callback: handleGoogleCredential,
-                auto_select: false,
-                cancel_on_tap_outside: true,
-                itp_support: true,
-                use_fedcm_for_button: true
-            });
+            if (!googleInitializedRef.current) {
+                window.google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: (response) => googleCredentialHandlerRef.current(response),
+                    auto_select: false,
+                    cancel_on_tap_outside: true,
+                    itp_support: true,
+                    use_fedcm_for_button: true
+                });
+                googleInitializedRef.current = true;
+            }
 
             const renderGoogleButton = (container: HTMLElement) => {
                 const availableWidth = Math.floor(container.clientWidth);
@@ -294,7 +305,7 @@ const Auth = () => {
             isCancelled = true;
             resizeObserver?.disconnect();
         };
-    }, [handleGoogleCredential, isForgotPasswordMode, isResetPasswordMode]);
+    }, [isForgotPasswordMode, isResetPasswordMode]);
 
     const goBackToLogin = () => {
         setIsForgotPasswordMode(false);
