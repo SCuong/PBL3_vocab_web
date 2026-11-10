@@ -3,25 +3,25 @@
 
 :root {
     color-scheme: light;
-    --bg-primary: #faf5ff;
-    --bg-secondary: #f3e8ff;
+    --bg-primary: #f8fafc;
+    --bg-secondary: #eef4fa;
     --surface: #ffffff;
-    --surface-hover: #f8f0ff;
-    --text-primary: #1e1b4b;
-    --text-secondary: #5b5697;
+    --surface-hover: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
     /* Darkened from #7c69c8 to reach WCAG AA (~5.4:1 on light bg); the old value
        measured ~4.2:1 and failed the Lighthouse contrast audit on muted text. */
-    --text-muted: #6959aa;
+    --text-muted: #475569;
     --text-on-accent: #ffffff;
-    --border-color: #e9d5ff;
-    --accent-color: #9333ea;
+    --border-color: #cbd5e1;
+    --accent-color: #0369a1;
     --success-color: #16a34a;
     --warning-color: #d97706;
     --danger-color: #dc2626;
-    --accent-secondary: #e879f9;
-    --accent-cyan: #22d3ee;
-    --accent-soft: #f3e8ff;
-    --shadow-color: rgba(147, 51, 234, 0.14);
+    --accent-secondary: #0f766e;
+    --accent-cyan: #0e7490;
+    --accent-soft: #e0f2fe;
+    --shadow-color: rgba(15, 23, 42, 0.08);
     --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 16%, var(--surface));
     --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 36%, var(--border-color));
     --sticky-note-blue-bg: color-mix(in srgb, var(--accent-cyan) 14%, var(--surface));
@@ -37,22 +37,22 @@
 
 [data-theme="dark"] {
     color-scheme: dark;
-    --bg-primary: #0f0b1d;
-    --bg-secondary: #171129;
-    --surface: #211a35;
-    --surface-hover: #2a2142;
+    --bg-primary: #0b1320;
+    --bg-secondary: #111c2d;
+    --surface: #18263b;
+    --surface-hover: #21324d;
     --text-primary: #f8fafc;
-    --text-secondary: #d8ccff;
-    --text-muted: #b7a7df;
-    --text-on-accent: #0f0b1d;
-    --border-color: #43345f;
-    --accent-color: #c084fc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-on-accent: #0b1320;
+    --border-color: #334155;
+    --accent-color: #38bdf8;
     --success-color: #22c55e;
     --warning-color: #f59e0b;
     --danger-color: #f87171;
-    --accent-secondary: #f0abfc;
-    --accent-cyan: #67e8f9;
-    --accent-soft: #2a2142;
+    --accent-secondary: #2dd4bf;
+    --accent-cyan: #22d3ee;
+    --accent-soft: #1e3a5f;
     --shadow-color: rgba(0, 0, 0, 0.32);
     --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 20%, var(--surface));
     --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 45%, var(--border-color));
@@ -75,7 +75,7 @@
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     --font-decorative: "Coiny", "Nunito", "Be Vietnam Pro", sans-serif;
     --font-display: "Nunito", "Fredoka", "Be Vietnam Pro", sans-serif;
-    --font-sans: "Plus Jakarta Sans", "Quicksand", "Be Vietnam Pro", sans-serif;
+    --font-sans: "Be Vietnam Pro", "Quicksand", sans-serif;
     --font-mono: "Space Mono", monospace;
     --color-primary: var(--accent-color);
     --color-primary-hover: color-mix(in srgb, var(--accent-color) 82%, var(--text-primary));
@@ -246,19 +246,19 @@
        look for the primary action across the app. */
     .btn-primary {
         @apply rounded-pill px-8 py-3 font-bold flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-on-accent relative;
-        background: linear-gradient(135deg, var(--accent-color), var(--accent-secondary));
+        background-color: var(--accent-color);
         box-shadow: 0 4px 24px var(--shadow-color);
-        transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), filter 200ms var(--ease-out);
+        transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), background-color 200ms var(--ease-out);
     }
 
     .btn-primary:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 32px var(--shadow-color);
-        filter: brightness(1.06);
+        background-color: var(--color-primary-hover);
     }
 
     .btn-secondary {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted;
+        @apply rounded-pill px-8 py-3 font-bold transition-[color,border-color,background-color,transform] duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted;
         border: 2px solid var(--border-color);
         background: var(--surface);
     }
@@ -678,9 +678,9 @@
     .auth-page-front {
         background: linear-gradient(
             140deg,
-            #6d28d9 0%,
-            #9333ea 45%,
-            #c026d3 100%
+            #075985 0%,
+            #0369a1 45%,
+            #0f766e 100%
         );
         z-index: 3;
     }
@@ -688,9 +688,9 @@
     .auth-page-back {
         background: linear-gradient(
             140deg,
-            #7c3aed 0%,
-            #a855f7 50%,
-            #ec4899 100%
+            #0c4a6e 0%,
+            #0284c7 50%,
+            #0d9488 100%
         );
         z-index: 2;
     }
@@ -927,7 +927,8 @@
         width: 300px;
         background: var(--surface);
         border-radius: var(--radius-2xl);
-        box-shadow: 0 24px 64px var(--shadow-color), 0 4px 16px var(--shadow-color);
+        border: 2px solid var(--border-color);
+        box-shadow: 0 8px 20px var(--shadow-color);
         overflow: hidden;
         position: relative;
         z-index: 2;
@@ -936,7 +937,7 @@
     }
     .hv-card-spine {
         height: 6px;
-        background: linear-gradient(90deg, var(--accent-color), var(--accent-cyan));
+        background-color: var(--accent-color);
     }
     .hv-card-body {
         padding: 2rem;
@@ -954,10 +955,10 @@
     .hv-float {
         position: absolute;
         background: var(--surface);
-        border: 1px solid var(--border-color);
+        border: 2px solid var(--border-color);
         border-radius: var(--radius-xl);
         padding: 1.25rem;
-        box-shadow: 0 12px 36px var(--shadow-color);
+        box-shadow: 0 6px 16px var(--shadow-color);
         width: 190px;
         z-index: 3;
     }
@@ -993,7 +994,7 @@
     }
     .hv-review-bar {
         height: 100%;
-        background: linear-gradient(90deg, var(--accent-color), var(--accent-secondary));
+        background-color: var(--accent-color);
         border-radius: 9999px;
     }
 
@@ -1044,9 +1045,9 @@
         .ss-row--flip { padding-block: 6.5rem; }
     }
     /* On narrow screens the written half always leads, whatever the DOM order. */
-    .ss-row--flip .ss-text { order: -1; }
+    .ss-row--flip .ss-text { order: 0; }
     @media (min-width: 1024px) {
-        .ss-row--flip .ss-text { order: 0; }
+        .ss-row--flip .ss-proof { order: -1; }
     }
 
     .ss-band {
@@ -1367,7 +1368,7 @@
     }
     .profile-card-tinted {
         @apply rounded-card border border-accent/30 shadow-[0_4px_20px_var(--shadow-color)];
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.10), rgba(236, 72, 153, 0.08));
+        background-color: color-mix(in srgb, var(--accent-color) 8%, var(--surface));
     }
     .profile-stat {
         @apply bg-surface border border-primary/10 rounded-card p-5 text-center;
@@ -1408,7 +1409,7 @@
     .profile-modal-overlay.is-open .profile-modal-card { transform: none; opacity: 1; }
     .profile-modal-header {
         @apply px-8 pt-6 pb-5 border-b border-primary/10 flex items-center justify-between;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+        background-color: color-mix(in srgb, var(--accent-color) 6%, var(--surface));
     }
     .profile-modal-body {
         @apply px-8 py-6 overflow-y-auto;
@@ -1564,7 +1565,7 @@
     .vocab-modal-overlay.is-open .vocab-modal-card { transform: none; opacity: 1; }
     .vocab-modal-header {
         @apply px-4 sm:px-6 md:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-primary/10 flex items-start justify-between gap-4;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+        background-color: color-mix(in srgb, var(--accent-color) 6%, var(--surface));
     }
     .vocab-modal-body {
         @apply px-4 sm:px-6 md:px-8 py-5 sm:py-6 overflow-y-auto;

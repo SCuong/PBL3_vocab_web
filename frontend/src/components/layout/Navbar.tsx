@@ -71,7 +71,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
             <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 sm:gap-5 lg:gap-8">
                 <button
                     onClick={() => navigate(PATHS.home)}
-                    className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-85 active:scale-95"
+                    className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-[opacity,transform] duration-200 hover:opacity-85 active:scale-95"
                     aria-label="VocabLearning home"
                 >
                     <Logo size={36} />
@@ -120,7 +120,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                         </button>
                     )}
 
-                    {/* Active indicator — horizontal slide only (transform + width) */}
+                    {/* Active indicator — horizontal slide only (transform + opacity) */}
                     <span
                         aria-hidden="true"
                         className="pointer-events-none absolute -bottom-px left-0 h-0.5 bg-primary rounded-full"
@@ -129,7 +129,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                             transform: `translateX(${indicator.left}px)`,
                             opacity: indicator.ready ? 1 : 0,
                             transition: animate
-                                ? 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), width 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease'
+                                ? 'transform 320ms var(--ease-out), opacity 200ms var(--ease-out)'
                                 : 'none',
                         }}
                     />
@@ -160,7 +160,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                             </button>
                             <button
                                 onClick={() => navigate(PATHS.register)}
-                                className="text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full transition-all hover:bg-primary-hover hover:-translate-y-px cursor-pointer shadow-[0_2px_12px_var(--shadow-color)]"
+                                className="text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full transition-[background-color,transform,box-shadow] hover:bg-primary-hover hover:-translate-y-px cursor-pointer shadow-[0_2px_12px_var(--shadow-color)]"
                             >
                                 Đăng ký
                             </button>
@@ -226,7 +226,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                         <>
                             <div className="mx-2 my-1 h-px bg-border" />
                             <div className="flex items-center gap-3 px-4 py-2">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-secondary text-sm font-display font-bold text-text-on-accent">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-display font-bold text-text-on-accent">
                                     {(currentUser.username?.trim?.()?.[0] ?? '?').toUpperCase()}
                                 </span>
                                 <div className="min-w-0">
@@ -262,7 +262,7 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
                                 </button>
                                 <button
                                     onClick={() => { navigate(PATHS.register); setMobileOpen(false); }}
-                                    className="min-h-11 flex-1 text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full cursor-pointer transition-all hover:bg-primary-hover"
+                                    className="min-h-11 flex-1 text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full cursor-pointer transition-colors hover:bg-primary-hover"
                                 >
                                     Đăng ký
                                 </button>
