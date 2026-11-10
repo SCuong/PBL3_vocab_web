@@ -164,7 +164,7 @@ const AppShell = () => {
                     <motion.div
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
-                        className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-2xl bg-surface/95 backdrop-blur-xl border-2 border-primary/30 p-3 rounded-card shadow-2xl flex items-center justify-between gap-2 sm:bottom-8 sm:w-[90%] sm:gap-6 sm:p-6"
+                        className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-2xl bg-surface/95 backdrop-blur-xl border-2 border-primary/30 p-3 rounded-card shadow-lg flex items-center justify-between gap-2 sm:bottom-8 sm:w-[90%] sm:gap-6 sm:p-6"
                     >
                         <div className="flex items-center gap-3 sm:gap-4">
                             <div className="hidden w-14 h-14 rounded-full bg-primary items-center justify-center text-text-on-accent shadow-lg sm:flex">

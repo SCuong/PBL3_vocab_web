@@ -21,7 +21,7 @@ const HeroVisual = () => (
                 {[18, 26, 16, 32, 24, 36].map((h, i) => (
                     <span key={i} className="w-3.5 rounded-sm bg-primary-light block" style={{ height: `${h}px` }} />
                 ))}
-                <span className="w-3.5 rounded-sm block bg-linear-to-t from-primary to-secondary" style={{ height: '42px' }} />
+                <span className="w-3.5 rounded-sm block bg-primary" style={{ height: '42px' }} />
             </div>
         </div>
 
@@ -54,9 +54,6 @@ const HeroVisual = () => (
             </div>
             <div className="text-xs text-text-muted">7 đã hoàn thành</div>
         </div>
-
-        {/* Soft ambient glow behind card */}
-        <div className="home-hero-glow" aria-hidden="true" />
     </div>
 );
 
@@ -122,8 +119,8 @@ const Home = () => {
                         </div>
 
                         <h1 className={`${typography.heroTitle} home-hero-title home-fade-in`} style={{ transitionDelay: '140ms' }}>
-                            Học từ vựng<br />tiếng Anh
-                            <span className="block bg-clip-text text-transparent bg-linear-to-r from-primary to-cyan">
+                            Học từ vựng{' '}<br />tiếng Anh{' '}
+                            <span className="block text-primary">
                                 dễ dàng &amp; hiệu quả
                             </span>
                         </h1>
@@ -161,7 +158,21 @@ const Home = () => {
 
             {/* ── CÁCH HOẠT ĐỘNG ── */}
             <section className="ss-row ss-row--flip ss-band home-defer">
-                <div className="ss-proof home-fade-in" style={{ transitionDelay: '0ms' }}>
+                <div className="ss-text home-fade-in" style={{ transitionDelay: '0ms' }}>
+                    <h2 className={typography.sectionTitle}>Ba bước, rồi bạn vào việc</h2>
+                    <p className="ss-lede">
+                        Không có bảng điều khiển rắc rối. Chọn một chủ đề, lật vài tấm thẻ,
+                        rồi để hệ thống nhắc bạn ôn đúng lúc.
+                    </p>
+                    <div className="ss-actions">
+                        <button onClick={() => navigate(PATHS.learning)} className="ss-chip">
+                            Bắt đầu học
+                            <ChevronRight size={14} className="shrink-0" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="ss-proof home-fade-in" style={{ transitionDelay: '120ms' }}>
                     <ol className="ss-stepper">
                         {steps.map(step => (
                             <li key={step.num} className="ss-step">
@@ -176,20 +187,6 @@ const Home = () => {
                             </li>
                         ))}
                     </ol>
-                </div>
-
-                <div className="ss-text home-fade-in" style={{ transitionDelay: '120ms' }}>
-                    <h2 className={typography.sectionTitle}>Ba bước, rồi bạn vào việc</h2>
-                    <p className="ss-lede">
-                        Không có bảng điều khiển rắc rối. Chọn một chủ đề, lật vài tấm thẻ,
-                        rồi để hệ thống nhắc bạn ôn đúng lúc.
-                    </p>
-                    <div className="ss-actions">
-                        <button onClick={() => navigate(PATHS.learning)} className="ss-chip">
-                            Bắt đầu học
-                            <ChevronRight size={14} className="shrink-0" />
-                        </button>
-                    </div>
                 </div>
             </section>
 
@@ -230,19 +227,7 @@ const Home = () => {
 
             {/* ── GHI NHỚ ── */}
             <section className="ss-row ss-row--flip ss-band home-defer">
-                <div className="ss-proof home-fade-in" style={{ transitionDelay: '0ms' }}>
-                    <ol className="ss-schedule">
-                        {schedule.map((slot, i) => (
-                            <li key={slot.label} className="ss-slot" style={{ ['--slot-fill' as string]: `${28 + i * 24}%` }}>
-                                <span className="ss-slot-label">{slot.label}</span>
-                                <span className="ss-slot-track" aria-hidden="true"><span className="ss-slot-fill" /></span>
-                                <span className="ss-slot-note">{slot.note}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-
-                <div className="ss-text home-fade-in" style={{ transitionDelay: '120ms' }}>
+                <div className="ss-text home-fade-in" style={{ transitionDelay: '0ms' }}>
                     <h2 className={typography.sectionTitle}>Ôn đúng lúc bạn sắp quên</h2>
                     <p className="ss-lede">
                         Lặp lại ngắt quãng giãn dần khoảng cách giữa các lần ôn. Mỗi lần nhớ lại
@@ -252,6 +237,18 @@ const Home = () => {
                         Chuỗi ngày học và tiến độ từng chủ đề được ghi lại, để bạn thấy mình
                         đang đi tới đâu.
                     </p>
+                </div>
+
+                <div className="ss-proof home-fade-in" style={{ transitionDelay: '120ms' }}>
+                    <ol className="ss-schedule">
+                        {schedule.map((slot, i) => (
+                            <li key={slot.label} className="ss-slot" style={{ ['--slot-fill' as string]: `${28 + i * 24}%` }}>
+                                <span className="ss-slot-label">{slot.label}</span>
+                                <span className="ss-slot-track" aria-hidden="true"><span className="ss-slot-fill" /></span>
+                                <span className="ss-slot-note">{slot.note}</span>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
             </section>
 
