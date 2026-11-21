@@ -29,7 +29,13 @@ namespace VocabLearning.Tests.Controllers
             _context = TestDbContextFactory.Create();
             _authService = new CustomAuthenticationService(_context);
 
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            // No SMTP in tests: return the verification link in the response instead of failing with 500.
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["EmailVerification:ExposeVerificationLinkInResponse"] = "true"
+                })
+                .Build();
             var googleVerifier = new GoogleIdTokenVerifier(
                 new HttpClient(),
                 configuration,
@@ -125,7 +131,9 @@ namespace VocabLearning.Tests.Controllers
         public async Task LoginApi_WithValidCredentials_ShouldReturnOkWithUser()
         {
             // Arrange
-            await _authService.RegisterAsync("testuser", "test@example.com", "Password1!");
+            var (_, _, user) = await _authService.RegisterAsync("testuser", "test@example.com", "Password1!");
+            user!.IsEmailVerified = true; // learners must verify email before login
+            await _context.SaveChangesAsync();
 
             // Act
             var result = await _controller.LoginApi(
@@ -166,21 +174,26 @@ namespace VocabLearning.Tests.Controllers
         }
 
         [Fact]
-        public async Task RegisterApi_WithValidData_ShouldReturnOkWithUser()
+        public async Task RegisterApi_WithValidData_ShouldCreateUnverifiedLearner()
         {
             var result = await _controller.RegisterApi(
                 new RegisterApiRequest
                 {
                     Name = "newuser",
                     Email = "new@example.com",
-                    Password = "Password1!"
+                    Password = "Password1!",
+                    ConfirmPassword = "Password1!"
                 },
                 CancellationToken.None);
 
             var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
             var response = okResult.Value.Should().BeOfType<AuthApiResponse>().Subject;
             response.Succeeded.Should().BeTrue();
-            response.User!.Username.Should().Be("newuser");
+            response.UsedFallbackLink.Should().BeTrue();
+
+            // Registration no longer signs the user in; the account waits for email verification.
+            var created = _context.Users.Single(u => u.Username == "newuser");
+            created.IsEmailVerified.Should().BeFalse();
         }
 
         [Fact]
