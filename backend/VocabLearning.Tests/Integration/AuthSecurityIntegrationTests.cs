@@ -31,7 +31,7 @@ namespace VocabLearning.Tests.Integration
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task ProtectedMvcEndpoints_Unauthenticated_ShouldRedirectToLogin()
+        public async Task ProtectedApiEndpoints_Unauthenticated_ShouldReturnUnauthorized()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -40,22 +40,15 @@ namespace VocabLearning.Tests.Integration
                 AllowAutoRedirect = false
             });
 
-            var profileResponse = await client.GetAsync("/Account/Profile");
-            var adminResponse = await client.GetAsync("/Admin");
+            var dashboardResponse = await client.GetAsync("/api/dashboard/learner");
+            var adminResponse = await client.GetAsync("/api/admin/users");
 
-            profileResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            profileResponse.Headers.Location.Should().NotBeNull();
-            profileResponse.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
-            profileResponse.Headers.Location!.OriginalString.Should().Contain("ReturnUrl=%2FAccount%2FProfile");
-
-            adminResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            adminResponse.Headers.Location.Should().NotBeNull();
-            adminResponse.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
-            adminResponse.Headers.Location!.OriginalString.Should().Contain("ReturnUrl=%2FAdmin");
+            dashboardResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            adminResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task AdminEndpoint_LearnerUser_ShouldRedirectToAccessDeniedPath()
+        public async Task AdminApi_LearnerUser_ShouldReturnForbidden()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -67,12 +60,9 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var response = await client.GetAsync("/Admin");
+            var response = await client.GetAsync("/api/admin/users");
 
-            response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            response.Headers.Location.Should().NotBeNull();
-            response.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
-            response.Headers.Location!.OriginalString.Should().Contain("ReturnUrl=%2FAdmin");
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
@@ -141,7 +131,7 @@ namespace VocabLearning.Tests.Integration
 
             var logoutResponse = await client.SendAsync(logoutRequest);
             var meResponse = await client.GetAsync("/api/auth/me");
-            var learningResponse = await client.GetAsync("/Learning");
+            var learningResponse = await client.GetAsync("/api/learning/progress");
 
             logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
             logoutResponse.GetAuthCookies().Should().ContainSingle(cookie =>
@@ -150,9 +140,7 @@ namespace VocabLearning.Tests.Integration
                     || cookie.Contains("max-age=0", StringComparison.OrdinalIgnoreCase)));
 
             meResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-            learningResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            learningResponse.Headers.Location.Should().NotBeNull();
-            learningResponse.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
+            learningResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         private static string GetCookieName(string setCookieHeader)
