@@ -620,7 +620,8 @@ namespace VocabLearning.Tests.Services
             {
                 VocabId = 1,
                 Type = ExerciseTypes.Filling,
-                MatchMode = "SOME_MODE"
+                // Must be a valid mode: invalid modes are rejected before type-specific clearing.
+                MatchMode = ExerciseMatchModes.MatchIpa
             };
 
             // Act
