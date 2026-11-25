@@ -8,6 +8,8 @@
   <strong>Full-stack English vocabulary learning platform.</strong>
 </p>
 
+<p align="center"><a href="https://vocablearning.online/">Live site</a></p>
+
 ---
 
 ## 1. Overview
@@ -87,13 +89,3 @@ npm run dev
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — enables Google login
 - `GEMINI_API_KEY` — enables AI word explanation
 - `SMTP_*` — enables password-reset email
-
-## 5. Deployment Plan
-
-> Not yet deployed. This is the intended deployment model, not the current state.
-
-- **Frontend** — Vite static build (`npm run build`) hosted on Vercel or another static host
-- **Backend** — ASP.NET Core service or container on Render / a VPS
-- **Database** — managed PostgreSQL (cloud provider) or PostgreSQL on a VPS — not the developer's local machine
-- **Config** — all secrets and per-environment values supplied via environment variables, not committed files
-- `docker-compose.yml` is provided for local end-to-end runs and as a reference for the eventual container setup
