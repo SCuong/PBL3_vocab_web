@@ -4,7 +4,9 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using VocabLearning.Constants;
 using VocabLearning.Data;
+using VocabLearning.ViewModels.Learning;
 
 namespace VocabLearning.Tests.Integration
 {
@@ -13,7 +15,7 @@ namespace VocabLearning.Tests.Integration
         public static bool IsSqlIntegrationConfigured => PostgreSqlIntegrationWebAppFactory.IsConfigured;
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task LearningIndex_Unauthenticated_ShouldRedirectToLogin()
+        public async Task GetLearningProgressApi_Unauthenticated_ShouldReturnUnauthorized()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -22,11 +24,9 @@ namespace VocabLearning.Tests.Integration
                 AllowAutoRedirect = false
             });
 
-            var response = await client.GetAsync("/Learning");
+            var response = await client.GetAsync("/api/learning/progress");
 
-            response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            response.Headers.Location.Should().NotBeNull();
-            response.Headers.Location!.OriginalString.Should().StartWith("/Account/Login");
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
@@ -41,7 +41,7 @@ namespace VocabLearning.Tests.Integration
 
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             var meResponse = await client.GetAsync("/api/auth/me");
-            var learningResponse = await client.GetAsync("/Learning");
+            var learningResponse = await client.GetAsync("/api/learning/progress");
 
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
             meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -55,7 +55,7 @@ namespace VocabLearning.Tests.Integration
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task MarkWordsLearnedApi_Authenticated_ShouldPersistProgressInSqlServer()
+        public async Task MarkWordsLearnedApi_Authenticated_ShouldPersistProgressInPostgreSql()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -164,7 +164,7 @@ namespace VocabLearning.Tests.Integration
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task Study_InvalidIndex_ShouldClampToAvailableWord()
+        public async Task StartSessionApi_ShouldPreserveWordOrderAndExposeActiveSession()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -176,14 +176,35 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var response = await client.GetAsync(
-                $"/Learning/Study?topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}&ids={PostgreSqlIntegrationWebAppFactory.FirstVocabularyId},{PostgreSqlIntegrationWebAppFactory.SecondVocabularyId}&index=999");
+            var wordIds = new[]
+            {
+                PostgreSqlIntegrationWebAppFactory.SecondVocabularyId,
+                PostgreSqlIntegrationWebAppFactory.FirstVocabularyId
+            };
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/learning/sessions/start")
+            {
+                Content = JsonContent.Create(new StartLearningSessionRequest
+                {
+                    Mode = LearningSessionModes.Study,
+                    TopicId = PostgreSqlIntegrationWebAppFactory.ChildTopicId,
+                    VocabIds = wordIds.ToList()
+                })
+            };
+            request.Headers.Add("X-XSRF-TOKEN", await client.GetAntiforgeryTokenAsync());
 
+            var response = await client.SendAsync(request);
             response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var session = await response.Content.ReadFromJsonAsync<LearningSessionResponse>();
+            session.Should().NotBeNull();
+            session!.CurrentIndex.Should().Be(0);
+            session.Items.Select(item => item.VocabId).Should().Equal(wordIds);
 
-            var html = await response.Content.ReadAsStringAsync();
-            html.Should().Contain("Word 2/2");
-            html.Should().Contain(">beta<");
+            var activeResponse = await client.GetAsync(
+                $"/api/learning/sessions/active?mode={LearningSessionModes.Study}&topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}");
+            activeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            var active = await activeResponse.Content.ReadFromJsonAsync<LearningSessionResponse>();
+            active.Should().NotBeNull();
+            active!.SessionId.Should().Be(session.SessionId);
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
@@ -320,7 +341,7 @@ namespace VocabLearning.Tests.Integration
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task Study_InvalidTopicId_ShouldRedirectToIndex()
+        public async Task StartSessionApi_UnknownTopic_ShouldReturnNotFound()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -332,15 +353,23 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var response = await client.GetAsync("/Learning/Study?topicId=999999&ids=1000");
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/learning/sessions/start")
+            {
+                Content = JsonContent.Create(new StartLearningSessionRequest
+                {
+                    Mode = LearningSessionModes.Study,
+                    TopicId = 999999,
+                    VocabIds = [PostgreSqlIntegrationWebAppFactory.FirstVocabularyId]
+                })
+            };
+            request.Headers.Add("X-XSRF-TOKEN", await client.GetAntiforgeryTokenAsync());
 
-            response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            response.Headers.Location.Should().NotBeNull();
-            response.Headers.Location!.OriginalString.Should().Be("/Learning");
+            var response = await client.SendAsync(request);
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         }
 
         [Fact(SkipUnless = nameof(IsSqlIntegrationConfigured), Skip = "Set VOCABLEARNING_TEST_POSTGRES_CONNECTION_STRING to run PostgreSQL-backed integration tests.")]
-        public async Task Result_WithoutTempData_ShouldRedirectToIndex()
+        public async Task GetActiveSessionApi_WithoutSession_ShouldReturnNoContent()
         {
             await using var factory = new PostgreSqlIntegrationWebAppFactory();
             await factory.InitializeAsync();
@@ -352,11 +381,10 @@ namespace VocabLearning.Tests.Integration
             var loginResponse = await client.LoginAsSeededLearnerAsync();
             loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var response = await client.GetAsync($"/Learning/Result?topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}");
+            var response = await client.GetAsync(
+                $"/api/learning/sessions/active?mode={LearningSessionModes.Study}&topicId={PostgreSqlIntegrationWebAppFactory.ChildTopicId}");
 
-            response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-            response.Headers.Location.Should().NotBeNull();
-            response.Headers.Location!.OriginalString.Should().Be($"/Learning?parentTopicId={PostgreSqlIntegrationWebAppFactory.ParentTopicId}");
+            response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         }
 
     }
