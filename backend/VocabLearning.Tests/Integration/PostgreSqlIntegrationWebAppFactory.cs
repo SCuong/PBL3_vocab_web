@@ -28,6 +28,12 @@ namespace VocabLearning.Tests.Integration
         private readonly string databaseName = $"vocablearning_int_{Guid.NewGuid():N}";
         private bool initialized;
 
+        static PostgreSqlIntegrationWebAppFactory()
+        {
+            // Match Program before the fixture opens its first PostgreSQL connection.
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+        }
+
         public static bool IsConfigured =>
             !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable));
 
