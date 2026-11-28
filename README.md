@@ -8,6 +8,14 @@
   <strong>Ứng dụng học Tiếng Anh lớp 1 (Global Success) theo phong cách Duolingo × Babilala.</strong>
 </p>
 
+<p align="center"><a href="https://vocablearning.online/">Live site</a></p>
+
+<p align="center">
+  <img src="docs/screenshots/vocabulary-review.webp" width="480" alt="A VocabLearning flashcard with four recall ratings that set the next review interval.">
+</p>
+
+I worked in a team of three and wrote most of the frontend and backend, including the review flow.
+
 ---
 
 ## 1. Overview

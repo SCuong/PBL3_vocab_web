@@ -23,6 +23,16 @@ namespace VocabLearning.Tests.Services
             _context.Dispose();
         }
 
+        // Learners must verify their email before they can log in.
+        private async Task<Users> RegisterVerifiedLearnerAsync(string username, string email, string password)
+        {
+            var (succeeded, errorMessage, user) = await _service.RegisterAsync(username, email, password);
+            succeeded.Should().BeTrue(errorMessage);
+            user!.IsEmailVerified = true;
+            await _context.SaveChangesAsync();
+            return user;
+        }
+
         #region RegisterAsync
 
         [Fact]
@@ -47,7 +57,7 @@ namespace VocabLearning.Tests.Services
         public async Task RegisterAsync_WithMinimumPolicyPassword_ShouldCreateUser()
         {
             var (succeeded, errorMessage, user) = await _service.RegisterAsync(
-                "policyuser", "policy@example.com", "abc12");
+                "policyuser", "policy@example.com", "Abcdef1!");
 
             succeeded.Should().BeTrue();
             errorMessage.Should().BeNull();
@@ -118,7 +128,7 @@ namespace VocabLearning.Tests.Services
         public async Task AuthenticateAsync_WithValidCredentials_ShouldReturnUser()
         {
             // Arrange
-            await _service.RegisterAsync("testuser", "test@example.com", "MyPassword1!");
+            await RegisterVerifiedLearnerAsync("testuser", "test@example.com", "MyPassword1!");
 
             // Act
             var user = await _service.AuthenticateAsync("testuser", "MyPassword1!");
@@ -132,7 +142,7 @@ namespace VocabLearning.Tests.Services
         public async Task AuthenticateAsync_WithEmail_ShouldReturnUser()
         {
             // Arrange
-            await _service.RegisterAsync("testuser", "test@example.com", "MyPassword1!");
+            await RegisterVerifiedLearnerAsync("testuser", "test@example.com", "MyPassword1!");
 
             // Act
             var user = await _service.AuthenticateAsync("test@example.com", "MyPassword1!");
@@ -205,11 +215,11 @@ namespace VocabLearning.Tests.Services
         public async Task ChangePasswordAsync_WithCorrectCurrentPassword_ShouldSucceed()
         {
             // Arrange
-            var (_, _, user) = await _service.RegisterAsync("testuser", "test@example.com", "OldPassword1!");
+            var user = await RegisterVerifiedLearnerAsync("testuser", "test@example.com", "OldPassword1!");
 
             // Act
             var (succeeded, errorMessage) = await _service.ChangePasswordAsync(
-                user!.UserId, "OldPassword1!", "NewPassword1!");
+                user.UserId, "OldPassword1!", "NewPassword1!");
 
             // Assert
             succeeded.Should().BeTrue();
@@ -223,15 +233,15 @@ namespace VocabLearning.Tests.Services
         [Fact]
         public async Task ChangePasswordAsync_WithMinimumPolicyPassword_ShouldSucceed()
         {
-            var (_, _, user) = await _service.RegisterAsync("changepolicy", "changepolicy@example.com", "old12");
+            var user = await RegisterVerifiedLearnerAsync("changepolicy", "changepolicy@example.com", "OldPass1!");
 
             var (succeeded, errorMessage) = await _service.ChangePasswordAsync(
-                user!.UserId, "old12", "abc12");
+                user.UserId, "OldPass1!", "Abcdef1!");
 
             succeeded.Should().BeTrue();
             errorMessage.Should().BeNull();
 
-            var authenticated = await _service.AuthenticateAsync("changepolicy", "abc12");
+            var authenticated = await _service.AuthenticateAsync("changepolicy", "Abcdef1!");
             authenticated.Should().NotBeNull();
         }
 
@@ -331,8 +341,8 @@ namespace VocabLearning.Tests.Services
         public async Task PasswordHash_SamePassword_ShouldProduceDifferentHashes()
         {
             // Arrange & Act
-            var (_, _, user1) = await _service.RegisterAsync("user1", "user1@example.com", "SamePassword!");
-            var (_, _, user2) = await _service.RegisterAsync("user2", "user2@example.com", "SamePassword!");
+            var (_, _, user1) = await _service.RegisterAsync("user1", "user1@example.com", "SamePassword1!");
+            var (_, _, user2) = await _service.RegisterAsync("user2", "user2@example.com", "SamePassword1!");
 
             // Assert — different salts produce different hashes
             user1!.PasswordHash.Should().NotBe(user2!.PasswordHash);
@@ -601,7 +611,7 @@ namespace VocabLearning.Tests.Services
         public async Task CreateUserAsync_WithMinimumPolicyPassword_ShouldCreateUser()
         {
             var (succeeded, errorMessage, user) = await _service.CreateUserAsync(
-                "adminpolicy", "adminpolicy@example.com", "abc12", UserRoles.Admin, UserStatuses.Active);
+                "adminpolicy", "adminpolicy@example.com", "Abcdef1!", UserRoles.Admin, UserStatuses.Active);
 
             succeeded.Should().BeTrue();
             errorMessage.Should().BeNull();
@@ -612,8 +622,8 @@ namespace VocabLearning.Tests.Services
         public async Task UpdateUserAsync_WithPasswordOutsidePolicy_ShouldFail()
         {
             var (_, _, admin) = await _service.CreateUserAsync(
-                "admin", "admin@example.com", "admin1", UserRoles.Admin, UserStatuses.Active);
-            var (_, _, user) = await _service.RegisterAsync("learner", "learner@example.com", "abc12");
+                "admin", "admin@example.com", "Admin123!", UserRoles.Admin, UserStatuses.Active);
+            var (_, _, user) = await _service.RegisterAsync("learner", "learner@example.com", "Learner1!");
 
             var (succeeded, errorMessage) = await _service.UpdateUserAsync(
                 user!.UserId,
@@ -686,11 +696,11 @@ namespace VocabLearning.Tests.Services
 
             // Assert
             succeeded.Should().BeFalse();
-            errorMessage.Should().Be("You cannot delete your own account.");
+            errorMessage.Should().Be("Không thể xóa chính tài khoản của bạn.");
         }
 
         [Fact]
-        public async Task DeleteUserAsync_LastAdmin_ShouldFail()
+        public async Task DeleteUserAsync_AdminAccount_ShouldFail()
         {
             // Arrange
             await _service.CreateUserAsync("admin", "admin@example.com", "Password1!", UserRoles.Admin, UserStatuses.Active);
@@ -702,7 +712,8 @@ namespace VocabLearning.Tests.Services
 
             // Assert
             succeeded.Should().BeFalse();
-            errorMessage.Should().Be("At least one active admin account must remain.");
+            // Admin accounts can no longer be deleted through the service at all.
+            errorMessage.Should().Be("Không thể xóa tài khoản quản trị.");
         }
 
         #endregion
