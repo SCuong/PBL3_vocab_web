@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '../ui';
+import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { AppDialog, Button, FloatingField } from '../ui';
 import { authApi } from '../../services/authApi';
 
 type DeleteAccountModalProps = {
@@ -13,6 +12,7 @@ type DeleteAccountModalProps = {
 
 export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: DeleteAccountModalProps) => {
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [confirmText, setConfirmText] = useState('');
@@ -50,6 +50,7 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
     const handleClose = () => {
         if (!isDeleting) {
             setPassword('');
+            setShowPassword(false);
             setConfirmText('');
             setError('');
             onClose();
@@ -57,113 +58,50 @@ export const DeleteAccountModal = ({ isOpen, onClose, onSuccess, onAddToast }: D
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                    onClick={handleClose}
-                >
-                    <motion.div
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="bg-surface rounded-3xl shadow-2xl w-full max-w-md"
-                        onClick={(e) => e.stopPropagation()}
+        <AppDialog
+            isOpen={isOpen}
+            onClose={handleClose}
+            title="Xóa tài khoản"
+            footer={(
+                <>
+                    <Button variant="ghost" onClick={handleClose} disabled={isDeleting}>Hủy</Button>
+                    <Button
+                        variant="danger"
+                        onClick={handleDelete}
+                        isLoading={isDeleting}
+                        disabled={!password.trim() || confirmText !== 'DELETE'}
                     >
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-3xl flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <AlertTriangle className="text-text-on-accent" size={24} />
-                                <h2 className="text-xl font-bold text-text-on-accent">Xoá Tài Khoản</h2>
-                            </div>
-                            <button
-                                onClick={handleClose}
-                                disabled={isDeleting}
-                                className="text-text-on-accent hover:bg-danger-color/80 rounded-full p-1 transition-colors"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Body */}
-                        <div className="p-6 space-y-4">
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                <p className="text-sm font-semibold text-red-900 mb-2">⚠️ Cảnh báo</p>
-                                <p className="text-sm text-red-800 leading-relaxed">
-                                    Hành động này sẽ xoá tài khoản của bạn vĩnh viễn. Tất cả dữ liệu học tập sẽ bị xóa. Bạn không thể hoàn tác.
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-text-secondary mb-2">
-                                    Nhập mật khẩu để xác nhận
-                                </label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => {
-                                        setPassword(e.target.value);
-                                        setError('');
-                                    }}
-                                    placeholder="Mật khẩu của bạn"
-                                    disabled={isDeleting}
-                                    className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-bg-secondary"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-text-secondary mb-2">
-                                    Nhập "DELETE" để xác nhận
-                                </label>
-                                <input
-                                    type="text"
-                                    value={confirmText}
-                                    onChange={(e) => {
-                                        setConfirmText(e.target.value.toUpperCase());
-                                        setError('');
-                                    }}
-                                    placeholder="Nhập DELETE"
-                                    disabled={isDeleting}
-                                    className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-bg-secondary"
-                                />
-                            </div>
-
-                            {error && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm"
-                                >
-                                    {error}
-                                </motion.div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="border-t border-border p-6 flex gap-3 justify-end">
-                            <Button
-                                variant="ghost"
-                                onClick={handleClose}
-                                disabled={isDeleting}
-                                className="flex-1"
-                            >
-                                Hủy
-                            </Button>
-                            <Button
-                                variant="danger"
-                                onClick={handleDelete}
-                                disabled={isDeleting || !password.trim() || confirmText !== 'DELETE'}
-                                className="flex-1"
-                            >
-                                {isDeleting ? 'Đang xoá...' : 'Xoá Tài Khoản'}
-                            </Button>
-                        </div>
-                    </motion.div>
-                </motion.div>
+                        Xóa vĩnh viễn
+                    </Button>
+                </>
             )}
-        </AnimatePresence>
+        >
+            <div className="space-y-4">
+                <div className="flex gap-3 rounded-[var(--radius-element)] bg-danger-color/10 p-4 text-sm text-text-primary">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger-color" aria-hidden />
+                    <p>Tài khoản và toàn bộ tiến độ học sẽ bị xóa vĩnh viễn. Bạn không thể hoàn tác.</p>
+                </div>
+                <FloatingField
+                    label="Mật khẩu"
+                    value={password}
+                    onChange={(next) => { setPassword(next); setError(''); }}
+                    disabled={isDeleting}
+                    autoComplete="current-password"
+                    isPassword
+                    shown={showPassword}
+                    onToggleShown={() => setShowPassword((v) => !v)}
+                />
+                <FloatingField
+                    label='Gõ "DELETE" để xác nhận'
+                    value={confirmText}
+                    onChange={(next) => { setConfirmText(next); setError(''); }}
+                    disabled={isDeleting}
+                    autoComplete="off"
+                />
+                {error && (
+                    <p role="alert" className="rounded-[var(--radius-element)] bg-danger-color/10 px-3.5 py-3 text-sm text-danger-color">{error}</p>
+                )}
+            </div>
+        </AppDialog>
     );
 };

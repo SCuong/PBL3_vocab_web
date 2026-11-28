@@ -51,12 +51,12 @@ namespace VocabLearning.Services
 
             if (!IsValidUsername(cleanUsername))
             {
-                return (false, $"Display name must be {MinimumUsernameLength}-{MaximumUsernameLength} characters.", null);
+                return (false, $"Tên hiển thị phải từ {MinimumUsernameLength}-{MaximumUsernameLength} ký tự hợp lệ.", null);
             }
 
             if (!IsValidEmail(cleanEmail))
             {
-                return (false, "Email format is invalid.", null);
+                return (false, "Email không đúng định dạng.", null);
             }
 
             if (!PasswordPolicyValidator.IsValid(password))
@@ -67,7 +67,7 @@ namespace VocabLearning.Services
 
             if (usernameExists)
             {
-                return (false, "User already exists.", null);
+                return (false, "Tên đăng nhập này đã được sử dụng.", null);
             }
 
             var normalizedEmail = NormalizeEmail(cleanEmail);
@@ -76,7 +76,7 @@ namespace VocabLearning.Services
 
             if (emailExists)
             {
-                return (false, "Email is already registered.", null);
+                return (false, "Email này đã được đăng ký.", null);
             }
 
             var user = new Users
@@ -121,18 +121,18 @@ namespace VocabLearning.Services
 
             if (user is null)
             {
-                return (null, "Username/email or password is incorrect.");
+                return (null, "Tên đăng nhập/email hoặc mật khẩu không chính xác.");
             }
 
             var (verified, needsRehash) = VerifyPassword(user, password);
             if (!verified)
             {
-                return (null, "Username/email or password is incorrect.");
+                return (null, "Tên đăng nhập/email hoặc mật khẩu không chính xác.");
             }
 
             if (IsLearner(user) && !user.IsEmailVerified)
             {
-                return (null, "Please verify your email before logging in.");
+                return (null, "Vui lòng xác minh email trước khi đăng nhập.");
             }
 
             if (needsRehash)
@@ -155,7 +155,7 @@ namespace VocabLearning.Services
 
             if (string.IsNullOrWhiteSpace(normalizedEmail) || string.IsNullOrWhiteSpace(cleanGoogleSubject))
             {
-                return (false, "Google login did not return enough account information.", null);
+                return (false, "Google không trả về đủ thông tin tài khoản.", null);
             }
 
             var user = await dbContext.Users
@@ -167,7 +167,7 @@ namespace VocabLearning.Services
             {
                 if (!IsUserActive(user))
                 {
-                    return (false, "This account is not active.", null);
+                    return (false, "Tài khoản này đang bị tạm khóa.", null);
                 }
 
                 if (!IsLearner(user))
@@ -237,7 +237,7 @@ namespace VocabLearning.Services
 
             if (user is null)
             {
-                return (false, "User account was not found.");
+                return (false, "Không tìm thấy tài khoản người dùng.");
             }
 
             var hasLocalPassword = !string.IsNullOrWhiteSpace(user.PasswordHash);
@@ -245,13 +245,13 @@ namespace VocabLearning.Services
             {
                 if (string.IsNullOrWhiteSpace(currentPassword))
                 {
-                    return (false, "Current password is required.");
+                    return (false, "Vui lòng nhập mật khẩu hiện tại.");
                 }
 
                 var (verified, _) = VerifyPassword(user, currentPassword);
                 if (!verified)
                 {
-                    return (false, "Current password is incorrect.");
+                    return (false, "Mật khẩu hiện tại không đúng.");
                 }
             }
 
@@ -260,7 +260,7 @@ namespace VocabLearning.Services
 
             if (hasLocalPassword && string.Equals(currentPassword, newPassword, StringComparison.Ordinal))
             {
-                return (false, "New password must be different from the current password.");
+                return (false, "Mật khẩu mới phải khác mật khẩu hiện tại.");
             }
 
             user.PasswordHash = HashPassword(newPassword);

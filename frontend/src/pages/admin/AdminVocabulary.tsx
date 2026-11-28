@@ -6,6 +6,7 @@ import {
 import { Button } from '../../components/ui';
 import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, TextArea, adminFocusRingClass, adminInputClass, adminLabelClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
+import { playPronunciationAudio } from '../../utils/audio';
 import {
     adminApi,
     type AdminExampleItem,
@@ -136,7 +137,7 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
 
     return (
         <Modal title={isEdit ? 'Chỉnh sửa từ vựng' : 'Thêm từ vựng'} onClose={onClose} size="lg">
-                <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+                <form noValidate onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <Input label="Từ vựng" value={form.word} onChange={set('word')} placeholder="Ví dụ: eloquent" required autoFocus />
@@ -168,13 +169,13 @@ const VocabFormModal = ({ modal, topics, onClose, onSave }: VocabFormModalProps)
                     </div>
 
                     {error && (
-                        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 p-3 rounded-[var(--radius-element)] bg-red-500/10 border border-red-500/20">
                             <AlertTriangle size={14} className="text-red-500 shrink-0" />
                             <p className="text-sm text-red-500">{error}</p>
                         </div>
                     )}
 
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex justify-end gap-3 pt-2">
                         <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Hủy</Button>
                         <Button type="submit" variant="primary" disabled={saving}>
                             {saving && <Loader2 size={14} className="animate-spin" />}
@@ -254,13 +255,13 @@ const ExampleFormModal = ({ modal, onClose, onSave }: ExampleFormModalProps) => 
                     </div>
 
                     {error && (
-                        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 p-3 rounded-[var(--radius-element)] bg-red-500/10 border border-red-500/20">
                             <AlertTriangle size={14} className="text-red-500 shrink-0" />
                             <p className="text-sm text-red-500">{error}</p>
                         </div>
                     )}
 
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex justify-end gap-3 pt-2">
                         <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Hủy</Button>
                         <Button type="submit" variant="primary" disabled={saving}>
                             {saving && <Loader2 size={14} className="animate-spin" />}
@@ -308,18 +309,17 @@ const DeleteConfirmModal = ({ target, onClose, onConfirm }: DeleteConfirmProps) 
     return (
         <Modal title="Xác nhận xóa" onClose={onClose} size="sm">
                 <div className="flex items-start gap-4 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-[var(--radius-element)] bg-red-500/15 flex items-center justify-center shrink-0">
                         <Trash2 size={18} className="text-red-500" />
                     </div>
                     <div>
-                        <h2 className="font-display font-bold text-text-primary mb-1">Xác nhận xóa</h2>
-                        <p className="text-sm text-text-muted break-words">Xóa {label}?</p>
+                        <p className="text-sm font-medium text-text-primary break-words">Bạn chắc chắn muốn xóa {label}?</p>
                         <p className="text-xs text-red-500 mt-2">{warning}</p>
                     </div>
                 </div>
 
                 {error && (
-                    <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                    <div className="flex items-center gap-2 p-3 mb-4 rounded-[var(--radius-element)] bg-red-500/10 border border-red-500/20">
                         <AlertTriangle size={14} className="text-red-500 shrink-0" />
                         <p className="text-sm text-red-500">{error}</p>
                     </div>
@@ -354,9 +354,9 @@ interface ExamplesPanelProps {
 const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPanelProps) => (
     <tr id={panelId}>
         <td colSpan={7} className="px-4 pb-3 pt-0">
-            <div className="p-4 rounded-2xl bg-primary/[0.04] border border-primary/10">
+            <div className="p-4 rounded-[var(--radius-container)] bg-primary/[0.04] border border-border">
                 <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-display font-bold text-text-muted uppercase tracking-wide">
+                    <span className="text-sm font-medium text-text-muted">
                         Ví dụ — <span className="text-primary">{vocab.word}</span>
                     </span>
                     <button
@@ -375,7 +375,7 @@ const ExamplesPanel = ({ vocab, panelId, onAdd, onEdit, onDelete }: ExamplesPane
                         {vocab.examples.map(ex => (
                             <div
                                 key={ex.exampleId}
-                                className="flex items-start gap-3 p-3 rounded-xl bg-surface border border-border group"
+                                className="flex items-start gap-3 p-3 rounded-[var(--radius-element)] bg-surface border border-border group"
                             >
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-text-primary">{ex.exampleEn}</p>
@@ -584,7 +584,7 @@ const AdminVocabulary = () => {
     // ── Filter bar ─────────────────────────────────────────────────────────────
 
     const filterInputCls = adminInputClass;
-    const filterLabelCls = 'text-xs font-display font-bold text-text-muted';
+    const filterLabelCls = 'text-sm font-medium text-text-muted';
 
     return (
         <div>
@@ -662,14 +662,14 @@ const AdminVocabulary = () => {
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
-                                    <tr className="border-b border-primary/10">
+                                    <tr className="border-b border-border">
                                         <th className="w-10 px-4 py-3.5" />
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Từ vựng</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">IPA</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Cấp độ</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Nghĩa</th>
-                                        <th className="px-4 py-3.5 text-left text-xs font-display font-bold text-text-muted uppercase tracking-wide">Chủ đề</th>
-                                        <th className="px-4 py-3.5 text-right text-xs font-display font-bold text-text-muted uppercase tracking-wide">Thao tác</th>
+                                        <th className="px-4 py-3.5 text-left text-sm font-medium text-text-muted">Từ vựng</th>
+                                        <th className="px-4 py-3.5 text-left text-sm font-medium text-text-muted">IPA</th>
+                                        <th className="px-4 py-3.5 text-left text-sm font-medium text-text-muted">Cấp độ</th>
+                                        <th className="px-4 py-3.5 text-left text-sm font-medium text-text-muted">Nghĩa</th>
+                                        <th className="px-4 py-3.5 text-left text-sm font-medium text-text-muted">Chủ đề</th>
+                                        <th className="px-4 py-3.5 text-right text-sm font-medium text-text-muted">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -685,7 +685,7 @@ const AdminVocabulary = () => {
                                             const examplesPanelId = `vocab-${vocab.vocabId}-examples`;
                                             return (
                                                 <React.Fragment key={vocab.vocabId}>
-                                                    <tr className={`border-b border-primary/5 transition-colors ${isExpanded ? 'bg-primary/[0.04]' : 'hover:bg-primary/[0.03]'}`}>
+                                                    <tr className={`border-b border-border transition-colors ${isExpanded ? 'bg-primary/[0.04]' : 'hover:bg-primary/[0.03]'}`}>
                                                         <td className="px-4 py-3">
                                                             <button
                                                                 type="button"
@@ -702,19 +702,17 @@ const AdminVocabulary = () => {
                                                         <td className="px-4 py-3">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="font-display font-bold text-sm text-text-primary">{vocab.word}</span>
-                                                                {vocab.audioUrl && (
-                                                                    <a
-                                                                        href={vocab.audioUrl}
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        aria-label={`Phát âm thanh của ${vocab.word}`}
-                                                                        className={`rounded text-text-muted hover:text-primary transition-colors ${adminFocusRingClass}`}
-                                                                    >
-                                                                        <Volume2 size={12} />
-                                                                    </a>
-                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => playPronunciationAudio(vocab.word, vocab.audioUrl ?? undefined)}
+                                                                    aria-label={`Phát âm ${vocab.word}`}
+                                                                    title={`Nghe phát âm ${vocab.word}`}
+                                                                    className={`rounded p-1 text-text-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer ${adminFocusRingClass}`}
+                                                                >
+                                                                    <Volume2 size={13} />
+                                                                </button>
                                                                 {vocab.examples.length > 0 && (
-                                                                    <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold leading-none">
+                                                                    <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold leading-none">
                                                                         {vocab.examples.length}
                                                                     </span>
                                                                 )}

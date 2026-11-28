@@ -7,6 +7,7 @@ namespace VocabLearning.ViewModels.Admin
         public string Word { get; set; } = string.Empty;
         public string? Ipa { get; set; }
         public string? AudioUrl { get; set; }
+        public string? ImageUrl { get; set; }
         public string Level { get; set; } = string.Empty;
         public string? MeaningVi { get; set; }
         public long? TopicId { get; set; }
@@ -17,6 +18,7 @@ namespace VocabLearning.ViewModels.Admin
         public string Word { get; set; } = string.Empty;
         public string? Ipa { get; set; }
         public string? AudioUrl { get; set; }
+        public string? ImageUrl { get; set; }
         public string Level { get; set; } = string.Empty;
         public string? MeaningVi { get; set; }
         public long? TopicId { get; set; }
@@ -53,6 +55,7 @@ namespace VocabLearning.ViewModels.Admin
         public string Word { get; set; } = string.Empty;
         public string? Ipa { get; set; }
         public string? AudioUrl { get; set; }
+        public string? ImageUrl { get; set; }
         public string? Level { get; set; }
         public string? MeaningVi { get; set; }
         public long? TopicId { get; set; }

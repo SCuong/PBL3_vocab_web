@@ -1,82 +1,52 @@
 /* Google Fonts are loaded non-render-blocking via <link> in index.html. */
+/* Cascade: Astryx reset → Tailwind preflight → Astryx components → theme → app utilities. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
 @import "tailwindcss";
 
+/* App-level aliases. Every colour resolves to an Astryx theme token
+   (src/theme/vocabTheme.ts), so light/dark and brand changes live in one place. */
 :root {
-    color-scheme: light;
-    --bg-primary: #faf5ff;
-    --bg-secondary: #f3e8ff;
-    --surface: #ffffff;
-    --surface-hover: #f8f0ff;
-    --text-primary: #1e1b4b;
-    --text-secondary: #5b5697;
-    /* Darkened from #7c69c8 to reach WCAG AA (~5.4:1 on light bg); the old value
-       measured ~4.2:1 and failed the Lighthouse contrast audit on muted text. */
-    --text-muted: #6959aa;
-    --text-on-accent: #ffffff;
-    --border-color: #e9d5ff;
-    --accent-color: #9333ea;
-    --success-color: #16a34a;
-    --warning-color: #d97706;
-    --danger-color: #dc2626;
-    --accent-secondary: #e879f9;
-    --accent-cyan: #22d3ee;
-    --accent-soft: #f3e8ff;
-    --shadow-color: rgba(147, 51, 234, 0.14);
+    --bg-primary: var(--color-background-body, #f5f7fb);
+    --bg-secondary: var(--color-background-muted, #f2eef9);
+    --surface: var(--color-background-surface, #ffffff);
+    --surface-hover: color-mix(in srgb, var(--accent-color) 5%, var(--surface));
+    --text-primary: var(--color-text-primary, #1d1038);
+    --text-secondary: var(--color-text-secondary, #4a3b6e);
+    /* AA on body and surface in both modes; don't lighten. */
+    --text-muted: var(--color-text-secondary, #4a3b6e);
+    --text-on-accent: var(--color-on-accent, #ffffff);
+    --border-color: var(--color-border, #e2dce8);
+    --border-strong: var(--color-border-emphasized, #c9bfd8);
+    --accent-color: var(--color-accent, #6d28d9);
+    --success-color: var(--color-text-success);
+    --warning-color: var(--color-text-warning);
+    --danger-color: var(--color-text-error);
+    /* Logo end-stops, tuned for text contrast. */
+    --accent-secondary: light-dark(#b42f97, #f08ad8);
+    --accent-cyan: light-dark(#0b7499, #63d3f3);
+    --accent-soft: var(--color-accent-muted, #efe9fb);
+    --shadow-color: rgba(0, 0, 0, 0.12);
+    --tactile-shadow: 0 3px 0 0 rgba(0, 0, 0, 0.05), 0 6px 10px -6px rgba(0, 0, 0, 0.12);
+    --tactile-shadow-raised: 0 4px 0 0 rgba(0, 0, 0, 0.07), 0 8px 10px -6px rgba(0, 0, 0, 0.16);
     --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 16%, var(--surface));
-    --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 36%, var(--border-color));
+    --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 38%, var(--border-color));
     --sticky-note-blue-bg: color-mix(in srgb, var(--accent-cyan) 14%, var(--surface));
-    --sticky-note-blue-border: color-mix(in srgb, var(--accent-cyan) 34%, var(--border-color));
+    --sticky-note-blue-border: color-mix(in srgb, var(--accent-cyan) 36%, var(--border-color));
     --sticky-note-green-bg: color-mix(in srgb, var(--success-color) 14%, var(--surface));
-    --sticky-note-green-border: color-mix(in srgb, var(--success-color) 34%, var(--border-color));
+    --sticky-note-green-border: color-mix(in srgb, var(--success-color) 36%, var(--border-color));
     --sticky-note-pink-bg: color-mix(in srgb, var(--accent-secondary) 14%, var(--surface));
-    --sticky-note-pink-border: color-mix(in srgb, var(--accent-secondary) 34%, var(--border-color));
+    --sticky-note-pink-border: color-mix(in srgb, var(--accent-secondary) 36%, var(--border-color));
     --sticky-note-purple-bg: color-mix(in srgb, var(--accent-color) 14%, var(--surface));
-    --sticky-note-purple-border: color-mix(in srgb, var(--accent-color) 34%, var(--border-color));
+    --sticky-note-purple-border: color-mix(in srgb, var(--accent-color) 36%, var(--border-color));
     --sticky-note-control-hover: color-mix(in srgb, var(--surface) 72%, var(--text-primary) 8%);
 }
 
-[data-theme="dark"] {
-    color-scheme: dark;
-    --bg-primary: #0f0b1d;
-    --bg-secondary: #171129;
-    --surface: #211a35;
-    --surface-hover: #2a2142;
-    --text-primary: #f8fafc;
-    --text-secondary: #d8ccff;
-    --text-muted: #b7a7df;
-    --text-on-accent: #0f0b1d;
-    --border-color: #43345f;
-    --accent-color: #c084fc;
-    --success-color: #22c55e;
-    --warning-color: #f59e0b;
-    --danger-color: #f87171;
-    --accent-secondary: #f0abfc;
-    --accent-cyan: #67e8f9;
-    --accent-soft: #2a2142;
-    --shadow-color: rgba(0, 0, 0, 0.32);
-    --sticky-note-yellow-bg: color-mix(in srgb, var(--warning-color) 20%, var(--surface));
-    --sticky-note-yellow-border: color-mix(in srgb, var(--warning-color) 45%, var(--border-color));
-    --sticky-note-blue-bg: color-mix(in srgb, var(--accent-cyan) 18%, var(--surface));
-    --sticky-note-blue-border: color-mix(in srgb, var(--accent-cyan) 42%, var(--border-color));
-    --sticky-note-green-bg: color-mix(in srgb, var(--success-color) 18%, var(--surface));
-    --sticky-note-green-border: color-mix(in srgb, var(--success-color) 42%, var(--border-color));
-    --sticky-note-pink-bg: color-mix(in srgb, var(--accent-secondary) 18%, var(--surface));
-    --sticky-note-pink-border: color-mix(in srgb, var(--accent-secondary) 42%, var(--border-color));
-    --sticky-note-purple-bg: color-mix(in srgb, var(--accent-color) 20%, var(--surface));
-    --sticky-note-purple-border: color-mix(in srgb, var(--accent-color) 45%, var(--border-color));
-    --sticky-note-control-hover: color-mix(in srgb, var(--surface-hover) 80%, var(--text-primary) 8%);
-}
-
-@theme {
-    /* Named easings — use these instead of the browser default `ease` or any
-       bounce/overshoot curve, which reads as dated on UI state changes. */
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
-    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    --font-decorative: "Coiny", "Nunito", "Be Vietnam Pro", sans-serif;
-    --font-display: "Nunito", "Fredoka", "Be Vietnam Pro", sans-serif;
-    --font-sans: "Plus Jakarta Sans", "Quicksand", "Be Vietnam Pro", sans-serif;
-    --font-mono: "Space Mono", monospace;
+/* Colour utilities inline the alias instead of emitting --color-* variables,
+   which would collide with Astryx's own --color-accent / --color-border / --color-text-*. */
+@theme inline reference {
     --color-primary: var(--accent-color);
     --color-primary-hover: color-mix(in srgb, var(--accent-color) 82%, var(--text-primary));
     --color-primary-light: var(--accent-soft);
@@ -93,6 +63,7 @@
     --color-surface-2: var(--bg-secondary);
     --color-border: var(--border-color);
     --color-border-color: var(--border-color);
+    --color-border-emphasized: var(--border-strong);
     --color-text-primary: var(--text-primary);
     --color-text-secondary: var(--text-secondary);
     --color-text-muted: var(--text-muted);
@@ -150,10 +121,23 @@
     --color-purple-600: var(--accent-color);
     --color-purple-700: var(--accent-color);
     --color-purple-900: color-mix(in srgb, var(--accent-color) 82%, var(--text-primary));
+}
+
+@theme {
+    /* Named easings — use these instead of the browser default `ease` or any
+       bounce/overshoot curve, which reads as dated on UI state changes. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    /* One family: Be Vietnam Pro carries full Vietnamese diacritics at every weight. */
+    --font-decorative: var(--font-family-heading, "Be Vietnam Pro"), sans-serif;
+    --font-display: var(--font-family-heading, "Be Vietnam Pro"), sans-serif;
+    --font-sans: var(--font-family-body, "Be Vietnam Pro"), sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
     --radius-pill: 9999px;
-    --radius-card: 16px;
-    --radius-xl: 1.5rem;
-    --radius-2xl: 2rem;
+    --radius-card: var(--radius-container, 1rem);
+    --radius-xl: var(--radius-container, 1rem);
+    --radius-2xl: 1.25rem;
 
     @keyframes slide-in {
         from {
@@ -168,26 +152,15 @@
     }
 
     @keyframes flame-pulse {
-        0%, 100% {
-            transform: scale(1);
-            filter: drop-shadow(0 0 2px #ff4d00);
-        }
-
-        50% {
-            transform: scale(1.1);
-            filter: drop-shadow(0 0 8px #ff4d00);
-        }
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
     }
 
-    @keyframes bounce-soft {
-        0%, 100% {
-            transform: translateY(0);
-        }
-
-        50% {
-            transform: translateY(-10px);
-        }
+    @keyframes loader-slide {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(200%); }
     }
+
 
     @keyframes slide-down {
         from {
@@ -204,16 +177,379 @@
     --animate-slide-in: slide-in 0.4s ease-out;
     --animate-slide-down: slide-down 0.2s ease;
     --animate-flame-pulse: flame-pulse 1.5s ease-in-out infinite;
-    --animate-bounce-soft: bounce-soft 2s ease-in-out infinite;
+}
+
+@keyframes cinema-img-reveal {
+    from {
+        opacity: 0.4;
+        transform: scale(1.03);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes cinema-content-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cinema-img-reveal {
+    animation: cinema-img-reveal 260ms var(--ease-out) both;
+    will-change: transform, opacity;
+}
+
+.cinema-content-in {
+    animation: cinema-content-in 200ms var(--ease-out) both;
+    will-change: transform, opacity;
+}
+
+/* Elevated tactile surfaces & ambient polish (Light + Dark mode token-safe) */
+.hero-mesh-bg {
+    background-color: #171429;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 40px -22px rgba(23, 20, 41, 0.45);
+}
+
+.topic-card-wow {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 6px 20px -14px rgba(23, 20, 41, 0.14);
+    transition:
+        transform 220ms var(--ease-out),
+        box-shadow 220ms var(--ease-out),
+        border-color 180ms var(--ease-out);
+}
+
+.topic-card-wow:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--accent-color) 42%, var(--border-color));
+    box-shadow: 0 16px 32px -18px rgba(23, 20, 41, 0.22);
+}
+
+.topic-cover-pill {
+    background: rgba(20, 16, 36, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+.flashcard-face-wow {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 16px 36px -20px rgba(23, 20, 41, 0.18);
+}
+
+.progress-fill-wow {
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--accent-color);
+    transition: width 420ms var(--ease-out);
+}
+
+/* ── Authentic Duolingo 3D Pressable Buttons ─────────────────────────────── */
+.duo-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 46px;
+    padding: 0.65rem 1.35rem;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    will-change: transform;
+    transition:
+        transform 80ms var(--ease-out),
+        background-color 120ms var(--ease-out);
+}
+
+.duo-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Signature Duolingo Owl Green */
+.duo-btn-green,
+.duo-btn-emerald {
+    background: #58cc02;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 0 #46a302;
+}
+.duo-btn-green:hover:not(:disabled),
+.duo-btn-emerald:hover:not(:disabled) {
+    background: #61e002;
+}
+.duo-btn-green:active:not(:disabled),
+.duo-btn-emerald:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #46a302;
+}
+
+/* Duolingo Macaw Blue */
+.duo-btn-blue {
+    background: #1cb0f6;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 0 #1485bc;
+}
+.duo-btn-blue:hover:not(:disabled) {
+    background: #2bc0ff;
+}
+.duo-btn-blue:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #1485bc;
+}
+
+/* Duolingo Royal Purple */
+.duo-btn-purple {
+    background: #7c3aed;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 0 #5b21b6;
+}
+.duo-btn-purple:hover:not(:disabled) {
+    background: #8b5cf6;
+}
+.duo-btn-purple:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #5b21b6;
+}
+
+/* Brand Warm Marigold / Amber 3D */
+.duo-btn-amber {
+    background: #f59e0b;
+    color: #171429;
+    border: none;
+    box-shadow: 0 4px 0 #b45309;
+}
+.duo-btn-amber:hover:not(:disabled) {
+    background: #fbbf24;
+}
+.duo-btn-amber:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #b45309;
+}
+
+/* Crisp White 3D for Dark Cinema Posters */
+.duo-btn-white {
+    background: #ffffff;
+    color: #171429;
+    border: none;
+    box-shadow: 0 4px 0 #cbd5e1;
+}
+.duo-btn-white:hover:not(:disabled) {
+    background: #f59e0b;
+    box-shadow: 0 4px 0 #b45309;
+}
+.duo-btn-white:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #b45309;
+}
+
+/* Duolingo Crisp White 3D Secondary */
+.duo-btn-surface {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+    box-shadow: 0 4px 0 var(--border-color);
+}
+.duo-btn-surface:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: var(--border-strong);
+    box-shadow: 0 4px 0 var(--border-strong);
+}
+.duo-btn-surface:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 var(--border-strong);
+}
+
+/* Duolingo Dark Poster Glass 3D */
+.duo-btn-glass {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.36);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.42);
+}
+.duo-btn-glass:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.24);
+}
+.duo-btn-glass:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0.42);
+}
+
+/* Compact 3D size for poster cards */
+.duo-btn-sm {
+    min-height: 38px;
+    padding: 0.45rem 0.95rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+}
+.duo-btn-glass:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+}
+.duo-btn-glass:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+.duo-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px -8px rgba(23, 20, 41, 0.1);
+    transition:
+        transform 180ms var(--ease-out),
+        border-color 180ms var(--ease-out),
+        box-shadow 180ms var(--ease-out);
+}
+.duo-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent-color) 42%, var(--border-color));
+    box-shadow: 0 14px 28px -16px rgba(23, 20, 41, 0.18);
+}
+
+.duo-unit-header {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 4px 14px -8px rgba(23, 20, 41, 0.08);
+}
+
+.duo-unit-header-accent {
+    background-color: #171429;
+    border: 1px solid #2b2544;
+    border-radius: 16px;
+    color: #ffffff;
+    box-shadow: 0 10px 24px -14px rgba(23, 20, 41, 0.36);
+}
+
+.duo-progress-track {
+    position: relative;
+    height: 12px;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: var(--bg-secondary);
+}
+
+.duo-progress-fill {
+    position: relative;
+    height: 100%;
+    border-radius: 9999px;
+    background: #10b981;
+    transition: width 360ms var(--ease-out);
+}
+
+.duo-progress-fill::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 3px;
+    height: 3px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.duo-progress-fill-amber {
+    background: #f59e0b;
+}
+
+.duo-progress-fill-violet {
+    background: #7c3aed;
 }
 
 @layer base {
     body {
-        @apply bg-bg-light text-text-primary font-sans selection:bg-accent/30 overflow-x-hidden;
+        @apply bg-bg-light text-text-primary font-sans overflow-x-hidden;
+        caret-color: var(--accent-color);
         -webkit-font-smoothing: antialiased;
         min-height: 100dvh;
         line-height: 1.65;
     }
+
+    /* Browser-drawn surfaces carry the palette too. */
+    html {
+        accent-color: var(--accent-color);
+    }
+
+    /* Minimal floating pill scrollbars (Light & Dark), without classic arrow buttons. */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: color-mix(in srgb, var(--text-primary) 22%, transparent);
+        border-radius: 999px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+        min-height: 36px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: color-mix(in srgb, var(--text-primary) 40%, transparent);
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:active {
+        background-color: color-mix(in srgb, var(--text-primary) 54%, transparent);
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-button {
+        display: none;
+        width: 0;
+        height: 0;
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    @supports not selector(::-webkit-scrollbar) {
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--text-primary) 28%, transparent) transparent;
+        }
+    }
+
+    ::selection {
+        background: color-mix(in srgb, var(--accent-color) 24%, transparent);
+        color: var(--text-primary);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--accent-color);
+        outline-offset: 2px;
+    }
+
+    table, time { font-variant-numeric: tabular-nums; }
+
+    a { text-underline-offset: 0.2em; }
 
     h1, h2, h3, h4, h5, h6 {
         @apply font-display font-bold;
@@ -230,76 +566,112 @@
 
 @layer components {
     /* ─── Shared UI primitives ─────────────────────────────────────────── */
+    /* Tactile letterpress card surface: crisp 2px border + tight neutral elevation. */
     .glass-card {
-        @apply bg-surface/70 backdrop-blur-md border border-primary/20 rounded-card shadow-[0_4px_20px_var(--shadow-color)] transition-all duration-300;
+        @apply bg-surface border-2 border-border rounded-card;
+        box-shadow: var(--tactile-shadow);
     }
 
-        .glass-card:hover {
-            @apply shadow-[0_8px_30px_var(--shadow-color)] border-primary/40;
+    :root[data-theme="dark"] {
+        color-scheme: dark;
+        --tactile-shadow: 0 3px 0 0 rgba(0, 0, 0, 0.32), 0 6px 10px -6px rgba(0, 0, 0, 0.45);
+        --tactile-shadow-raised: 0 5px 0 0 rgba(0, 0, 0, 0.42), 0 8px 10px -6px rgba(0, 0, 0, 0.56);
+    }
+
+    :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0.82;
+        cursor: pointer;
+    }
+
+    /* Live 9-bar audio waveform animation (GPU-only scaleY) */
+    @keyframes vl-wave-bar {
+        0%, 100% { transform: scaleY(0.32); }
+        50% { transform: scaleY(var(--vl-peak, 1)); }
+    }
+
+    .vl-wave-bar {
+        display: block;
+        width: 2.5px;
+        height: 14px;
+        border-radius: 999px;
+        background-color: currentColor;
+        transform-origin: center;
+        transform: scaleY(calc(var(--vl-peak, 0.5) * 0.46));
+        transition: transform 200ms var(--ease-out);
+    }
+
+    .vl-wave-live .vl-wave-bar {
+        animation: vl-wave-bar 580ms var(--ease-in-out) infinite;
+        animation-delay: var(--vl-delay, 0ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .vl-wave-live .vl-wave-bar {
+            animation: none;
+            transform: scaleY(var(--vl-peak, 0.8));
         }
-
-    .btn-base {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer;
     }
 
-    /* Gradient fill kept at the owner's request — it is the established brand
-       look for the primary action across the app. */
-    .btn-primary {
-        @apply rounded-pill px-8 py-3 font-bold flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-on-accent relative;
-        background: linear-gradient(135deg, var(--accent-color), var(--accent-secondary));
-        box-shadow: 0 4px 24px var(--shadow-color);
-        transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), filter 200ms var(--ease-out);
+    /* Neutralize Chrome/Edge blue autofill fill globally across all inputs. */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus {
+        -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+        -webkit-text-fill-color: var(--text-primary) !important;
+        caret-color: var(--accent-color);
+        transition: background-color 99999s ease-out 0s;
     }
 
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 32px var(--shadow-color);
-        filter: brightness(1.06);
+    /* Pinterest-style floating-label input: single transform property so React state
+       and browser :-webkit-autofill never stack or clip the label. */
+    .vl-float-label {
+        position: absolute;
+        left: 14px;
+        top: 0;
+        transform-origin: left top;
+        transform: translateY(15.5px) scale(1);
+        transition: transform 200ms var(--ease-out), color 150ms var(--ease-out);
     }
 
-    .btn-secondary {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted;
-        border: 2px solid var(--border-color);
-        background: var(--surface);
+    .vl-float-label[data-floated="true"],
+    .vl-float-input:-webkit-autofill + .vl-float-label,
+    .vl-float-input:autofill + .vl-float-label {
+        transform: translateY(5px) scale(0.73);
+        font-weight: 600;
     }
 
-    .btn-secondary:hover {
-        color: var(--accent-color);
-        border-color: var(--accent-color);
-        background: var(--accent-soft);
+    .vl-float-input:-webkit-autofill,
+    .vl-float-input:-webkit-autofill:hover,
+    .vl-float-input:-webkit-autofill:focus {
+        padding-top: 20px !important;
+        padding-bottom: 4px !important;
     }
 
-    .btn-ghost {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer text-text-muted hover:text-text-primary hover:bg-primary/10 hover:scale-[1.03];
+    /* Legacy button classes, aligned with Astryx Button (solid, quiet, 44px). */
+    .btn-base, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-element)] px-5 font-semibold cursor-pointer;
+        transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), border-color 150ms var(--ease-out);
     }
 
-    .btn-danger {
-        @apply rounded-pill px-8 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-2 active:scale-95 cursor-pointer bg-danger-color/10 text-danger-color hover:bg-danger-color/20;
+    .btn-base:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-ghost:focus-visible, .btn-danger:focus-visible {
+        outline: 2px solid var(--accent-color);
+        outline-offset: 2px;
     }
+
+    .btn-primary { @apply bg-primary text-text-on-accent hover:bg-primary-hover; }
+    .btn-secondary { @apply border border-border bg-surface text-text-primary hover:bg-surface-hover; }
+    .btn-ghost { @apply text-text-secondary hover:bg-surface-hover hover:text-text-primary; }
+    .btn-danger { @apply bg-danger-color/10 text-danger-color hover:bg-danger-color/15; }
 
     .badge {
         @apply px-3 py-1 rounded-pill text-xs font-bold uppercase tracking-wide transition-all duration-300;
     }
 
-    .badge-cyan {
-        @apply bg-accent/20 text-text-primary border border-accent/30;
-    }
-
-    .badge-pink {
-        @apply bg-secondary/20 text-text-primary border border-secondary/30;
-    }
-
-    .badge-purple {
-        @apply bg-primary/20 text-text-primary border border-primary/30;
-    }
-
-    .badge-green {
-        @apply bg-green-100 text-green-700 border border-green-200;
-    }
-
-    .badge-warn {
-        @apply bg-orange-100 text-orange-700 border border-orange-200;
-    }
+    .badge-cyan { @apply bg-cyan/10 text-cyan; }
+    .badge-pink { @apply bg-secondary/10 text-secondary; }
+    .badge-purple { @apply bg-primary-light text-primary; }
+    .badge-green { @apply bg-success-color/10 text-success-color; }
+    .badge-warn { @apply bg-warning-color/10 text-warning-color; }
 
     .nav-link {
         @apply relative py-2 px-1 font-medium text-text-secondary hover:text-text-primary transition-colors;
@@ -307,151 +679,14 @@
 
         .nav-link.active::after {
             content: '';
-            @apply absolute bottom-0 left-0 w-full h-0.5 bg-linear-to-r from-accent to-primary rounded-full;
+            @apply absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full;
         }
 
-    /* ─── Flashcard 3D ──────────────────────────────────────────────────── */
-    .flashcard-wrapper {
-        perspective: 1000px;
-    }
-
-    .flashcard {
-        @apply relative w-full h-full transition-transform duration-500 cursor-pointer;
-        transform-style: preserve-3d;
-    }
-
-        .flashcard.flipped {
-            transform: rotateY(180deg);
-        }
-
-    .card-front, .card-back {
-        @apply absolute inset-0 bg-surface/70 backdrop-blur-md border border-primary/20 rounded-card shadow-lg transition-all duration-300 flex flex-col items-center justify-center p-8;
-        backface-visibility: hidden;
-    }
-
-    .card-back {
-        transform: rotateY(180deg);
-    }
-
-    /* ─── Animations ────────────────────────────────────────────────────── */
-    @keyframes float {
-        0%, 100% {
-            transform: translateY(0) rotate(0);
-        }
-
-        50% {
-            transform: translateY(-12px) rotate(1deg);
-        }
-    }
-
-    .animate-float {
-        animation: float 3.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse-soft {
-        0%, 100% {
-            transform: scale(1);
-            opacity: 0.8;
-        }
-
-        50% {
-            transform: scale(1.05);
-            opacity: 1;
-        }
-    }
-
-    .animate-pulse-soft {
-        animation: pulse-soft 2.8s ease-in-out infinite;
-    }
-
-    /* ─── Mesh Orbs ─────────────────────────────────────────────────────── */
-    .mesh-orb {
-        @apply absolute rounded-full blur-[100px] -z-10 opacity-50;
-    }
-
-    /* ─── Matching Game ─────────────────────────────────────────────────── */
-    .matching-game {
-        @apply grid grid-cols-2 gap-4;
-    }
-
-    .matching-item {
-        @apply p-4 rounded-xl border-2 border-primary/10 bg-surface/50 cursor-pointer transition-all duration-200 text-center font-bold;
-    }
-
-        .matching-item.selected {
-            @apply border-accent bg-accent/10 shadow-lg shadow-accent/20;
-        }
-
-        .matching-item.correct {
-            @apply border-success-color bg-success-color/10 text-success-color;
-        }
-
-        .matching-item.wrong {
-            @apply border-danger-color bg-danger-color/10 text-danger-color;
-            animation: shake 0.5s ease-in-out;
-        }
-
-    @keyframes shake {
-        0%, 100% {
-            transform: translateX(0);
-        }
-
-        25% {
-            transform: translateX(-4px);
-        }
-
-        75% {
-            transform: translateX(4px);
-        }
-    }
 
     /* ─── Progress Bar ──────────────────────────────────────────────────── */
     .progress-fill {
-        @apply h-full bg-linear-to-r from-accent to-primary rounded-full transition-all duration-500;
+        @apply h-full bg-primary rounded-full transition-[width] duration-500;
     }
-
-    /* ─── Preview Styles ────────────────────────────────────────────────── */
-    .topic-card.locked {
-        @apply opacity-50 grayscale pointer-events-none relative overflow-hidden;
-    }
-
-    .lock-overlay {
-        @apply absolute inset-0 flex items-center justify-center bg-bg-light/40 backdrop-blur-[2px] z-10 text-3xl;
-    }
-
-    .preview-banner-top {
-        @apply bg-linear-to-r from-accent/10 to-primary/10 border-b border-primary/20 p-4 flex items-center justify-between text-sm font-medium;
-    }
-
-    .sticky-cta {
-        @apply fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-lg border-t border-primary/20 p-4 flex items-center justify-between z-50 shadow-2xl;
-    }
-
-    /* ─── XP Float ──────────────────────────────────────────────────────── */
-    .xp-float {
-        @apply fixed font-bold text-primary pointer-events-none z-[100] text-xl;
-    }
-
-    /* ─── Leaderboard Podium ────────────────────────────────────────────── */
-    .podium {
-        @apply flex items-end justify-center gap-4 mb-12;
-    }
-
-    .podium-item {
-        @apply flex flex-col items-center;
-    }
-
-    .podium-block {
-        @apply w-24 rounded-t-2xl flex items-center justify-center font-display text-3xl font-bold;
-    }
-
-    .podium-avatar {
-        @apply w-16 h-16 rounded-full border-4 border-white shadow-lg mb-2 flex items-center justify-center text-2xl bg-primary/10;
-    }
-
-        .podium-avatar.gold {
-            @apply border-accent ring-4 ring-accent/20;
-        }
 
     /* ─── Heatmap ───────────────────────────────────────────────────────── */
     .heatmap-grid {
@@ -463,420 +698,12 @@
     }
 
         .heatmap-cell.active {
-            @apply bg-accent shadow-[0_0_8px_var(--shadow-color)];
+            @apply bg-primary;
         }
-
-    /* ─── Matching Game Lines ───────────────────────────────────────────── */
-    .matching-line {
-        @apply absolute pointer-events-none z-0 stroke-accent stroke-[3px] fill-none;
-        stroke-dasharray: 1000;
-        stroke-dashoffset: 1000;
-        animation: draw-line 0.5s forwards;
-    }
-
-    @keyframes draw-line {
-        to {
-            stroke-dashoffset: 0;
-        }
-    }
-
-    /* ─── Split View ────────────────────────────────────────────────────── */
-    .split-view {
-        @apply grid grid-cols-1 lg:grid-cols-2 gap-8;
-    }
-
-    .split-left {
-        @apply h-full overflow-y-auto pr-4;
-    }
-
-    .split-right {
-        @apply h-full overflow-y-auto;
-    }
-
-    /* ─── Toast ─────────────────────────────────────────────────────────── */
-    .toast-container {
-        @apply fixed bottom-8 right-8 flex flex-col gap-3 z-[200];
-    }
-
-    .toast {
-        @apply bg-surface/70 backdrop-blur-md border border-primary/20 rounded-card shadow-lg transition-all duration-300 px-6 py-4 flex items-center gap-3 shadow-2xl border-accent/30 animate-slide-in;
-    }
-
-    /* ─── Quizlet Grid ──────────────────────────────────────────────────── */
-    .quizlet-grid {
-        @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4;
-    }
-
-    .quizlet-card {
-        @apply bg-surface/70 backdrop-blur-md border border-primary/20 rounded-card shadow-lg transition-all duration-300 p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-accent/50;
-    }
 
     /* ─── Streak Flame ──────────────────────────────────────────────────── */
     .flame-pulse {
         @apply animate-flame-pulse;
-    }
-
-    /* ═══════════════════════════════════════════════════════════════════════
-     AUTH FLIP LAYOUT
-     Pattern follows CSSStyling.css from the sample folder:
-       - .auth-flip-root  = #container  (perspective + preserve-3d)
-       - .auth-panel-login   = .login   (left half, white bg)
-       - .auth-panel-register= .register(right half, white bg)
-       - .auth-page-front    = .page.front (gradient page, z-3, right side)
-       - .auth-page-back     = .page.back  (gradient page, z-2, right side)
-       - .auth-flip-root.active → pages flip, showing register form
-       - .auth-flip-root.close  → pages flip back, showing login form
-
-     FIX 1: no nested @layer (removed inner @layer components block)
-     FIX 2: overlay (gradient pages) does NOT cover form — they sit only on
-             the RIGHT half (50% width), leaving the form fully clickable
-     FIX 3: flip state class is on .auth-flip-root (the root), not on a
-             child element, so all child selectors work correctly
-     FIX 4: animation keyframes ported from CSSStyling.css, adapted to
-             tím/hồng/cyan color scheme
-  ═══════════════════════════════════════════════════════════════════════ */
-
-    /* ── Shared auth input helpers ────────────────────────────────────── */
-    .auth-input {
-        @apply w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-surface/50 focus:border-primary/30 focus:bg-surface transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 text-text-primary placeholder:text-text-muted;
-    }
-
-    .auth-eye-btn {
-        @apply absolute right-3 top-1/2 -translate-y-1/2 text-lg hover:scale-110 transition-transform cursor-pointer;
-    }
-
-    .auth-error {
-        @apply text-sm text-red-500 font-medium bg-red-50/70 rounded-lg p-3 border border-red-200/50;
-    }
-
-    .auth-success {
-        @apply text-sm text-green-600 font-medium bg-green-50/70 rounded-lg p-3 border border-green-200/50;
-    }
-
-    .auth-mobile-switch {
-        @apply mt-4 text-sm text-text-secondary text-center;
-    }
-
-    /* ── Root container ───────────────────────────────────────────────── */
-    .auth-flip-root {
-        position: relative;
-        width: 95%;
-        max-width: 900px;
-        /* Height is controlled by the tallest panel; use min-height as floor */
-        min-height: 660px;
-        border-radius: 24px;
-        box-shadow: 0 14px 40px -10px var(--shadow-color), 0 10px 20px -10px var(--shadow-color);
-        transform-style: preserve-3d;
-        perspective: 1500px;
-    }
-
-    /* ── Form panels (login LEFT, register RIGHT) ─────────────────────── */
-    .auth-panel {
-        position: absolute;
-        width: 50%;
-        min-width: 320px;
-        height: 100%;
-        top: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow-y: auto;
-        background: color-mix(in srgb, var(--surface) 82%, transparent);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-    }
-
-    .auth-panel-login {
-        left: 0;
-        border-radius: 24px 0 0 24px;
-    }
-
-    .auth-panel-register {
-        right: 0;
-        border-radius: 0 24px 24px 0;
-        z-index: 1;
-        justify-content: flex-start;
-    }
-
-    .auth-panel-content {
-        width: 100%;
-        padding: 2rem 2.5rem 1.5rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    /* Show/hide panel content with fade animations */
-    .auth-panel-login .auth-panel-content {
-        animation: auth-show 0.7s ease-in-out both;
-    }
-
-    .auth-panel-register .auth-panel-content {
-        animation: auth-hide 0.7s ease-in-out both;
-    }
-
-    .auth-flip-root.active .auth-panel-login .auth-panel-content {
-        animation: auth-hide 0.7s ease-in-out both;
-    }
-
-    .auth-flip-root.active .auth-panel-register .auth-panel-content {
-        animation: auth-show 0.7s ease-in-out both;
-    }
-
-    .auth-flip-root.close .auth-panel-login .auth-panel-content {
-        animation: auth-show 0.7s ease-in-out both;
-    }
-
-    .auth-flip-root.close .auth-panel-register .auth-panel-content {
-        animation: auth-hide 0.7s ease-in-out both;
-    }
-
-    @keyframes auth-show {
-        from {
-            opacity: 0;
-            transform: scale(0.92);
-        }
-
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
-    }
-
-    @keyframes auth-hide {
-        from {
-            opacity: 1;
-            transform: scale(1);
-        }
-
-        to {
-            opacity: 0;
-            transform: scale(0.92);
-        }
-    }
-
-    /* ── Gradient page overlays (RIGHT half only — never block LEFT form) ─ */
-    /* .auth-page-front and .auth-page-back are positioned on the RIGHT side */
-    /* and rotate around their LEFT edge (left center origin),               */
-    /* exactly like the sample's .page { transform-origin: left center }     */
-    .auth-page {
-        position: absolute;
-        right: 0;
-        width: 50%;
-        height: 100%;
-        top: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: #ffffff;
-        transform-origin: left center;
-        border-radius: 0 24px 24px 0;
-    }
-
-    .auth-page-front {
-        background: linear-gradient(
-            140deg,
-            #6d28d9 0%,
-            #9333ea 45%,
-            #c026d3 100%
-        );
-        z-index: 3;
-    }
-
-    .auth-page-back {
-        background: linear-gradient(
-            140deg,
-            #7c3aed 0%,
-            #a855f7 50%,
-            #ec4899 100%
-        );
-        z-index: 2;
-    }
-
-    /* Back-face content is pre-rotated 180° so it reads correctly when flipped */
-    .auth-page-back-content {
-        transform: rotateY(180deg);
-    }
-
-    /* ── Flip animations — .active (→ register view) ─────────────────── */
-    .auth-flip-root.active .auth-page-front {
-        animation: auth-rot-front 0.6s ease-in-out forwards;
-    }
-
-    .auth-flip-root.active .auth-page-back {
-        animation: auth-rot-back 0.6s ease-in-out forwards;
-    }
-
-    /* ── Close animations — .close (→ login view) ─────────────────────── */
-    .auth-flip-root.close .auth-page-front {
-        animation: auth-close-front 0.6s ease-in-out forwards;
-    }
-
-    .auth-flip-root.close .auth-page-back {
-        animation: auth-close-back 0.6s ease-in-out forwards;
-    }
-
-    /* Front flips out to the left */
-    @keyframes auth-rot-front {
-        from {
-            transform: translateZ(2px) rotateY(0deg);
-        }
-
-        to {
-            transform: translateZ(1px) rotateY(-180deg);
-        }
-    }
-
-    /* Back comes into view */
-    @keyframes auth-rot-back {
-        from {
-            transform: translateZ(1px) rotateY(0deg);
-        }
-
-        to {
-            transform: translateZ(2px) rotateY(-180deg);
-        }
-    }
-
-    /* Restore front */
-    @keyframes auth-close-front {
-        from {
-            transform: translateZ(1px) rotateY(-180deg);
-        }
-
-        to {
-            transform: translateZ(2px) rotateY(0deg);
-        }
-    }
-
-    /* Back goes back behind */
-    @keyframes auth-close-back {
-        from {
-            transform: translateZ(2px) rotateY(-180deg);
-        }
-
-        to {
-            transform: translateZ(1px) rotateY(0deg);
-        }
-    }
-
-    /* ── Page content inside gradient overlays ─────────────────────────── */
-    .auth-page-content {
-        width: 100%;
-        padding: 2rem 2.5rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1rem;
-    }
-
-    .auth-page-icon {
-        font-size: 3.5rem;
-        display: block;
-        margin-bottom: 0.5rem;
-    }
-
-    .auth-page-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-top: 1.5rem;
-        border-radius: 9999px;
-        border: 2px solid rgba(255, 255, 255, 0.85);
-        background: transparent;
-        color: #ffffff;
-        font-family: var(--font-display);
-        font-size: 1rem;
-        font-weight: 700;
-        padding: 0.7rem 2rem;
-        letter-spacing: 0.03em;
-        cursor: pointer;
-        transition: background 0.25s, transform 0.2s;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-    }
-
-        .auth-page-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
-        }
-
-        .auth-page-btn:active {
-            transform: scale(0.95);
-        }
-
-    /* ── Mobile (≤ 1024px): stack panels, hide gradient overlays ─────────── */
-    @media (max-width: 1024px) {
-        .auth-flip-root {
-            perspective: none;
-            max-width: 100%;
-            min-height: auto;
-        }
-
-        .auth-panel {
-            position: static;
-            width: 100%;
-            min-width: unset;
-            height: auto;
-            border-radius: 24px;
-        }
-
-        /* Reset panel animations on mobile */
-        .auth-panel-login .auth-panel-content,
-        .auth-panel-register .auth-panel-content,
-        .auth-flip-root.active .auth-panel-login .auth-panel-content,
-        .auth-flip-root.active .auth-panel-register .auth-panel-content,
-        .auth-flip-root.close .auth-panel-login .auth-panel-content,
-        .auth-flip-root.close .auth-panel-register .auth-panel-content {
-            animation: none;
-            opacity: 1;
-            transform: none;
-        }
-
-        /* Show login by default; switch panels when .active */
-        .auth-panel-login {
-            display: flex;
-        }
-
-        .auth-panel-register {
-            display: none;
-        }
-
-        .auth-flip-root.active .auth-panel-login {
-            display: none;
-        }
-
-        .auth-flip-root.active .auth-panel-register {
-            display: flex;
-        }
-
-        .auth-flip-root.close .auth-panel-login {
-            display: flex;
-        }
-
-        .auth-flip-root.close .auth-panel-register {
-            display: none;
-        }
-
-        /* Hide 3D gradient pages on mobile */
-        .auth-page {
-            display: none !important;
-        }
-
-        /* Show mobile switch links */
-        .auth-mobile-switch {
-            display: block;
-        }
-    }
-
-    /* On desktop, hide mobile switch links */
-    @media (min-width: 1025px) {
-        .auth-mobile-switch {
-            display: none;
-        }
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
@@ -890,27 +717,27 @@
 
     /* Selectable card — answer blocks, matching cards, vocab cards */
     .selectable-card {
-        @apply cursor-pointer transition-all duration-150 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] active:translate-y-0;
+        @apply cursor-pointer transition-colors duration-150 hover:border-primary/40 active:scale-[0.99];
     }
 
     /* Selected state for selectable cards */
     .selectable-card.selected {
-        @apply border-primary shadow-md -translate-y-0.5;
+        @apply border-primary bg-primary-light;
     }
 
     /* Interactive card — topic cards, leaderboard rows */
     .interactive-card {
-        @apply cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30;
+        @apply cursor-pointer transition-colors duration-150 hover:border-primary/40;
     }
 
     /* Icon button — volume, eye, back, etc. */
     .icon-btn {
-        @apply cursor-pointer transition-all duration-150 hover:opacity-80 hover:scale-110 active:scale-95;
+        @apply cursor-pointer transition-colors duration-150 hover:text-text-primary;
     }
 
     /* Text link — switch between forms, inline actions */
     .text-link {
-        @apply cursor-pointer transition-opacity duration-150 hover:opacity-70 underline-offset-2;
+        @apply cursor-pointer font-medium text-primary underline-offset-4 hover:underline;
     }
 
     /* Disabled state — universal */
@@ -918,500 +745,56 @@
         @apply opacity-50 cursor-not-allowed pointer-events-none;
     }
 
-    /* ═══════════════════════════════════════════════════════════════════════
-       HOME PAGE — matching vocablearning-home static design
-    ═══════════════════════════════════════════════════════════════════════ */
-
-    /* ── Hero Visual ── */
-    .hv-main-card {
-        width: 300px;
-        background: var(--surface);
-        border-radius: var(--radius-2xl);
-        box-shadow: 0 24px 64px var(--shadow-color), 0 4px 16px var(--shadow-color);
-        overflow: hidden;
-        position: relative;
-        z-index: 2;
-        margin-left: 80px;
-        animation: hv-float 5s ease-in-out infinite;
-    }
-    .hv-card-spine {
-        height: 6px;
-        background: linear-gradient(90deg, var(--accent-color), var(--accent-cyan));
-    }
-    .hv-card-body {
-        padding: 2rem;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    @keyframes hv-float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-12px); }
-    }
-
-    /* ── Floating cards ── */
-    .hv-float {
-        position: absolute;
-        background: var(--surface);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-xl);
-        padding: 1.25rem;
-        box-shadow: 0 12px 36px var(--shadow-color);
-        width: 190px;
-        z-index: 3;
-    }
-    .hv-streak {
-        top: 30px;
-        left: 0;
-        transform: rotate(-4deg);
-        animation: hv-float-a 4s ease-in-out infinite;
-    }
-    .hv-review {
-        bottom: 40px;
-        left: 10px;
-        transform: rotate(3deg);
-        animation: hv-float-b 4.5s ease-in-out infinite;
-    }
-    @keyframes hv-float-a {
-        0%, 100% { transform: rotate(-4deg) translateY(0); }
-        50% { transform: rotate(-4deg) translateY(-8px); }
-    }
-    @keyframes hv-float-b {
-        0%, 100% { transform: rotate(3deg) translateY(0); }
-        50% { transform: rotate(3deg) translateY(-8px); }
-    }
-
-    /* ── Review bar ── */
-    .hv-review-bar-wrap {
-        width: 100%;
-        height: 6px;
-        background: var(--accent-soft);
-        border-radius: 9999px;
-        margin: 0.5rem 0;
-        overflow: hidden;
-    }
-    .hv-review-bar {
-        height: 100%;
-        background: linear-gradient(90deg, var(--accent-color), var(--accent-secondary));
-        border-radius: 9999px;
-    }
-
-    /* ── Hero ambient glow ── */
-    .home-hero-glow {
-        position: absolute;
-        inset: 8% 4% 8% 14%;
-        z-index: 0;
-        pointer-events: none;
-        border-radius: 9999px;
-        background: radial-gradient(
-            60% 60% at 60% 40%,
-            color-mix(in srgb, var(--accent-color) 20%, transparent) 0%,
-            color-mix(in srgb, var(--accent-cyan) 12%, transparent) 45%,
-            transparent 75%
-        );
-        filter: blur(52px);
-        opacity: 0.7;
-    }
-
-    /* ═══ Landing sections ═══════════════════════════════════════════
-       Split rows: each block divides into a written half and a proof
-       half, alternating direction down the page. The halves are set
-       apart by a gutter rather than a rule. */
-    .ss-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 3rem;
-        align-items: center;
-        max-width: 1180px;
-        margin-inline: auto;
-        padding: 4.5rem 1.25rem;
-    }
-    @media (min-width: 1024px) {
-        .ss-row {
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 5.5rem;
-            padding-inline: 2rem;
-        }
-    }
-    /* Rhythm: sections are deliberately not all padded the same. */
-    .ss-row--hero { padding-top: 3.5rem; padding-bottom: 5.5rem; }
-    @media (min-width: 1024px) {
-        .ss-row--hero {
-            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-            padding-block: 5rem 7rem;
-        }
-        .ss-row--flip { padding-block: 6.5rem; }
-    }
-    /* On narrow screens the written half always leads, whatever the DOM order. */
-    .ss-row--flip .ss-text { order: -1; }
-    @media (min-width: 1024px) {
-        .ss-row--flip .ss-text { order: 0; }
-    }
-
-    .ss-band {
-        background: color-mix(in srgb, var(--accent-soft) 46%, var(--surface));
-        border-block: 1px solid color-mix(in srgb, var(--accent-color) 9%, transparent);
-    }
-
-    .ss-text > h2 { max-width: 18ch; }
-
-    .ss-lede {
-        margin-top: 1.25rem;
-        max-width: 46ch;
-        font-size: 1.0625rem;
-        line-height: 1.7;
-        color: var(--text-secondary);
-    }
-    .ss-note {
-        margin-top: 1rem;
-        max-width: 44ch;
-        font-size: 0.9375rem;
-        line-height: 1.7;
-        color: var(--text-muted);
-    }
-
-    .ss-actions {
-        margin-top: 2rem;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.875rem;
-    }
-    .ss-actions--close { justify-content: center; margin-top: 2.25rem; }
-
-    /* Split Studio button voice: an outlined chip beneath the written half. */
-    .ss-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        white-space: nowrap;
-        padding: 0.875rem 1.5rem;
-        border-radius: 9999px;
-        border: 1.5px solid color-mix(in srgb, var(--accent-color) 30%, var(--border-color));
-        background: var(--surface);
-        color: var(--accent-color);
-        font-weight: 700;
-        font-size: 0.875rem;
-        cursor: pointer;
-        transition: border-color 200ms var(--ease-out), background-color 200ms var(--ease-out);
-    }
-    .ss-chip:hover {
-        border-color: var(--accent-color);
-        background: color-mix(in srgb, var(--accent-color) 7%, var(--surface));
-    }
-    .ss-chip:active { transform: translateY(1px); }
-    .ss-chip:focus-visible {
-        outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
-        outline-offset: 2px;
-    }
-
-    /* ── Stepper (process proof) ── */
-    .ss-stepper {
-        display: flex;
-        flex-direction: column;
-        gap: 2rem;
-        position: relative;
-        padding-left: 0.25rem;
-    }
-    .ss-step {
-        display: flex;
-        gap: 1.25rem;
-        align-items: flex-start;
-        position: relative;
-    }
-    .ss-step:not(:last-child)::before {
-        content: "";
-        position: absolute;
-        left: 1.375rem;
-        top: 3rem;
-        bottom: -2rem;
-        width: 1.5px;
-        background: color-mix(in srgb, var(--accent-color) 22%, transparent);
-    }
-    .ss-step-mark {
-        width: 2.75rem;
-        height: 2.75rem;
-        border-radius: 0.875rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        color: var(--accent-color);
-        background: color-mix(in srgb, var(--accent-color) 10%, var(--surface));
-        border: 1px solid color-mix(in srgb, var(--accent-color) 18%, transparent);
-    }
-    .ss-step-num {
-        font-size: 0.6875rem;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        color: color-mix(in srgb, var(--accent-color) 78%, var(--text-muted));
-    }
-    .ss-step-title {
-        font-family: var(--font-display);
-        font-weight: 700;
-        font-size: 1.125rem;
-        line-height: 1.3;
-        color: var(--text-primary);
-        margin-top: 0.125rem;
-    }
-    .ss-step-desc {
-        margin-top: 0.375rem;
-        font-size: 0.9375rem;
-        line-height: 1.6;
-        color: var(--text-muted);
-        max-width: 34ch;
-    }
-
-    /* ── Topic list (catalogue proof) ── */
-    .ss-topics {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0.5rem;
-    }
-    @media (min-width: 640px) {
-        .ss-topics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    .ss-topic {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 0.875rem;
-        text-align: left;
-        padding: 0.875rem 1rem;
-        border-radius: 0.875rem;
-        border: 1px solid transparent;
-        background: var(--surface);
-        cursor: pointer;
-        transition: border-color 200ms var(--ease-out), background-color 200ms var(--ease-out);
-    }
-    .ss-topic:hover {
-        border-color: color-mix(in srgb, var(--accent-color) 28%, transparent);
-        background: color-mix(in srgb, var(--accent-color) 5%, var(--surface));
-    }
-    .ss-topic:focus-visible {
-        outline: 3px solid color-mix(in srgb, var(--accent-color) 45%, transparent);
-        outline-offset: 2px;
-    }
-    .ss-topic-icon {
-        width: 2.25rem;
-        height: 2.25rem;
-        border-radius: 0.625rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        color: var(--accent-color);
-        background: color-mix(in srgb, var(--accent-color) 9%, transparent);
-    }
-    .ss-topic-name {
-        display: block;
-        font-weight: 700;
-        font-size: 0.875rem;
-        color: var(--text-primary);
-        line-height: 1.35;
-    }
-    .ss-topic-count {
-        display: block;
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        margin-top: 0.125rem;
-    }
-
-    /* ── Spaced-repetition schedule (method proof) ── */
-    .ss-schedule {
-        display: flex;
-        flex-direction: column;
-        gap: 1.125rem;
-    }
-    .ss-slot {
-        display: grid;
-        grid-template-columns: 4.5rem minmax(0, 1fr);
-        align-items: center;
-        gap: 0.5rem 1rem;
-    }
-    .ss-slot-label {
-        font-family: var(--font-display);
-        font-weight: 700;
-        font-size: 0.9375rem;
-        color: var(--text-primary);
-        font-variant-numeric: tabular-nums;
-    }
-    .ss-slot-track {
-        height: 0.5rem;
-        border-radius: 9999px;
-        background: color-mix(in srgb, var(--accent-color) 10%, transparent);
-        overflow: hidden;
-    }
-    .ss-slot-fill {
-        display: block;
-        height: 100%;
-        width: var(--slot-fill, 40%);
-        border-radius: inherit;
-        background: var(--accent-color);
-    }
-    .ss-slot-note {
-        grid-column: 2;
-        font-size: 0.8125rem;
-        color: var(--text-muted);
-    }
-
-    /* ── Closing statement ── */
-    .ss-close {
-        max-width: 640px;
-        margin-inline: auto;
-        padding: 6rem 1.5rem 7rem;
-        text-align: center;
-    }
-    .ss-close-line {
-        font-family: var(--font-display);
-        font-weight: 700;
-        font-size: clamp(1.75rem, 4vw, 2.5rem);
-        line-height: 1.15;
-        color: var(--text-primary);
-        overflow-wrap: anywhere;
-    }
-    .ss-close-sub {
-        margin-top: 1rem;
-        font-size: 1.0625rem;
-        line-height: 1.7;
-        color: var(--text-secondary);
-    }
-
-    /* ── Fade-in animation ── */
-    /* Reveal is deliberately quick and shallow: a long, deep, heavily-staggered
-       fade on every element makes the page feel like it never settles. */
-    .home-fade-in {
-        opacity: 0;
-        transform: translate3d(0, 10px, 0);
-        transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
-        will-change: opacity, transform;
-    }
-    .home-fade-in.visible {
-        opacity: 1;
-        transform: translate3d(0, 0, 0);
-    }
-
-    /* ── Hero entry (replaces framer-motion) ── */
-    @keyframes home-slide-in-left {
-        from { opacity: 0; transform: translateX(-40px); }
-        to   { opacity: 1; transform: none; }
-    }
-    @keyframes home-slide-in-right {
-        from { opacity: 0; transform: translateX(40px); }
-        to   { opacity: 1; transform: none; }
-    }
-    .home-hero-slide-left {
-        animation: home-slide-in-left 600ms ease both;
-    }
-    .home-hero-slide-right {
-        animation: home-slide-in-right 600ms ease 200ms both;
-    }
-
-    /* ── Deferred paint for below-the-fold home sections ── */
-    .home-defer {
-        content-visibility: auto;
-        contain-intrinsic-size: 600px;
-    }
-
-    /* ── Honour reduced-motion preference ── */
-    @media (prefers-reduced-motion: reduce) {
-        .home-hero-slide-left,
-        .home-hero-slide-right,
-        .hv-main-card,
-        .hv-streak,
-        .hv-review,
-        .animate-float,
-        .animate-pulse-soft {
-            animation: none !important;
-            transition: none !important;
-            opacity: 1 !important;
-            transform: none !important;
-        }
-        /* Scroll reveal still runs, but as a motion-safe opacity-only fade:
-           content stays hidden until it enters the viewport (no translate). */
-        .home-fade-in {
-            transform: none !important;
-            transition: opacity 600ms ease !important;
-        }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .ss-topic,
-        .ss-chip {
-            transition: none !important;
-        }
-        .ss-topic:hover,
-        .ss-chip:hover,
-        .ss-chip:active {
-            transform: none !important;
-        }
-    }
-
-    /* ── Responsive home ── */
-    @media (max-width: 1024px) {
-        .hv-main-card { margin-left: 0; width: 260px; }
-        .hv-float { width: 160px; }
-    }
-    @media (max-width: 768px) {
-        .hv-main-card { width: 240px; }
-        .hv-float { display: none; }
-    }
-
     /* ─── Profile-scoped lightweight primitives ─────────────────────────
        Used by Profile page + EditProfileModal. Visually mirrors .glass-card
        but drops backdrop-filter and transition-all so stacking many of them
        (or scrolling past them) does not stall the compositor. */
     .profile-card {
-        @apply bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)];
+        @apply bg-surface border-2 border-border rounded-card;
+        box-shadow: var(--tactile-shadow);
     }
     .profile-card-tinted {
-        @apply rounded-card border border-accent/30 shadow-[0_4px_20px_var(--shadow-color)];
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.10), rgba(236, 72, 153, 0.08));
+        @apply rounded-card border-2 border-primary/25 bg-primary-light;
     }
     .profile-stat {
-        @apply bg-surface border border-primary/10 rounded-card p-5 text-center;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 14px rgba(15, 23, 42, 0.05);
-        transition: border-color 150ms ease, transform 150ms ease;
+        @apply bg-surface border-2 border-border rounded-card p-5 text-center;
+        box-shadow: var(--tactile-shadow);
     }
-    .profile-stat:hover { @apply border-primary/35; }
     .profile-input {
-        @apply w-full px-4 py-3 rounded-xl border-2 border-primary/10 bg-surface text-text-primary outline-none;
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+        @apply w-full min-h-11 px-3.5 py-2.5 rounded-[var(--radius-element)] border border-border-emphasized bg-surface text-text-primary outline-none placeholder:text-text-muted;
+        transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
     }
     .profile-input:focus {
-        @apply border-primary/50;
+        @apply border-primary;
         box-shadow: 0 0 0 3px var(--accent-soft);
     }
     .profile-input.is-invalid {
-        @apply border-red-400;
+        @apply border-danger-color;
     }
     .profile-defer {
-        content-visibility: auto;
-        contain-intrinsic-size: 480px;
+        overflow: visible;
     }
 
     .profile-modal-overlay {
         @apply fixed inset-0 z-[700] flex items-center justify-center p-6;
-        background: rgba(15, 23, 42, 0.48);
+        background: color-mix(in srgb, #0b0a12 55%, transparent);
         opacity: 0;
         transition: opacity 150ms ease;
     }
     .profile-modal-overlay.is-open { opacity: 1; }
     .profile-modal-card {
-        @apply bg-surface rounded-card w-full max-w-2xl p-0 max-h-[90vh] overflow-hidden border border-primary/10;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 6px 16px rgba(15, 23, 42, 0.08);
+        @apply bg-surface rounded-card w-full max-w-2xl p-0 max-h-[90vh] overflow-hidden border border-border;
+        box-shadow: var(--shadow-high);
         transform: translateY(10px);
         opacity: 0;
         transition: opacity 150ms ease, transform 150ms ease;
     }
     .profile-modal-overlay.is-open .profile-modal-card { transform: none; opacity: 1; }
     .profile-modal-header {
-        @apply px-8 pt-6 pb-5 border-b border-primary/10 flex items-center justify-between;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+        @apply px-6 pt-5 pb-4 sm:px-8 sm:pt-6 border-b border-border flex items-center justify-between;
     }
     .profile-modal-body {
-        @apply px-8 py-6 overflow-y-auto;
+        @apply px-6 py-5 sm:px-8 sm:py-6 overflow-y-auto;
         max-height: calc(90vh - 88px);
     }
 
@@ -1420,7 +803,7 @@
         transition: background-color 120ms ease;
     }
     .heatmap-cell:hover { @apply bg-primary/25; }
-    .heatmap-cell.is-active { @apply bg-accent; }
+    .heatmap-cell.is-active { @apply bg-primary; }
     .heatmap-cell.is-selected {
         outline: 2px solid var(--accent-color);
         outline-offset: 1px;
@@ -1432,12 +815,11 @@
        backdrop-filter and hover shadow growth so the many cards stacked on
        a learning screen do not stall the compositor. */
     .learning-card {
-        @apply bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)];
+        @apply bg-surface border-2 border-border-emphasized rounded-card;
+        box-shadow: var(--tactile-shadow-raised);
     }
-    .learning-card:hover { @apply border-primary/25; }
     .learning-defer {
-        content-visibility: auto;
-        contain-intrinsic-size: 360px;
+        overflow: visible;
     }
 
     /* ── Learning page entrance ──
@@ -1489,6 +871,16 @@
             transition: opacity 300ms ease, background-color 180ms ease !important;
         }
     }
+    /* Wrong-answer nudge in the matching game (reduced motion: no movement). */
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        @keyframes shake { from, to { transform: none; } }
+    }
+
     @keyframes minitest-result-enter {
         from { opacity: 0; transform: scale(0.94); }
         to   { opacity: 1; transform: none; }
@@ -1502,31 +894,28 @@
        cards at a time, so each card must avoid backdrop-filter and
        transition-all to keep scroll smooth. */
     .vocab-card {
-        @apply bg-surface border border-primary/10 rounded-card p-6 cursor-pointer;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
-        transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+        @apply bg-surface border-2 border-border rounded-card p-5 cursor-pointer;
+        box-shadow: var(--tactile-shadow);
+        transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), transform 180ms var(--ease-out);
     }
     .vocab-card:hover {
-        @apply border-primary/40;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.08);
+        @apply border-primary bg-surface-hover;
         transform: translateY(-2px);
     }
     .vocab-input {
-        @apply w-full px-4 py-3 bg-surface border-2 border-primary/10 rounded-pill outline-none;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-        transition: border-color 150ms ease, box-shadow 150ms ease;
+        @apply w-full min-h-11 px-3.5 py-2.5 rounded-[var(--radius-element)] border-2 border-border-emphasized bg-surface text-text-primary outline-none placeholder:text-text-muted;
+        transition: border-color 150ms var(--ease-out);
     }
     .vocab-input:focus {
         @apply border-primary;
-        box-shadow: 0 0 0 3px var(--accent-soft);
+        outline: 2px solid var(--accent-soft);
     }
     .vocab-empty {
-        @apply bg-surface border border-primary/10 rounded-card p-8 text-center text-text-muted;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+        @apply bg-surface border-2 border-border rounded-card p-8 text-center text-text-muted flex flex-col items-center gap-3;
+        box-shadow: var(--tactile-shadow);
     }
     .vocab-defer {
-        content-visibility: auto;
-        contain-intrinsic-size: 480px;
+        overflow: visible;
     }
 
     /* ── Vocabulary entrance (header/filters on mount, cards staggered).
@@ -1549,22 +938,23 @@
     }
     .vocab-modal-overlay {
         @apply fixed inset-0 z-[700] flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6;
-        background: rgba(15, 23, 42, 0.5);
+        background: color-mix(in srgb, #0b0a12 36%, transparent);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
         opacity: 0;
         transition: opacity 150ms ease;
     }
     .vocab-modal-overlay.is-open { opacity: 1; }
     .vocab-modal-card {
-        @apply bg-surface rounded-t-3xl sm:rounded-card w-full max-w-3xl p-0 max-h-[92dvh] sm:max-h-[90vh] overflow-hidden border border-primary/10;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 6px 16px rgba(15, 23, 42, 0.08);
+        @apply bg-surface rounded-t-[var(--radius-page)] sm:rounded-card w-full max-w-3xl p-0 max-h-[92dvh] sm:max-h-[90vh] overflow-hidden border-2 border-border-emphasized;
+        box-shadow: var(--tactile-shadow-raised);
         transform: translateY(10px);
         opacity: 0;
         transition: opacity 150ms ease, transform 150ms ease;
     }
     .vocab-modal-overlay.is-open .vocab-modal-card { transform: none; opacity: 1; }
     .vocab-modal-header {
-        @apply px-4 sm:px-6 md:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-primary/10 flex items-start justify-between gap-4;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(236, 72, 153, 0.05));
+        @apply px-4 sm:px-6 md:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-border flex items-start justify-between gap-4;
     }
     .vocab-modal-body {
         @apply px-4 sm:px-6 md:px-8 py-5 sm:py-6 overflow-y-auto;
@@ -1582,12 +972,11 @@
        drops backdrop-filter and transition-all so the 9 cards stacked on
        one viewport do not stall the compositor on scroll. */
     .dashboard-card {
-        @apply bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)];
+        @apply bg-surface border-2 border-border rounded-card;
+        box-shadow: var(--tactile-shadow);
     }
-    .dashboard-card:hover { @apply border-primary/25; }
     .dashboard-defer {
-        content-visibility: auto;
-        contain-intrinsic-size: 320px;
+        overflow: visible;
     }
 
     /* ── Dashboard entrance (on-mount, staggered via delay-* utilities) ── */
@@ -1694,4 +1083,224 @@
     .delay-1000 {
         animation-delay: 1000ms;
     }
+}
+
+/* Compositor-thread top-to-bottom sunrise / twilight theme reveal + miniature orbital toggle. */
+html.is-theme-transitioning *,
+html.is-theme-transitioning *::before,
+html.is-theme-transitioning *::after {
+    transition: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+    z-index: 1;
+}
+
+/* Ensure Astryx/surface dialog panels stay opaque in Dark Mode without ever painting fullscreen backdrops. */
+dialog[open],
+[role="dialog"]:not(.fixed):not(.vocab-modal-overlay) {
+    background-color: var(--surface);
+    color: var(--text-primary);
+}
+
+/* Prevent layout-thrashing padding transitions in Astryx ToastViewport collapse slots. */
+.xjshnde {
+    transition-property: grid-template-rows, opacity, transform !important;
+}
+
+/* Give Astryx badges comfortable vertical/horizontal breathing room so labels are never flush. */
+.astryx-badge {
+    padding-block: 4px !important;
+    padding-inline: 10px !important;
+    line-height: 1.25 !important;
+    min-height: 24px;
+}
+
+.no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+::view-transition {
+    pointer-events: none;
+}
+
+::view-transition-new(root) {
+    z-index: 9990;
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 2300' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L1000,0 L1000,1140 C860,1245 710,1045 520,1155 C340,1260 170,1055 0,1165 Z' fill='%23000'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 2300' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L1000,0 L1000,1140 C860,1245 710,1045 520,1155 C340,1260 170,1055 0,1165 Z' fill='%23000'/%3E%3C/svg%3E");
+    mask-size: 100% 230%;
+    -webkit-mask-size: 100% 230%;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    animation: theme-ocean-wave 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes theme-ocean-wave {
+    0% {
+        mask-position: 0% 100%;
+        -webkit-mask-position: 0% 100%;
+    }
+    100% {
+        mask-position: 0% 0%;
+        -webkit-mask-position: 0% 0%;
+    }
+}
+
+::view-transition-group(theme-beam) {
+    z-index: 9995;
+    animation: none;
+}
+
+::view-transition-old(theme-beam) {
+    display: none;
+}
+
+::view-transition-new(theme-beam) {
+    animation: theme-wave-crest-drop 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes theme-wave-crest-drop {
+    0% {
+        transform: translate3d(0, -140px, 0);
+        opacity: 0.9;
+    }
+    45% {
+        opacity: 1;
+    }
+    82% {
+        opacity: 0.85;
+    }
+    100% {
+        transform: translate3d(0, calc(100vh + 40px), 0);
+        opacity: 0;
+    }
+}
+
+::view-transition-group(theme-toggle) {
+    z-index: 10000;
+    animation: none;
+}
+
+::view-transition-old(theme-toggle) {
+    animation: theme-toggle-fade-out 340ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+::view-transition-new(theme-toggle) {
+    animation: theme-toggle-fade-in 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes theme-toggle-fade-out {
+    from { opacity: 1; transform: translateX(0) rotate(0deg) scale(1); }
+    to { opacity: 0; transform: translateX(-8px) rotate(-32deg) scale(0.65); }
+}
+
+@keyframes theme-toggle-fade-in {
+    from { opacity: 0; transform: translateX(8px) rotate(32deg) scale(0.65); }
+    to { opacity: 1; transform: translateX(0) rotate(0deg) scale(1); }
+}
+
+.theme-wave-crest {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 180px;
+    pointer-events: none;
+    view-transition-name: theme-beam;
+}
+
+.celestial-toggle {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    overflow: hidden;
+    view-transition-name: theme-toggle;
+    transition: background-color 240ms var(--ease-out), border-color 240ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.celestial-toggle:hover {
+    border-color: var(--accent-color);
+}
+
+.celestial-toggle:active {
+    transform: scale(0.94);
+}
+
+.celestial-toggle:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.celestial-toggle.is-light {
+    background-color: #FEF3C7;
+    border-color: #FDE68A;
+}
+
+.celestial-toggle.is-dark {
+    background-color: #251948;
+    border-color: rgba(196, 181, 253, 0.34);
+}
+
+.celestial-star {
+    position: absolute;
+    border-radius: 999px;
+    background-color: #E9D5FF;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.4);
+    transition: opacity 280ms var(--ease-out), transform 280ms var(--ease-out);
+}
+
+.celestial-star--a {
+    width: 2.5px;
+    height: 2.5px;
+    top: 8px;
+    left: 9px;
+}
+
+.celestial-star--b {
+    width: 2px;
+    height: 2px;
+    bottom: 9px;
+    right: 8px;
+}
+
+.celestial-toggle.is-dark .celestial-star {
+    opacity: 0.85;
+    transform: scale(1);
+}
+
+.celestial-icon-single {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+}
+
+.celestial-sun-svg {
+    color: #D97706;
+}
+
+.celestial-moon-svg {
+    color: #E9D5FF;
 }

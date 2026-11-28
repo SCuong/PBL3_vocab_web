@@ -1,12 +1,24 @@
-import { useState } from 'react';
-import { ArrowLeft, Volume2, Sparkles, Loader2 } from 'lucide-react';
-import { playPronunciationAudio } from '../utils/audio';
-import { Badge, Button, typography } from '../components/ui';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Sparkles, Loader2 } from 'lucide-react';
+import { AudioWaveButton, Badge, Button, typography } from '../components/ui';
 import { apiFetch } from '../services/apiClient';
+import { playPronunciationAudio, stopPronunciationAudio } from '../utils/audio';
+import { getAutoPlayPronunciation } from '../utils/learningPreferences';
 
 const VocabDetail = ({ word, onBack }: any) => {
     const [aiResponse, setAiResponse] = useState<{ summary: string; quickUsage: string } | null>(null);
     const [isLoadingAi, setIsLoadingAi] = useState(false);
+
+    useEffect(() => {
+        if (!word?.word || !getAutoPlayPronunciation()) return;
+        const timer = window.setTimeout(() => {
+            playPronunciationAudio(word.audioUrl, word.word);
+        }, 120);
+        return () => {
+            window.clearTimeout(timer);
+            stopPronunciationAudio();
+        };
+    }, [word?.id, word?.word, word?.audioUrl]);
 
     if (!word) return null;
 
@@ -46,27 +58,48 @@ const VocabDetail = ({ word, onBack }: any) => {
     return (
         <div className="max-w-4xl mx-auto px-6 py-12">
             <Button variant="ghost" className="mb-8" onClick={onBack}><ArrowLeft size={18} /> Quay lại</Button>
-            <div className="bg-surface border border-primary/10 rounded-card shadow-[0_4px_20px_var(--shadow-color)] p-6 sm:p-8 relative overflow-hidden">
+            <div className="glass-card p-6 sm:p-8 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-12 relative z-10">
                     <div className="text-center md:text-left flex-1">
-                        <Badge variant="cyan" className="mb-4">{word.cefr}</Badge>
+                        <Badge variant="purple" className="mb-4">{word.cefr}</Badge>
                         <h1 className={`${typography.pageTitle} mb-2`}>{word.word}</h1>
                         <p className="text-lg sm:text-xl text-text-muted font-ipa mb-8">{word.transcription}</p>
                         <div className="flex flex-col gap-3">
-                            <Button variant="primary" className="text-lg px-8 w-full md:w-auto" onClick={() => playPronunciationAudio(word.audioUrl, word.word)}><Volume2 size={24} /> Nghe phát âm</Button>
+                            <AudioWaveButton
+                                text={word.word}
+                                audioUrl={word.audioUrl}
+                                caption="Nghe phát âm"
+                                className="w-full md:w-auto"
+                            />
                             <Button variant="accent" className="text-lg px-8 w-full md:w-auto" onClick={handleAskAi} disabled={isLoadingAi}>
                                 {isLoadingAi ? <Loader2 size={24} className="animate-spin" /> : <Sparkles size={24} />}
-                                {isLoadingAi ? "Đang nhờ AI..." : "Hỏi AI ✨"}
+                                {isLoadingAi ? "Đang giải thích…" : "Giải thích thêm"}
                             </Button>
                         </div>
                     </div>
-                    <div className="flex-1 bg-surface/50 p-8 rounded-card border-2 border-primary/10 shadow-sm w-full">
+                    <div className="flex-1 bg-surface p-8 rounded-card border-2 border-border w-full">
+                        {word.imageUrl && (
+                            <div className="mb-6 overflow-hidden rounded-inner border border-border bg-bg-secondary">
+                                <img
+                                    src={word.imageUrl}
+                                    alt={`Minh họa ${word.word}`}
+                                    loading="lazy"
+                                    className="aspect-[4/3] max-h-56 w-full object-cover"
+                                />
+                            </div>
+                        )}
                         <h3 className="text-xl font-bold mb-4 text-primary">Ý nghĩa</h3>
                         <p className="text-xl mb-8 leading-relaxed">{word.meaning}</p>
                         <div className="flex items-center gap-3 mb-4">
                             <h3 className="text-xl font-bold text-purple">Ví dụ</h3>
                             {word.example && (
-                                <Button variant="ghost" className="p-2 min-h-0 rounded-full" onClick={() => playPronunciationAudio(word.exampleAudioUrl, word.example)}><Volume2 size={16} /></Button>
+                                <AudioWaveButton
+                                    text={word.example}
+                                    audioUrl={word.exampleAudioUrl}
+                                    variant="compact"
+                                    size="sm"
+                                    label="Nghe câu ví dụ"
+                                />
                             )}
                         </div>
                         {word.example && (
@@ -74,9 +107,9 @@ const VocabDetail = ({ word, onBack }: any) => {
                         )}
                         
                         {(isLoadingAi || aiResponse) && (
-                            <div className="mt-8 pt-6 border-t-2 border-primary/10">
+                            <div className="mt-8 pt-6 border-t-2 border-border">
                                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-600">
-                                    <Sparkles size={20} /> Trợ lý AI 🤖
+                                    <Sparkles size={20} aria-hidden /> Giải thích thêm
                                 </h3>
                                 {isLoadingAi ? (
                                     <div className="flex items-center justify-center p-6 text-cyan-600">

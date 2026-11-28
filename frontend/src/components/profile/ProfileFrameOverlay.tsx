@@ -4,7 +4,7 @@ import { getProfileFrameImg } from '../../utils/profileFrames';
 // `position: relative` container; the avatar shows through the frame's hole.
 export const ProfileFrameOverlay = ({
     frameKey,
-    sizeClass = 'h-[165%] w-[165%]',
+    sizeClass = 'h-[148%] w-[148%]',
 }: {
     frameKey: string | null | undefined;
     sizeClass?: string;

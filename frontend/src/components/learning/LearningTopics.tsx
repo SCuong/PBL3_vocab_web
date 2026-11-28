@@ -1,500 +1,539 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Shield } from "lucide-react";
-import { motion } from "framer-motion";
-import { Badge, Button } from "../ui";
-import { useAppContext } from "../../context/AppContext";
-import { PATHS } from "../../routes/paths";
-import { vocabularyApi } from "../../services/vocabularyApi";
-import { mapLearningVocabularyToUiModel } from "../../utils/vocabularyMapper";
+import { useMemo, useState } from 'react';
+import { Compass, Lock, Star, Trophy, Unlock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { GRADE1_ALL_WORDS, GRADE1_UNITS, getGrade1Unit } from '../../data/grade1Curriculum';
+import {
+  getTotalStars,
+  isReviewUnlocked,
+  isUnitUnlocked,
+  loadGrade1Progress,
+  recordReviewCompletion,
+  recordUnitCompletion,
+  saveGrade1Progress,
+} from '../../utils/grade1Progress';
+import { getDueSm2Cards, getSm2Summary } from '../../utils/sm2';
+import { useAppContext } from '../../context/AppContext';
+import { UnitAdventure } from '../kids/UnitAdventure';
+import { ReviewSession } from '../kids/ReviewSession';
 
-const toCategorySectionId = (id: unknown) =>
-  `learning-topic-${String(id).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+// Candy Crush x Duolingo S-curve SVG coordinate system (10 nodes per semester: 8 Units + 2 Reviews)
+const MAP_VIEWBOX_W = 800;
+const NODE_STEP_Y = 156;
+const MAP_TOP_PAD = 108;
+const MAP_BOTTOM_PAD = 110;
+const NODE_X_CURVE = [400, 200, 145, 370, 625, 655, 445, 180, 255, 535];
 
-const LearningTopics = () => {
-  const navigate = useNavigate();
-  const topicScrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const { currentUser, learningTopicGroups: topicGroups, addToast } = useAppContext();
+function buildSmoothRoadPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return '';
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const midY = (prev.y + curr.y) / 2;
+    d += ` C ${prev.x} ${midY}, ${curr.x} ${midY}, ${curr.x} ${curr.y}`;
+  }
+  return d;
+}
 
-  // Page entrance: flip one frame after the topic groups are available (covers
-  // both synchronous context data and a later async load) so the header/cards/
-  // index transition from hidden → visible instead of appearing all at once.
-  const [mounted, setMounted] = useState(false);
+type MapNode =
+  | { kind: 'unit'; unit: number }
+  | { kind: 'review'; reviewNumber: number; fromUnit: number; toUnit: number };
 
-  const onStartStudy = useCallback(async (topicId: number, mode?: string) => {
-    try {
-      const items = await vocabularyApi.getLearningByTopic(topicId);
-      if (!items || items.length === 0) {
-        addToast('Chủ đề này chưa có từ vựng.', 'info');
-        return;
+export function LearningTopics() {
+  const { currentUser, addXP, triggerStreakCheck, addToast } = useAppContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [semester, setSemester] = useState<1 | 2>(1);
+  const [progress, setProgress] = useState(() => loadGrade1Progress());
+  const [sm2Tick, setSm2Tick] = useState(0);
+
+  const activeUnitParam = searchParams.get('unit');
+  const activeReviewParam = searchParams.get('review');
+  const activeSm2Param = searchParams.get('sm2');
+
+  const activeUnitNumber = activeUnitParam ? Number(activeUnitParam) : null;
+  const activeUnit =
+    activeUnitNumber && activeUnitNumber >= 1 && activeUnitNumber <= 16
+      ? getGrade1Unit(activeUnitNumber)
+      : null;
+
+  const activeReviewNumber =
+    activeReviewParam && Number(activeReviewParam) >= 1 && Number(activeReviewParam) <= 4
+      ? Number(activeReviewParam)
+      : null;
+
+  const isSm2Session = activeSm2Param === '1';
+
+  const sm2Summary = useMemo(() => {
+    void sm2Tick;
+    return getSm2Summary();
+  }, [sm2Tick]);
+
+  const dueSm2Words = useMemo(() => {
+    void sm2Tick;
+    const dueCards = getDueSm2Cards();
+    const bySlug = new Map(GRADE1_ALL_WORDS.map((w) => [w.slug, w]));
+    return dueCards
+      .map((c) => bySlug.get(c.slug))
+      .filter((w): w is (typeof GRADE1_ALL_WORDS)[number] => Boolean(w));
+  }, [sm2Tick]);
+
+  // Structured textbook roadmap: every 4 Units -> 1 Milestone Boss Review (Review 1..4)
+  const mapNodes = useMemo<MapNode[]>(() => {
+    const units = GRADE1_UNITS.filter((u) => u.semester === semester);
+    const nodes: MapNode[] = [];
+    for (const u of units) {
+      nodes.push({ kind: 'unit', unit: u.unit });
+      if (u.unit % 4 === 0) {
+        const reviewNumber = u.unit / 4;
+        nodes.push({
+          kind: 'review',
+          reviewNumber,
+          fromUnit: u.unit - 3,
+          toUnit: u.unit,
+        });
       }
-      navigate(PATHS.learningStudy, {
-        state: { topicId, words: items.map(mapLearningVocabularyToUiModel), mode: mode ?? null },
-      });
-    } catch {
-      addToast('Không tải được dữ liệu học cho chủ đề này.', 'info');
     }
-  }, [navigate, addToast]);
-  const isGuest = !currentUser;
+    return nodes;
+  }, [semester]);
 
-  const categoryNavItems = useMemo(
-    () => topicGroups.map((cat: any, index: number) => ({
-      id: String(cat.id),
-      sectionId: toCategorySectionId(cat.id),
-      title: cat.title,
-      count: Array.isArray(cat.topics) ? cat.topics.length : 0,
-      locked: isGuest && index > 0,
-    })),
-    [isGuest, topicGroups],
-  );
+  const totalStars = getTotalStars(progress);
 
-  const scrollToCategory = useCallback((sectionId: string) => {
-    const target = document.getElementById(sectionId);
-    const scrollContainer = topicScrollContainerRef.current;
+  const nextUnitNumber = useMemo(() => {
+    const firstUnfinished = GRADE1_UNITS.find((u) => !progress.units[u.unit]?.stars);
+    return firstUnfinished ? firstUnfinished.unit : 16;
+  }, [progress]);
 
-    if (!target) return;
+  const openUnit = (unitNum: number) => setSearchParams({ unit: String(unitNum) });
+  const openReview = (reviewNum: number) => setSearchParams({ review: String(reviewNum) });
+  const openSm2Review = () => setSearchParams({ sm2: '1' });
+  const closeActive = () => {
+    setSearchParams({});
+    setSm2Tick((t) => t + 1);
+  };
 
-    if (
-      scrollContainer?.contains(target) &&
-      scrollContainer.scrollHeight > scrollContainer.clientHeight
-    ) {
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
+  const toggleUnlockAll = () => {
+    const next = { ...progress, unlockAll: !progress.unlockAll };
+    setProgress(next);
+    saveGrade1Progress(next);
+  };
 
-      scrollContainer.scrollTo({
-        top: scrollContainer.scrollTop + targetRect.top - containerRect.top,
-        behavior: "smooth",
-      });
-      return;
-    }
+  // =========================================================================
+  // 1. ACTIVE UNIT ADVENTURE (/learning?unit=1)
+  // =========================================================================
+  if (activeUnit) {
+    const hasNext = activeUnit.unit < 16;
+    return (
+      <UnitAdventure
+        key={activeUnit.unit}
+        unit={activeUnit}
+        onExit={closeActive}
+        onComplete={(stars) => {
+          setProgress((prev) => recordUnitCompletion(prev, activeUnit.unit, stars));
+          setSm2Tick((t) => t + 1);
+          if (currentUser) {
+            addXP(50);
+            triggerStreakCheck();
+          }
+          addToast(`Hoan hô! Xong Unit ${activeUnit.unit} · +${stars} sao vàng`, 'success');
+        }}
+        onNextUnit={
+          hasNext
+            ? () => {
+                const nextNum = activeUnit.unit + 1;
+                if (nextNum >= 9) setSemester(2);
+                openUnit(nextNum);
+              }
+            : undefined
+        }
+      />
+    );
+  }
 
-    target.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  }, []);
+  // =========================================================================
+  // 2. MILESTONE BOSS REVIEW (/learning?review=1..4)
+  // =========================================================================
+  if (activeReviewNumber) {
+    const fromUnit = (activeReviewNumber - 1) * 4 + 1;
+    const toUnit = activeReviewNumber * 4;
+    const pool = GRADE1_UNITS.filter((u) => u.unit >= fromUnit && u.unit <= toUnit).flatMap(
+      (u) => u.words,
+    );
+    const shuffledPool = [...pool].sort(() => Math.random() - 0.5);
+    return (
+      <ReviewSession
+        title={`Kiểm tra lớn · Review ${activeReviewNumber} (Unit ${fromUnit}–${toUnit})`}
+        subtitle="Nghe và chọn đúng tranh tổng hợp 4 Unit!"
+        words={shuffledPool}
+        backdropUrl={
+          activeReviewNumber <= 2
+            ? '/illustrations/map-hk1-bg.webp'
+            : '/illustrations/map-hk2-bg.webp'
+        }
+        onExit={closeActive}
+        onComplete={(stars) => {
+          setProgress((prev) => recordReviewCompletion(prev, activeReviewNumber, stars));
+          setSm2Tick((t) => t + 1);
+          if (currentUser) {
+            addXP(80);
+            triggerStreakCheck();
+          }
+          addToast(`Tuyệt vời! Vượt qua Review ${activeReviewNumber} · +${stars} sao vàng`, 'success');
+        }}
+      />
+    );
+  }
 
-  const totalReviewCount = isGuest ? 0 : topicGroups.reduce(
-    (sum: number, cat: any) => sum + cat.topics.reduce((s: number, t: any) => s + (t.stats?.review || 0), 0), 0
-  );
+  // =========================================================================
+  // 3. SM-2 SMART SPACED REPETITION REVIEW (/learning?sm2=1)
+  // =========================================================================
+  if (isSm2Session && dueSm2Words.length > 0) {
+    return (
+      <ReviewSession
+        title="Ôn bài cùng Lumo"
+        subtitle="Nghe và chọn đúng tranh nhé bé ơi!"
+        words={dueSm2Words}
+        backdropUrl="/illustrations/map-hk1-bg.webp"
+        onExit={closeActive}
+        onComplete={(stars) => {
+          setSm2Tick((t) => t + 1);
+          if (currentUser) {
+            addXP(40);
+            triggerStreakCheck();
+          }
+          addToast(`Hoan hô! Bé nhận thêm +${stars} sao vàng!`, 'success');
+        }}
+      />
+    );
+  }
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousRootOverflow = document.documentElement.style.overflow;
-
-    const syncPageScrollLock = () => {
-      const overflowValue = mediaQuery.matches ? "hidden" : "";
-      document.body.style.overflow = overflowValue || previousBodyOverflow;
-      document.documentElement.style.overflow = overflowValue || previousRootOverflow;
-    };
-
-    syncPageScrollLock();
-    mediaQuery.addEventListener("change", syncPageScrollLock);
-
-    return () => {
-      mediaQuery.removeEventListener("change", syncPageScrollLock);
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousRootOverflow;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mounted || topicGroups.length === 0) return;
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, [mounted, topicGroups]);
+  // =========================================================================
+  // 4. STRUCTURED WORLD MAP (/learning)
+  // =========================================================================
+  const mapBg =
+    semester === 1 ? '/illustrations/map-hk1-bg.webp' : '/illustrations/map-hk2-bg.webp';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 relative sm:px-6 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
-      {/* Guest Banner */}
-      {isGuest && (
-        <div className="mb-4 p-4 bg-linear-to-r from-cyan/80 via-purple/80 to-pink/80 rounded-2xl flex flex-col items-stretch gap-3 border border-text-on-accent/20 shadow-xl animate-fade-in sm:flex-row sm:items-center sm:justify-between lg:shrink-0">
-          <div className="flex items-center gap-4 text-text-on-accent">
-            <div className="w-10 h-10 rounded-full bg-surface/20 flex items-center justify-center text-xl">
-              ✨
-            </div>
-            <p className="font-bold">
-              Bạn đang xem chế độ khách. Đăng ký để mở khóa toàn bộ 44 chủ đề!
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full justify-center bg-surface/20 border-text-on-accent/40 text-text-on-accent sm:w-auto"
-            onClick={() => navigate("/register")}
-          >
-            Đăng ký miễn phí →
-          </Button>
-        </div>
-      )}
-
-      {!isGuest && totalReviewCount > 0 && (
-        <div className={`mb-4 p-4 rounded-2xl flex items-center gap-4 border animate-fade-in lg:shrink-0 ${
-          totalReviewCount > 10
-            ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-purple/10 border-purple/30 text-primary'
-        }`}>
-          <div className="text-3xl flex-shrink-0">🔔</div>
-          <div>
-            <p className="font-bold text-lg">
-              Hôm nay bạn có <span className="underline">{totalReviewCount} từ</span> cần ôn tập!
-            </p>
-            <p className="text-sm opacity-80">Ôn tập đúng hạn giúp ghi nhớ lâu hơn theo phương pháp Spaced Repetition.</p>
-          </div>
-        </div>
-      )}
-
-      {categoryNavItems.length > 0 && (
-        <nav
-          className="lg:hidden mb-6 -mx-4 px-4 overflow-x-auto sm:-mx-6 sm:px-6"
-          aria-label="Danh mục chủ đề học tập"
-        >
-          <div className="flex gap-3 min-w-max pb-2">
-            {categoryNavItems.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => scrollToCategory(item.sectionId)}
-                disabled={item.locked}
-                className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition-all ${
-                  item.locked
-                    ? "cursor-not-allowed border-border bg-bg-light text-text-muted opacity-50"
-                    : "border-primary/20 bg-surface text-text-primary hover:border-primary/40 hover:bg-primary/5 active:scale-[0.98]"
-                }`}
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] text-text-on-accent">
-                  {index + 1}
-                </span>
-                <span>{item.title}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-      )}
-
-      <div className="grid gap-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
+    <div className="relative min-h-[calc(100vh-56px)] w-full overflow-hidden">
+      {/* Full-Bleed Flat-Vector Storybook World Backdrop */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 top-14 z-0">
+        <img src={mapBg} alt="" className="h-full w-full object-cover object-center" />
         <div
-          ref={topicScrollContainerRef}
-          className="lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:rounded-card lg:border lg:border-primary/10 lg:bg-surface/30 lg:shadow-inner"
-        >
-          <div className="space-y-8 lg:space-y-6">
-          {topicGroups.map((cat: any, catIndex: number) => {
-            const topics = Array.isArray(cat.topics) ? cat.topics : [];
-            const isCategoryLocked = isGuest && catIndex > 0;
-            const sectionId = categoryNavItems[catIndex]?.sectionId ?? toCategorySectionId(cat.id);
-            const categoryTotals = topics.reduce(
-              (totals: { total: number; learned: number; review: number }, topic: any) => ({
-                total: totals.total + Number(topic.stats?.total ?? 0),
-                learned: totals.learned + Number(topic.stats?.learned ?? 0),
-                review: totals.review + Number(topic.stats?.review ?? 0),
-              }),
-              { total: 0, learned: 0, review: 0 },
-            );
-            const categoryProgress =
-              categoryTotals.total > 0
-                ? Math.round((categoryTotals.learned / categoryTotals.total) * 100)
-                : 0;
-
-            return (
-              <section
-                id={sectionId}
-                key={cat.id}
-                className="scroll-mt-28"
-              >
-                <div
-                  className={`learning-card border-2 border-primary/5 transition-all ${
-                    isCategoryLocked ? "opacity-50" : "hover:border-primary/20"
-                  }`}
-                >
-                  <div className={`learning-fade ${mounted ? "is-visible" : ""} z-40 flex flex-col gap-3 rounded-t-card border-b border-primary/10 bg-surface p-4 shadow-[0_12px_30px_var(--shadow-color)] sm:flex-row sm:items-center sm:justify-between sm:p-6 lg:sticky lg:top-0`}>
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-[1.75rem]">
-                        {cat.icon ?? "📚"}
-                      </div>
-                      <div>
-                        <h3 className="flex items-center gap-2 text-xl font-bold text-text-primary sm:text-2xl">
-                          <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-primary px-2 text-sm text-text-on-accent">
-                            {catIndex + 1}
-                          </span>
-                          {cat.title}
-                          {isCategoryLocked && (
-                            <Shield size={18} className="text-text-muted" />
-                          )}
-                        </h3>
-                        <p className="mt-1 text-sm text-text-muted">
-                          {topics.length} chủ đề từ vựng
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                      <span className="rounded-full border border-primary/10 bg-bg-light px-3 py-1 text-text-muted">
-                        {categoryTotals.total} từ
-                      </span>
-                      {!isGuest && (
-                        <>
-                          <span className="hidden rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-green-700 sm:inline-flex">
-                            {categoryProgress}% đã học
-                          </span>
-                          {categoryTotals.review > 0 && (
-                            <span className="hidden rounded-full border border-purple/30 bg-purple/10 px-3 py-1 text-purple sm:inline-flex">
-                              {categoryTotals.review} cần ôn
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {isCategoryLocked ? (
-                    <div className="flex items-center gap-4 bg-surface/30 p-6 text-text-muted">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm">
-                        <Shield size={18} />
-                      </div>
-                      <p className="text-sm font-medium">
-                        Đăng ký để mở khóa danh mục này.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-4 bg-surface/30 p-4 sm:gap-5 sm:p-6 xl:grid-cols-2">
-                      {topics.map((topic: any, idx: number) => {
-                        const stats = topic.stats ?? { new: 0, review: 0, learned: 0, total: 0 };
-                        const isTopicLocked = isGuest && idx >= 3;
-                        const isLearnedOut =
-                          !isGuest &&
-                          stats.new === 0 &&
-                          stats.review === 0;
-                        const progressPercent =
-                          stats.total > 0
-                            ? Math.round((stats.learned / stats.total) * 100)
-                            : 0;
-
-                        return (
-                          <div
-                            key={topic.id}
-                            className={`learning-fade-in h-full ${mounted ? "is-visible" : ""}`}
-                            style={{ transitionDelay: `${Math.min(idx * 60, 420)}ms` }}
-                          >
-                          <article
-                            className={`learning-card relative flex h-full min-h-0 flex-col p-4 transition-all sm:min-h-[18rem] sm:p-6 ${
-                              isTopicLocked
-                                ? "pointer-events-none blur-[2px] opacity-70"
-                                : "hover:-translate-y-1 hover:border-primary/40"
-                            }`}
-                          >
-                            {isTopicLocked && (
-                              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-card bg-surface/10">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary/20 bg-surface/80 text-text-muted shadow-lg">
-                                  🔒
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="mb-4 flex items-start justify-between gap-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-light text-[1.75rem]">
-                                  {topic.icon}
-                                </div>
-                                <div className="text-xs font-semibold text-text-muted">
-                                  {stats.total} từ
-                                </div>
-                              </div>
-
-                              {isGuest && idx < 3 && (
-                                <Badge
-                                  variant="green"
-                                  className="animate-pulse"
-                                >
-                                  Preview ✓
-                                </Badge>
-                              )}
-                              {!isGuest && (
-                                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
-                                  <Badge
-                                    variant="cyan"
-                                    className="text-[10px] px-1.5"
-                                  >
-                                    🆕 {stats.new}
-                                  </Badge>
-                                  <Badge
-                                    variant="purple"
-                                    className="text-[10px] px-1.5"
-                                  >
-                                    🔔 {stats.review}
-                                  </Badge>
-                                  <Badge
-                                    variant="green"
-                                    className="text-[10px] px-1.5 font-bold"
-                                  >
-                                    ✅ {stats.learned}
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
-
-                            <h4 className="mb-2 text-xl font-bold text-text-primary">
-                              {topic.title}
-                            </h4>
-                            <p className="mb-6 line-clamp-2 text-sm text-text-secondary">
-                              {topic.description}
-                            </p>
-
-                            {!isGuest && (
-                              <div className="mb-6">
-                                <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-primary/10">
-                                  <div
-                                    className="h-full bg-linear-to-r from-primary to-accent transition-all duration-1000"
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
-                                </div>
-                                <div className="flex justify-between text-[10px] font-medium text-text-muted">
-                                  <span>Tiến độ</span>
-                                  <span>{progressPercent}%</span>
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="mt-auto">
-                              {isLearnedOut ? (
-                                <Button
-                                  variant="ghost"
-                                  className="w-full cursor-not-allowed opacity-40"
-                                  disabled
-                                  title="Bạn đã học hết chủ đề này! Chờ ngày ôn tiếp theo."
-                                >
-                                  Đã hoàn thành
-                                </Button>
-                              ) : (
-                                <div className="space-y-2">
-                                  {stats.new > 0 && (
-                                    <Button
-                                      variant="primary"
-                                      className="w-full group/btn"
-                                      onClick={() => onStartStudy(topic.id)}
-                                      disabled={isTopicLocked}
-                                    >
-                                      {stats.review > 0 ? "🆕 Học từ mới" : "Bắt đầu →"}
-                                    </Button>
-                                  )}
-                                  {stats.review > 0 && (
-                                    <Button
-                                      variant="ghost"
-                                      className="w-full border border-purple/50 text-purple hover:bg-purple/10"
-                                      onClick={() => onStartStudy(topic.id, 'review')}
-                                      disabled={isTopicLocked}
-                                    >
-                                      🔔 Ôn tập ngay ({stats.review})
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </article>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </section>
-            );
-          })}
-          </div>
-        </div>
-
-        {categoryNavItems.length > 0 && (
-          <aside
-            className={`hidden lg:block learning-fade-in delay-[200ms] ${mounted ? "is-visible" : ""}`}
-            aria-label="Mục lục chủ đề học tập"
-          >
-            <div className="learning-card sticky top-24 p-4">
-              <div className="mb-4 flex items-center gap-3 border-b border-primary/10 pb-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  #
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-text-primary">
-                    Nhóm chủ đề
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    Chọn để cuộn nhanh
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {categoryNavItems.map((item, index) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => scrollToCategory(item.sectionId)}
-                    disabled={item.locked}
-                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-all ${
-                      item.locked
-                        ? "cursor-not-allowed text-text-muted opacity-45"
-                        : "text-text-secondary hover:bg-primary/5 hover:text-text-primary active:scale-[0.98]"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        item.locked
-                          ? "bg-bg-light text-text-muted"
-                          : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-text-on-accent"
-                      }`}
-                    >
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-semibold">
-                      {item.title}
-                    </span>
-                    <span className="text-[10px] text-text-muted">
-                      {item.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </aside>
-        )}
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.08) 50%, rgba(245,247,251,0.38) 100%)',
+          }}
+        />
       </div>
 
-      {/* Sticky Guest CTA */}
-      {isGuest && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 flex justify-center pointer-events-none sm:p-6">
-          <motion.div
-            initial={{ y: 100 }}
-            animate={{ y: 0 }}
-            className="pointer-events-auto bg-surface/95 border-2 border-primary/40 p-3 rounded-card shadow-2xl flex items-center gap-3 sm:gap-8 max-w-4xl w-full sm:p-4"
-          >
-            <div className="min-w-0 flex flex-1 items-center gap-6">
-              <div className="hidden w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-purple items-center justify-center text-text-on-accent text-3xl shadow-lg ring-4 ring-primary/10 sm:flex">
-                🎯
-              </div>
-              <div>
-                <h4 className="text-sm font-bold leading-snug text-text-primary sm:mb-1 sm:text-xl">
-                  Mở khóa 44 chủ đề đặc sắc
-                </h4>
-                <p className="hidden text-text-secondary sm:block">
-                  Theo dõi tiến trình học tập và nhận ngay 100 XP thưởng! 🔥
-                </p>
+      <div className="relative z-10 mx-auto max-w-[960px] px-4 pt-5 pb-24 sm:px-6">
+        {/* Clean Minimal Control Bar (Low Button Density for Kids) */}
+        <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-white/85 bg-white/92 p-4 shadow-[0_14px_32px_-14px_rgba(17,16,25,0.2)] backdrop-blur-sm sm:px-6">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[#8B5CF6] text-white shadow-[0_4px_0_#5B21B6]">
+              <Compass size={26} aria-hidden />
+            </div>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-primary">
+                Tiếng Anh 1 · Global Success
+              </p>
+              <h1 className="text-lg font-black tracking-tight text-[#111019] sm:text-2xl">
+                Lộ trình học cùng Lumo
+              </h1>
+              <div className="mt-0.5 flex items-center gap-2 text-xs font-extrabold text-[#B45309]">
+                <Star size={14} className="fill-[#F59E0B] text-[#F59E0B]" />
+                <span>{totalStars} / 60 sao vàng</span>
               </div>
             </div>
-            <Button
-              variant="primary"
-              className="shrink-0 justify-center px-4 py-3 text-sm sm:ml-auto sm:px-10 sm:py-4 sm:text-lg"
-              onClick={() => navigate("/register")}
+          </div>
+
+          <div className="inline-flex rounded-2xl border border-border bg-bg-secondary p-1">
+            <button
+              type="button"
+              onClick={() => setSemester(1)}
+              className={`cursor-pointer rounded-xl px-4 py-2 text-xs font-extrabold transition-colors sm:text-sm ${
+                semester === 1
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
             >
-              Đăng ký miễn phí →
-            </Button>
-          </motion.div>
+              Học kỳ 1 (U1–8)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSemester(2)}
+              className={`cursor-pointer rounded-xl px-4 py-2 text-xs font-extrabold transition-colors sm:text-sm ${
+                semester === 2
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Học kỳ 2 (U9–16)
+            </button>
+          </div>
+        </section>
+
+        {/* Kid-Friendly Review Prompt (SM-2 runs silently under the hood!) + Parent Unlock */}
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-2.5">
+          <div>
+            {sm2Summary.dueCount > 0 && (
+              <button
+                type="button"
+                onClick={openSm2Review}
+                className="duo-btn duo-btn-amber !px-5 !py-2.5 !text-sm"
+              >
+                <Star size={16} className="fill-current" aria-hidden />
+                Ôn {sm2Summary.dueCount} từ cùng Lumo!
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleUnlockAll}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/80 bg-white/88 px-3.5 py-1.5 text-xs font-extrabold text-[#374151] shadow-xs transition-colors hover:bg-white hover:text-primary"
+          >
+            {progress.unlockAll ? <Unlock size={13} /> : <Lock size={13} />}
+            {progress.unlockAll ? 'Đang mở tự do' : 'Phụ huynh: Mở tự do'}
+          </button>
         </div>
-      )}
+
+        {/* Candy Crush x Duolingo Winding S-Curve SVG Adventure Trail */}
+        {(() => {
+          const points = mapNodes.map((_, idx) => ({
+            x: NODE_X_CURVE[idx % NODE_X_CURVE.length],
+            y: MAP_TOP_PAD + idx * NODE_STEP_Y,
+          }));
+          const totalHeight =
+            MAP_TOP_PAD + Math.max(0, mapNodes.length - 1) * NODE_STEP_Y + MAP_BOTTOM_PAD;
+          const fullRoadD = buildSmoothRoadPath(points);
+
+          let highestUnlockedIdx = 0;
+          mapNodes.forEach((node, idx) => {
+            const isOpen =
+              node.kind === 'review'
+                ? isReviewUnlocked(progress, node.reviewNumber)
+                : isUnitUnlocked(progress, node.unit);
+            if (isOpen) highestUnlockedIdx = idx;
+          });
+          const progressRoadD = buildSmoothRoadPath(points.slice(0, highestUnlockedIdx + 1));
+
+          return (
+            <div
+              className="relative mx-auto w-full max-w-[800px]"
+              style={{ height: `${totalHeight}px` }}
+            >
+              {/* Layered Cubic Bézier Winding Cobblestone Road */}
+              <svg
+                aria-hidden="true"
+                viewBox={`0 0 ${MAP_VIEWBOX_W} ${totalHeight}`}
+                preserveAspectRatio="none"
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              >
+                <defs>
+                  <linearGradient id="lumoRoadProgress" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#8B5CF6" />
+                    <stop offset="100%" stopColor="#F59E0B" />
+                  </linearGradient>
+                </defs>
+
+                {/* Soft ground shadow under the road */}
+                <path
+                  d={fullRoadD}
+                  fill="none"
+                  stroke="rgba(17, 16, 25, 0.12)"
+                  strokeWidth={44}
+                  strokeLinecap="round"
+                  transform="translate(0, 6)"
+                />
+                {/* Crisp white outer ribbon */}
+                <path
+                  d={fullRoadD}
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth={38}
+                  strokeLinecap="round"
+                />
+                {/* Warm cream-amber trail bed */}
+                <path
+                  d={fullRoadD}
+                  fill="none"
+                  stroke="#FEF3C7"
+                  strokeWidth={26}
+                  strokeLinecap="round"
+                />
+                {/* Subtle stepping-stone dashes */}
+                <path
+                  d={fullRoadD}
+                  fill="none"
+                  stroke="#FCD34D"
+                  strokeWidth={5}
+                  strokeLinecap="round"
+                  strokeDasharray="10 16"
+                />
+                {/* Illuminated progress segment up to the child's current unlocked island */}
+                {highestUnlockedIdx > 0 && (
+                  <path
+                    d={progressRoadD}
+                    fill="none"
+                    stroke="url(#lumoRoadProgress)"
+                    strokeWidth={14}
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+
+              {/* Tactile Circular 3D Level Medallions Positioned Right on the S-Curve */}
+              {mapNodes.map((node, idx) => {
+                const pt = points[idx];
+                const leftPct = (pt.x / MAP_VIEWBOX_W) * 100;
+
+                if (node.kind === 'review') {
+                  const unlocked = isReviewUnlocked(progress, node.reviewNumber);
+                  const stars = progress.reviews[node.reviewNumber]?.stars ?? 0;
+
+                  return (
+                    <div
+                      key={`review-${node.reviewNumber}`}
+                      style={{ left: `${leftPct}%`, top: `${pt.y}px` }}
+                      className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                    >
+                      {/* Arcing 3 Stars above Boss Medallion */}
+                      <div className="mb-1.5 flex items-end gap-1">
+                        {[1, 2, 3].map((s) => (
+                          <Star
+                            key={s}
+                            size={s === 2 ? 20 : 16}
+                            className={`drop-shadow-xs ${
+                              s === 2 ? '-translate-y-1' : ''
+                            } ${
+                              s <= stars
+                                ? 'fill-[#F59E0B] text-[#D97706]'
+                                : 'fill-white/90 text-[#CBD5E1]'
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!unlocked}
+                        onClick={() => openReview(node.reviewNumber)}
+                        className={`flex h-24 w-24 flex-col items-center justify-center rounded-[28px] border-4 border-white transition-transform duration-150 ${
+                          !unlocked
+                            ? 'cursor-not-allowed bg-[#94A3B8] text-white/90 shadow-[0_7px_0_#64748B]'
+                            : 'cursor-pointer bg-gradient-to-b from-[#FBBF24] to-[#F59E0B] text-white shadow-[0_8px_0_#B45309,0_16px_26px_-8px_rgba(245,158,11,0.55)] hover:-translate-y-1 active:translate-y-1'
+                        }`}
+                      >
+                        {unlocked ? <Trophy size={34} /> : <Lock size={28} />}
+                        <span className="mt-0.5 text-[11px] font-black uppercase tracking-wide">
+                          Review {node.reviewNumber}
+                        </span>
+                      </button>
+
+                      <span className="mt-2 whitespace-nowrap rounded-full border-2 border-[#FDE68A] bg-white/95 px-3.5 py-1 text-xs font-black text-[#92400E] shadow-xs">
+                        Kiểm tra lớn · U{node.fromUnit}–{node.toUnit}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const u = getGrade1Unit(node.unit);
+                const unlocked = isUnitUnlocked(progress, u.unit);
+                const stars = progress.units[u.unit]?.stars ?? 0;
+                const isCurrent = u.unit === nextUnitNumber;
+
+                return (
+                  <div
+                    key={`unit-${u.unit}`}
+                    style={{ left: `${leftPct}%`, top: `${pt.y}px` }}
+                    className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                  >
+                    {/* Duolingo-style Bouncing "BẮT ĐẦU" Tag on Active Unit */}
+                    {isCurrent && (
+                      <div className="mb-1.5 animate-bounce rounded-xl border-2 border-[#F59E0B] bg-white px-3 py-1 text-[11px] font-black uppercase tracking-wide text-[#D97706] shadow-sm">
+                        Bắt đầu!
+                      </div>
+                    )}
+
+                    {/* Candy Crush-style 3 Arcing Stars */}
+                    {!isCurrent && (
+                      <div className="mb-1.5 flex items-end gap-1">
+                        {[1, 2, 3].map((s) => (
+                          <Star
+                            key={s}
+                            size={s === 2 ? 19 : 15}
+                            className={`drop-shadow-xs ${
+                              s === 2 ? '-translate-y-1' : ''
+                            } ${
+                              s <= stars
+                                ? 'fill-[#F59E0B] text-[#D97706]'
+                                : 'fill-white/90 text-[#CBD5E1]'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Circular 3D Tactile Medallion */}
+                    <button
+                      type="button"
+                      disabled={!unlocked}
+                      onClick={() => openUnit(u.unit)}
+                      style={
+                        unlocked
+                          ? {
+                              backgroundColor: u.color,
+                              boxShadow: isCurrent
+                                ? '0 8px 0 rgba(17,16,25,0.28), 0 0 0 6px rgba(245,158,11,0.38)'
+                                : '0 8px 0 rgba(17,16,25,0.24)',
+                            }
+                          : undefined
+                      }
+                      className={`group relative flex h-[86px] w-[86px] flex-col items-center justify-center rounded-full border-4 border-white text-white transition-transform duration-150 ${
+                        !unlocked
+                          ? 'cursor-not-allowed bg-[#94A3B8] shadow-[0_7px_0_#64748B]'
+                          : 'cursor-pointer hover:-translate-y-1 hover:scale-105 active:translate-y-1'
+                      }`}
+                    >
+                      {unlocked ? (
+                        <>
+                          <span className="text-[28px] font-black leading-none tracking-tight">
+                            {u.phonicsLetter}
+                          </span>
+                          <span className="mt-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-extrabold leading-none">
+                            Unit {u.unit}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={24} />
+                          <span className="mt-1 text-[10px] font-extrabold opacity-90">
+                            Unit {u.unit}
+                          </span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Crisp Compact Label Pill below the Medallion */}
+                    <span
+                      className={`mt-2 whitespace-nowrap rounded-full border-2 px-3 py-0.5 text-xs font-black shadow-xs ${
+                        isCurrent
+                          ? 'border-[#F59E0B] bg-[#FFFBEB] text-[#92400E]'
+                          : unlocked
+                            ? 'border-white bg-white/95 text-[#111019]'
+                            : 'border-white/70 bg-white/80 text-[#64748B]'
+                      }`}
+                    >
+                      {u.titleVi}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
-};
-
-export { LearningTopics };
+}

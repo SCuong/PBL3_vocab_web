@@ -99,7 +99,7 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = loginResult.ErrorMessage ?? "Username/email or password is incorrect."
+                    Message = loginResult.ErrorMessage ?? "Tên đăng nhập/email hoặc mật khẩu không chính xác."
                 });
             }
 
@@ -140,7 +140,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Name, email, password, and confirmation are required."
+                    Message = "Vui lòng điền đầy đủ tên hiển thị, email, mật khẩu và xác nhận mật khẩu."
                 });
             }
 
@@ -149,7 +149,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password confirmation does not match."
+                    Message = "Xác nhận mật khẩu không khớp."
                 });
             }
 
@@ -159,7 +159,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = result.ErrorMessage ?? "Registration failed."
+                    Message = result.ErrorMessage ?? "Đăng ký thất bại."
                 });
             }
 
@@ -177,7 +177,7 @@ namespace VocabLearning.Controllers
                 return Ok(new AuthApiResponse
                 {
                     Succeeded = true,
-                    Message = "Account created and auto-verified (Development mode). You can log in now.",
+                    Message = "Tài khoản đã được tạo và tự động kích hoạt. Bạn có thể đăng nhập ngay.",
                     EmailSent = false
                 });
             }
@@ -221,7 +221,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Google credential is required."
+                    Message = "Thiếu mã xác thực Google."
                 });
             }
 
@@ -231,7 +231,7 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Google login could not be verified."
+                    Message = "Không thể xác minh phiên đăng nhập Google."
                 });
             }
 
@@ -246,7 +246,7 @@ namespace VocabLearning.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = result.ErrorMessage ?? "Google login is not available for this account."
+                    Message = result.ErrorMessage ?? "Tài khoản này không hỗ trợ đăng nhập bằng Google."
                 });
             }
 
@@ -255,7 +255,7 @@ namespace VocabLearning.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Google login is only available for learner accounts."
+                    Message = "Đăng nhập Google chỉ áp dụng cho tài khoản học viên."
                 });
             }
 
@@ -299,7 +299,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Email verified successfully. You can now log in.",
+                Message = "Xác minh email thành công. Bạn có thể đăng nhập ngay.",
                 Email = result.Email
             });
         }
@@ -416,7 +416,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Profile updated successfully.",
+                Message = "Cập nhật hồ sơ thành công.",
                 User = MapAuthenticatedUser(result.User)
             });
         }
@@ -432,7 +432,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Request body is required."
+                    Message = "Thiếu dữ liệu yêu cầu."
                 });
             }
 
@@ -442,7 +442,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "New password and confirmation are required."
+                    Message = "Vui lòng nhập mật khẩu mới và xác nhận mật khẩu."
                 });
             }
 
@@ -451,7 +451,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password confirmation does not match."
+                    Message = "Xác nhận mật khẩu không khớp."
                 });
             }
 
@@ -461,7 +461,7 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Not authenticated."
+                    Message = "Bạn chưa đăng nhập."
                 });
             }
 
@@ -471,7 +471,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Current password is required."
+                    Message = "Vui lòng nhập mật khẩu hiện tại."
                 });
             }
 
@@ -480,7 +480,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "New password must be different from the current password."
+                    Message = "Mật khẩu mới phải khác mật khẩu hiện tại."
                 });
             }
 
@@ -495,7 +495,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = result.ErrorMessage ?? "Password could not be changed."
+                    Message = result.ErrorMessage ?? "Không thể đổi mật khẩu."
                 });
             }
 
@@ -514,7 +514,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = hasLocalPassword ? "Password changed successfully." : "Password set successfully.",
+                Message = hasLocalPassword ? "Đổi mật khẩu thành công." : "Thiết lập mật khẩu thành công.",
                 User = refreshedUser is null ? null : MapAuthenticatedUser(refreshedUser)
             });
         }
@@ -527,7 +527,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Signed out successfully."
+                Message = "Đã đăng xuất."
             });
         }
 
@@ -542,7 +542,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Request body is required."
+                    Message = "Thiếu dữ liệu yêu cầu."
                 });
             }
 
@@ -551,7 +551,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password is required to delete account."
+                    Message = "Vui lòng nhập mật khẩu để xóa tài khoản."
                 });
             }
 
@@ -561,7 +561,16 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Not authenticated."
+                    Message = "Bạn chưa đăng nhập."
+                });
+            }
+
+            if (string.Equals(user.Role, UserRoles.Admin, StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new AuthApiResponse
+                {
+                    Succeeded = false,
+                    Message = "Tài khoản quản trị không thể tự xóa tại đây."
                 });
             }
 
@@ -570,7 +579,7 @@ namespace VocabLearning.Controllers
                 return BadRequest(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password is not available for this account."
+                    Message = "Tài khoản này chưa thiết lập mật khẩu cục bộ."
                 });
             }
 
@@ -583,7 +592,7 @@ namespace VocabLearning.Controllers
                 return Unauthorized(new AuthApiResponse
                 {
                     Succeeded = false,
-                    Message = "Password is incorrect."
+                    Message = "Mật khẩu không chính xác."
                 });
             }
 
@@ -598,7 +607,7 @@ namespace VocabLearning.Controllers
             return Ok(new AuthApiResponse
             {
                 Succeeded = true,
-                Message = "Account deleted successfully."
+                Message = "Đã xóa tài khoản thành công."
             });
         }
 

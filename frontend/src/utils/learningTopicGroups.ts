@@ -23,8 +23,9 @@ type TopicGroupUiModel = {
     topics: TopicUiModel[];
 };
 
-const DEFAULT_CATEGORY_ICON = '📚';
-const DEFAULT_TOPIC_ICON = '📘';
+// Unmapped topics get no icon: a repeated filler glyph adds noise, not meaning.
+const DEFAULT_CATEGORY_ICON = '';
+const DEFAULT_TOPIC_ICON = '';
 
 // Keyed by normalized topic name (trim + lowercase). Names are stable across
 // DB migrations; topic_id is not — Postgres IDENTITY reassigns ids based on
@@ -41,7 +42,8 @@ const CATEGORY_ICONS_BY_NAME: Record<string, string> = {
     'emotions and opinions': '💭',
     'emotions & opinions': '💭',
     'culture and science': '🌍',
-    'culture & science': '🌍'
+    'culture & science': '🌍',
+    'real-world communication': '🌍'
 };
 
 const TOPIC_ICONS_BY_NAME: Record<string, string> = {
@@ -107,7 +109,12 @@ const TOPIC_ICONS_BY_NAME: Record<string, string> = {
     'books and literature': '📚',
     'history and culture': '🏛️',
     'traditions and customs': '🎎',
-    'holidays around the world': '🌎'
+    'holidays around the world': '🌎',
+
+    // Everyday English A1-B1 Curriculum
+    'home and daily routines': '🏠',
+    'work and study': '💼',
+    'health and lifestyle': '💪'
 };
 
 type TopicProgressLookup = Record<number, LearningProgressTopicStateItem>;
@@ -189,4 +196,13 @@ export const buildLearningTopicGroups = (
             topics
         };
     });
+};
+
+/** Picks the single topic unlocked for unauthenticated guests to try the full study loop. */
+export const getGuestTrialTopicId = (topicGroups: TopicGroupUiModel[]): number | null => {
+    for (const group of topicGroups) {
+        const withWords = group.topics.find((topic) => (topic.stats?.total ?? 0) > 0);
+        if (withWords) return withWords.id;
+    }
+    return topicGroups[0]?.topics[0]?.id ?? null;
 };

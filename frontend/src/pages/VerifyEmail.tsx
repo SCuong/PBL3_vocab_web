@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, typography } from '../components/ui';
+import { AlertCircle, Check } from 'lucide-react';
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { authApi } from '../services/authApi';
 import { PATHS } from '../routes/paths';
 
@@ -41,19 +42,20 @@ const VerifyEmail = () => {
     }, [navigate, searchParams]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 py-8">
-            <div className="glass-card max-w-md w-full rounded-3xl p-8 text-center">
-                <div className="mb-4 text-4xl">
-                    {status === 'loading' ? '...' : status === 'success' ? '✓' : '!'}
-                </div>
-                <h1 className={`${typography.pageTitle} mb-3`}>Xác minh email</h1>
-                <p className="text-text-secondary mb-6">{message}</p>
-                <Link to={PATHS.login}>
-                    <Button variant="primary" className="w-full">
-                        Đăng nhập
-                    </Button>
-                </Link>
-            </div>
+        <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-8">
+            <section className="w-full max-w-[420px] rounded-[var(--radius-container)] border border-border bg-surface p-6 text-center sm:p-8" aria-live="polite">
+                <span
+                    className={`mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full ${
+                        status === 'error' ? 'bg-danger-color/10 text-danger-color' : 'bg-primary-light text-primary'
+                    }`}
+                    aria-hidden
+                >
+                    {status === 'loading' ? <Spinner size="md" /> : status === 'success' ? <Check size={22} /> : <AlertCircle size={22} />}
+                </span>
+                <h1 className="text-2xl font-bold tracking-[-0.02em] text-text-primary">Xác minh email</h1>
+                <p className="mt-2 text-sm text-text-muted">{message}</p>
+                <Link to={PATHS.login} className="btn-primary mt-6 w-full">Đăng nhập</Link>
+            </section>
         </div>
     );
 };

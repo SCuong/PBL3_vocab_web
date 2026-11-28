@@ -121,7 +121,16 @@ const AdminOverview = () => {
                 <StatCard icon={<Users size={22} className="text-text-on-accent" />} label="Người dùng hoạt động" value={overview?.activeUserCount ?? 0} />
                 <StatCard icon={<BookOpen size={22} className="text-text-on-accent" />} label="Chủ đề đã học" value={overview?.learnedTopicCount ?? 0} tone="cyan" />
                 <StatCard icon={<BookMarked size={22} className="text-text-on-accent" />} label="Từ đã học" value={overview?.totalWordsStudied.toLocaleString('vi-VN') ?? 0} tone="accent" />
-                <StatCard icon={<Clock size={22} className="text-text-on-accent" />} label="Giờ hoạt động" value={overview?.totalActiveHours.toFixed(1) ?? 0} tone="secondary" />
+                <StatCard
+                    icon={<Clock size={22} className="text-text-on-accent" />}
+                    label="Thời gian hoạt động"
+                    value={
+                        overview && overview.totalActiveHours > 0 && overview.totalActiveHours < 1
+                            ? `${Math.max(1, Math.round(overview.totalActiveHours * 60))} phút`
+                            : `${(overview?.totalActiveHours ?? 0).toFixed(1)} giờ`
+                    }
+                    tone="secondary"
+                />
             </div>
 
             <div className="mb-8 grid gap-4 lg:grid-cols-3">
@@ -149,12 +158,12 @@ const AdminOverview = () => {
 
                 <DashboardCard title="Xu hướng học theo ngày" subtitle="Số từ học theo ngày trong khoảng đã chọn.">
                     {chartData.some(item => item.value > 0)
-                        ? <MiniBarChart data={chartData} tone="accent" height={112} maxVisibleLabels={5} />
+                        ? <MiniBarChart data={chartData} tone="primary" height={112} maxVisibleLabels={5} />
                         : <EmptyState icon={<BarChart3 size={20} />} title="Chưa có dữ liệu xu hướng" description="Dữ liệu xuất hiện sau khi người học hoàn thành phiên học." />}
                 </DashboardCard>
             </div>
 
-            <FilterBar actions={(filters.fromDate || filters.toDate) ? <Button variant="ghost" onClick={clearFilters}>Xóa bộ lọc</Button> : undefined}>
+            <FilterBar actions={(filters.fromDate || filters.toDate) ? <Button variant="ghost" onClick={clearFilters}>Xóa bộ lọc</Button> : <span className="self-center text-xs text-text-muted">Mặc định hiển thị 30 ngày gần nhất</span>}>
                 <Input label="Từ ngày" type="date" value={filters.fromDate} onChange={event => { setFilters(current => ({ ...current, fromDate: event.target.value })); setPage(1); }} />
                 <Input label="Đến ngày" type="date" value={filters.toDate} onChange={event => { setFilters(current => ({ ...current, toDate: event.target.value })); setPage(1); }} />
             </FilterBar>
@@ -164,7 +173,7 @@ const AdminOverview = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-primary/10">
+                            <tr className="border-b border-border">
                                 {[
                                     ['Người dùng', 'user'], ['Chủ đề', 'topic'], ['Phiên học', 'sessions'],
                                     ['Số từ', 'words'], ['Thời gian', 'activeminutes'],
@@ -178,7 +187,7 @@ const AdminOverview = () => {
                             {rows.length === 0 ? (
                                 <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-text-muted">Không có hoạt động học trong khoảng đã chọn.</td></tr>
                             ) : rows.map(row => (
-                                <tr key={`${row.userId}-${row.topicId}`} className="border-b border-primary/5 transition-colors hover:bg-primary/[0.03]">
+                                <tr key={`${row.userId}-${row.topicId}`} className="border-b border-border transition-colors hover:bg-primary/[0.03]">
                                     <td className="px-4 py-3.5 text-sm font-display font-bold text-text-primary">{row.username}</td>
                                     <td className="px-4 py-3.5 text-sm text-text-muted">{row.topicName}</td>
                                     <td className="px-4 py-3.5 text-center text-sm text-text-primary">{row.sessionCount}</td>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Check, Circle } from 'lucide-react';
-import { Button } from '../ui';
+import { Check } from 'lucide-react';
+import { AppDialog, Button, FloatingField } from '../ui';
 import { authApi } from '../../services/authApi';
 import {
     checkPasswordPolicy,
@@ -21,6 +21,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
@@ -29,6 +32,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
         setCurrentPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
+        setShowCurrent(false);
+        setShowNew(false);
+        setShowConfirm(false);
         setConfirmPasswordError('');
     }, [isOpen]);
 
@@ -64,107 +70,81 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
         }
     };
 
-    if (!isOpen) return null;
+    const mismatch = 'Mật khẩu xác nhận không khớp với mật khẩu mới.';
 
     return (
-        <div className="fixed inset-0 z-[800] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-            <div
-                className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-[#E5D9F2] overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[#EFE4FA]">
-                    <h3 className="font-bold text-text-primary">Đổi mật khẩu</h3>
-                    <button
-                        type="button"
-                        aria-label="Đóng"
-                        className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer"
-                        onClick={onClose}
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <input
-                        type="password"
-                        className="profile-input"
-                        placeholder="Mật khẩu hiện tại"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        autoComplete="current-password"
-                    />
-                    <input
-                        type="password"
-                        className="profile-input"
-                        placeholder="Mật khẩu mới"
-                        value={newPassword}
-                        maxLength={PASSWORD_MAX_LENGTH}
-                        autoComplete="new-password"
-                        onChange={(e) => {
-                            const next = e.target.value;
-                            setNewPassword(next);
-                            if (!confirmNewPassword) {
-                                setConfirmPasswordError('');
-                                return;
-                            }
-                            setConfirmPasswordError(
-                                next === confirmNewPassword
-                                    ? ''
-                                    : 'Mật khẩu xác nhận không khớp với mật khẩu mới.'
-                            );
-                        }}
-                    />
-                    <div className="rounded-2xl border border-[#EFE4FA] bg-[#F7F0FF]/60 px-4 py-3 text-xs text-text-secondary space-y-1.5">
-                        <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
-                        {PASSWORD_POLICY_LABELS.map(([key, label]) => {
-                            const ok = newPasswordPolicy[key];
-                            return (
-                                <p key={key} className={`flex items-center gap-2 transition-colors ${ok ? 'text-green-700 font-semibold' : 'text-text-muted'}`}>
-                                    {ok ? (
-                                        <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center shrink-0">
-                                            <Check size={12} strokeWidth={3} />
-                                        </span>
-                                    ) : (
-                                        <span className="w-4 h-4 rounded-full border-2 border-[#E5D9F2] flex items-center justify-center shrink-0">
-                                            <Circle size={6} className="text-[#E5D9F2] fill-current" />
-                                        </span>
-                                    )}
-                                    {label}
-                                </p>
-                            );
-                        })}
-                    </div>
-                    <input
-                        type="password"
-                        className={`profile-input${confirmPasswordError ? ' is-invalid' : ''}`}
-                        placeholder="Xác nhận mật khẩu mới"
-                        value={confirmNewPassword}
-                        maxLength={PASSWORD_MAX_LENGTH}
-                        autoComplete="new-password"
-                        onChange={(e) => {
-                            const next = e.target.value;
-                            setConfirmNewPassword(next);
-                            setConfirmPasswordError(
-                                next === newPassword
-                                    ? ''
-                                    : 'Mật khẩu xác nhận không khớp với mật khẩu mới.'
-                            );
-                        }}
-                    />
-                    {confirmPasswordError && (
-                        <p className="text-sm text-red-500 -mt-1">{confirmPasswordError}</p>
-                    )}
-                </div>
-                <div className="px-6 py-4 border-t border-[#EFE4FA] flex items-center justify-end gap-2">
-                    <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-                        Hủy
-                    </Button>
-                    <Button variant="primary" onClick={handleSubmit} disabled={isSaving}>
-                        {isSaving ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
-                    </Button>
-                </div>
+        <AppDialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Đổi mật khẩu"
+            footer={(
+                <>
+                    <Button variant="ghost" onClick={onClose} disabled={isSaving}>Hủy</Button>
+                    <Button onClick={handleSubmit} isLoading={isSaving}>Cập nhật mật khẩu</Button>
+                </>
+            )}
+        >
+            <div className="space-y-4">
+                <FloatingField
+                    label="Mật khẩu hiện tại"
+                    value={currentPassword}
+                    onChange={setCurrentPassword}
+                    autoComplete="current-password"
+                    disabled={isSaving}
+                    isPassword
+                    shown={showCurrent}
+                    onToggleShown={() => setShowCurrent((v) => !v)}
+                />
+                <FloatingField
+                    label="Mật khẩu mới"
+                    value={newPassword}
+                    autoComplete="new-password"
+                    maxLength={PASSWORD_MAX_LENGTH}
+                    disabled={isSaving}
+                    isPassword
+                    shown={showNew}
+                    onToggleShown={() => setShowNew((v) => !v)}
+                    onChange={(value) => {
+                        const next = value.slice(0, PASSWORD_MAX_LENGTH);
+                        setNewPassword(next);
+                        setConfirmPasswordError(confirmNewPassword && next !== confirmNewPassword ? mismatch : '');
+                    }}
+                />
+                <ul className="space-y-1 text-sm" aria-label="Yêu cầu mật khẩu">
+                    {PASSWORD_POLICY_LABELS.map(([key, label]) => {
+                        const ok = newPasswordPolicy[key];
+                        return (
+                            <li key={key} className={`flex items-center gap-2 ${ok ? 'text-success-color' : 'text-text-muted'}`}>
+                                <span
+                                    className={`flex h-4 w-4 items-center justify-center rounded-full ${ok ? 'bg-success-color text-text-on-accent' : 'border border-border-emphasized'}`}
+                                    aria-hidden
+                                >
+                                    {ok && <Check size={11} strokeWidth={3} />}
+                                </span>
+                                {label}
+                            </li>
+                        );
+                    })}
+                </ul>
+                <FloatingField
+                    label="Xác nhận mật khẩu mới"
+                    value={confirmNewPassword}
+                    autoComplete="new-password"
+                    maxLength={PASSWORD_MAX_LENGTH}
+                    disabled={isSaving}
+                    isPassword
+                    shown={showConfirm}
+                    onToggleShown={() => setShowConfirm((v) => !v)}
+                    error={confirmPasswordError}
+                    onChange={(value) => {
+                        const next = value.slice(0, PASSWORD_MAX_LENGTH);
+                        setConfirmNewPassword(next);
+                        setConfirmPasswordError(next === newPassword ? '' : mismatch);
+                    }}
+                    onEnter={handleSubmit}
+                />
             </div>
-        </div>
+        </AppDialog>
     );
 };
 

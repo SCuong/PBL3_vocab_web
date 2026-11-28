@@ -35,7 +35,8 @@ namespace VocabLearning.Controllers
                     Cefr = vocabulary.Level ?? string.Empty,
                     TopicId = vocabulary.TopicId,
                     TopicName = vocabulary.Topic?.Name ?? string.Empty,
-                    AudioUrl = vocabulary.AudioUrl ?? string.Empty
+                    AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                    ImageUrl = vocabulary.ImageUrl ?? string.Empty
                 })
                 .ToList();
 
@@ -67,7 +68,8 @@ namespace VocabLearning.Controllers
                     Cefr = vocabulary.Level ?? string.Empty,
                     TopicId = vocabulary.TopicId,
                     TopicName = vocabulary.Topic?.Name ?? string.Empty,
-                    AudioUrl = vocabulary.AudioUrl ?? string.Empty
+                    AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                    ImageUrl = vocabulary.ImageUrl ?? string.Empty
                 })
                 .ToList();
 
@@ -116,6 +118,7 @@ namespace VocabLearning.Controllers
                         TopicId = vocabulary.TopicId,
                         TopicName = topic.Name,
                         AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                        ImageUrl = vocabulary.ImageUrl ?? string.Empty,
                         Example = firstExample?.ExampleEn ?? string.Empty,
                         ExampleVi = firstExample?.ExampleVi ?? string.Empty,
                         ExampleAudioUrl = firstExample?.AudioUrl ?? string.Empty
@@ -145,6 +148,7 @@ namespace VocabLearning.Controllers
                 TopicId = vocabulary.TopicId,
                 TopicName = vocabulary.Topic?.Name ?? string.Empty,
                 AudioUrl = vocabulary.AudioUrl ?? string.Empty,
+                ImageUrl = vocabulary.ImageUrl ?? string.Empty,
                 Examples = vocabulary.Examples
                     .Select(example => new VocabularyExampleViewModel
                     {

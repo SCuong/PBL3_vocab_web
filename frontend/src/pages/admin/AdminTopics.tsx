@@ -383,11 +383,11 @@ const AdminTopics = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-primary/10">
+                            <tr className="border-b border-border">
                                 {['ID', 'Tên', 'Mô tả', 'Chủ đề cha', ''].map(h => (
                                     <th
                                         key={h}
-                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
+                                        className={`px-4 py-3.5 text-sm font-medium text-text-muted ${h === '' ? 'text-right' : 'text-left'}`}
                                     >
                                         {h}
                                     </th>
@@ -410,7 +410,7 @@ const AdminTopics = () => {
                                 paged.map(topic => (
                                     <tr
                                         key={topic.topicId}
-                                        className="border-b border-primary/5 hover:bg-primary/[0.03] transition-colors"
+                                        className="border-b border-border hover:bg-primary/[0.03] transition-colors"
                                     >
                                         <td className="px-4 py-3.5 text-xs text-text-muted font-mono">
                                             {topic.topicId}

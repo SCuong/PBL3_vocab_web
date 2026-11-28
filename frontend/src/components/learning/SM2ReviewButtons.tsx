@@ -1,99 +1,73 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { ReviewOptionItem } from '../../services/learningProgressApi';
+import { playSfx } from '../../utils/sound';
 
 interface SM2ReviewButtonsProps {
     options: ReviewOptionItem[];
     onSelect: (quality: number) => void;
     isSubmitting: boolean;
+    /** Kept for callers; colours now come from theme tokens in every mode. */
     appearance?: 'default' | 'focusedLight' | 'focusedDark';
 }
 
 const BUTTON_CONFIG = [
-    {
-        quality: 0,
-        emoji: '😵',
-        label: 'Quên rồi',
-        defaultClasses: 'border-red-200 hover:bg-red-50 hover:border-red-300 focus:ring-red-200',
-        focusedLightClasses: 'border-[#f4b6bc] hover:bg-[#fff5f6] hover:border-[#e88993] focus:ring-[#f4b6bc]',
-        focusedDarkClasses: 'border-[#8f5965] hover:bg-[#4b3042] hover:border-[#c17b89] focus:ring-[#8f5965]',
-    },
-    {
-        quality: 3,
-        emoji: '🤔',
-        label: 'Chưa chắc',
-        defaultClasses: 'border-orange-200 hover:bg-orange-50 hover:border-orange-300 focus:ring-orange-200',
-        focusedLightClasses: 'border-[#f2c27b] hover:bg-[#fff9ee] hover:border-[#dfa14d] focus:ring-[#f2c27b]',
-        focusedDarkClasses: 'border-[#96744e] hover:bg-[#493c38] hover:border-[#c69b65] focus:ring-[#96744e]',
-    },
-    {
-        quality: 5,
-        emoji: '🔥',
-        label: 'Nhớ rõ',
-        defaultClasses: 'border-green-200 hover:bg-green-50 hover:border-green-300 focus:ring-green-200',
-        focusedLightClasses: 'border-[#9bd8b5] hover:bg-[#f2fbf6] hover:border-[#65bf8c] focus:ring-[#9bd8b5]',
-        focusedDarkClasses: 'border-[#4f856b] hover:bg-[#2c463e] hover:border-[#72b18e] focus:ring-[#4f856b]',
-    },
+    { quality: 0, key: '1', label: 'Quên', sfx: 'wrong' as const, tone: 'var(--danger-color)' },
+    { quality: 3, key: '2', label: 'Chưa chắc', sfx: 'unsure' as const, tone: 'var(--warning-color)' },
+    { quality: 5, key: '3', label: 'Nhớ', sfx: 'correct' as const, tone: 'var(--success-color)' },
 ] as const;
 
 const formatSubLabel = (days: number): string => {
     if (days === 0) return 'Ôn lại ngay';
-    if (days === 1) return 'Ôn sau 1 ngày';
-    return `Ôn sau ${days} ngày`;
+    if (days === 1) return 'Sau 1 ngày';
+    return `Sau ${days} ngày`;
 };
 
-const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({
-    options,
-    onSelect,
-    isSubmitting,
-    appearance = 'default',
-}) => {
+const SM2ReviewButtons: React.FC<SM2ReviewButtonsProps> = ({ options, onSelect, isSubmitting }) => {
     const getOption = (quality: number) => options.find(o => o.quality === quality);
-    const isFocusedLight = appearance === 'focusedLight';
-    const isFocusedDark = appearance === 'focusedDark';
+
+    // Desktop shortcut: 1 / 2 / 3, ignored while typing.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (isSubmitting || event.metaKey || event.ctrlKey || event.altKey) return;
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+            const config = BUTTON_CONFIG.find(c => c.key === event.key);
+            if (config) {
+                event.preventDefault();
+                playSfx(config.sfx);
+                onSelect(config.quality);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isSubmitting, onSelect]);
 
     return (
-        <div className="mt-4 w-full max-w-2xl mx-auto sm:mt-6">
-            <p className={`mb-2 text-center text-[11px] font-semibold uppercase tracking-wide sm:mb-3 sm:text-sm ${
-                isFocusedLight ? 'text-[#6f6185]' : isFocusedDark ? 'text-[#cbbce2]' : 'text-text-muted'
-            }`}>
-                Bạn nhớ từ này ở mức nào?
-            </p>
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                {BUTTON_CONFIG.map((config) => {
-                    const { quality, emoji, label } = config;
+        <div className="mx-auto mt-4 w-full max-w-2xl sm:mt-6">
+            <p className="mb-3 text-center text-sm font-medium text-text-muted">Bạn nhớ từ này ở mức nào?</p>
+            <div className="grid grid-cols-3 gap-2">
+                {BUTTON_CONFIG.map(({ quality, key, label, sfx, tone }) => {
                     const option = getOption(quality);
-                    const subLabel = option ? formatSubLabel(option.days) : '…';
-                    const colorClasses = isFocusedLight
-                        ? config.focusedLightClasses
-                        : isFocusedDark
-                            ? config.focusedDarkClasses
-                            : config.defaultClasses;
-
                     return (
                         <button
                             key={quality}
                             type="button"
+                            data-no-tap-sfx="true"
                             disabled={isSubmitting}
-                            onClick={() => onSelect(quality)}
-                            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl border-2 px-1 py-2.5 sm:rounded-2xl sm:px-2 sm:py-3
-                                transition-all duration-150 cursor-pointer
-                                active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-1
-                                disabled:opacity-40 disabled:cursor-not-allowed
-                                ${isFocusedLight
-                                    ? 'bg-white/95 focus:ring-offset-[#f3ecff]'
-                                    : isFocusedDark
-                                        ? 'bg-[#3a304d] focus:ring-offset-[#282138]'
-                                        : 'bg-surface'
-                                }
-                                ${colorClasses}`}
+                            onClick={() => {
+                                playSfx(sfx);
+                                onSelect(quality);
+                            }}
+                            aria-keyshortcuts={key}
+                            style={{ '--tone': tone } as React.CSSProperties}
+                            className="group relative flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-element)] border border-border bg-surface px-2 py-3 transition-colors duration-150 hover:border-[var(--tone)] hover:bg-[color-mix(in_srgb,var(--tone)_8%,var(--surface))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tone)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                            <span className="text-xl leading-none sm:text-2xl">{emoji}</span>
-                            <span className={`text-[11px] font-bold leading-tight sm:text-sm ${
-                                isFocusedLight ? 'text-[#2b2140]' : isFocusedDark ? 'text-[#f5f0ff]' : 'text-text-primary'
-                            }`}>{label}</span>
-                            <span className={`hidden text-[11px] leading-tight min-[390px]:block ${
-                                isFocusedLight ? 'text-[#76688e]' : isFocusedDark ? 'text-[#cbbce2]' : 'text-text-muted'
-                            }`}>{subLabel}</span>
+                            <span className="mb-1 h-1.5 w-6 rounded-full bg-[var(--tone)]" aria-hidden />
+                            <span className="text-sm font-semibold text-text-primary sm:text-[15px]">{label}</span>
+                            <span className="text-xs tabular-nums text-text-muted">{option ? formatSubLabel(option.days) : '…'}</span>
+                            <kbd className="absolute right-2 top-2 hidden rounded border border-border px-1 text-[11px] font-medium text-text-muted lg:block" aria-hidden>
+                                {key}
+                            </kbd>
                         </button>
                     );
                 })}

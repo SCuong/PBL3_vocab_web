@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Award, Flame, LogOut, Shield, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Award, Flame, LogOut, Settings, Shield, User } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { DropdownMenu, type DropdownMenuOption } from '@astryxdesign/core/DropdownMenu';
+import { Avatar } from '@astryxdesign/core/Avatar';
 import { loadProfilePreferences } from '../../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../../utils/avatarPresets';
+import { captureAvatarHeroOrigin } from '../../utils/avatarHeroTransition';
 import { useAppContext } from '../../context/AppContext';
 import { ProfileFrameOverlay } from '../profile/ProfileFrameOverlay';
+import { LearningSettingsModal } from './LearningSettingsModal';
 import { PATHS } from '../../routes/paths';
 
 type UserWidgetProps = {
@@ -16,10 +20,11 @@ type UserWidgetProps = {
 
 export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidgetProps) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const avatarOriginRef = useRef<HTMLSpanElement | null>(null);
     const { learnerAnalytics, profileFrameKey } = useAppContext();
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
     // Prefer backend analytics (same source as dashboard/profile); fall back to local game data.
@@ -35,101 +40,80 @@ export const UserWidget = ({ user, gameData, onStreakClick, onLogout }: UserWidg
         setAvatarUrl(normalizeAvatarUrl(preferences.avatarUrl));
     }, [user]);
 
-    useEffect(() => {
-        if (!dropdownOpen) return;
-        const handler = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [dropdownOpen]);
-
     const handleLogout = async () => {
-        setDropdownOpen(false);
         await onLogout();
         navigate(PATHS.home);
     };
 
+    const items: DropdownMenuOption[] = [
+        {
+            type: 'section',
+            title: user.email || user.username,
+            items: [
+                {
+                    label: 'Hồ sơ cá nhân',
+                    icon: <User size={16} />,
+                    onClick: () => {
+                        if (location.pathname !== PATHS.profile) {
+                            captureAvatarHeroOrigin(avatarOriginRef.current);
+                        }
+                        navigate(PATHS.profile);
+                    },
+                },
+                { label: 'Cài đặt', icon: <Settings size={16} />, onClick: () => setIsSettingsOpen(true) },
+            ],
+        },
+        ...(isAdmin
+            ? [{ label: 'Quản trị', icon: <Shield size={16} />, onClick: () => navigate(PATHS.admin) }]
+            : []),
+        { type: 'divider' },
+        { label: 'Đăng xuất', icon: <LogOut size={16} />, variant: 'destructive', onClick: handleLogout },
+    ];
+
     return (
-        <div className="flex items-center gap-4 bg-surface/40 backdrop-blur-md border border-primary/20 rounded-pill px-4 py-1.5 shadow-sm">
-            <div
-                className="flex items-center gap-1.5 text-orange-500 font-bold cursor-pointer hover:scale-105 transition-transform"
-                title="Streak"
+        <div className="flex items-center gap-1">
+            <button
+                type="button"
                 onClick={onStreakClick}
+                className="inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-element)] px-3 text-sm font-semibold tabular-nums text-text-primary transition-colors hover:bg-surface-hover"
+                aria-label={`Chuỗi ${streakValue} ngày. Xem lịch học`}
             >
-                <Flame size={18} fill="currentColor" className={streakValue > 0 ? 'flame-pulse' : ''} />
-                <span>{streakValue}</span>
-            </div>
-            <div className="w-px h-4 bg-primary/20" />
-            <div className="flex items-center gap-1.5 text-primary font-bold" title="XP">
-                <Award size={18} />
-                <span>{xpValue}</span>
-            </div>
-            <div className="w-px h-4 bg-primary/20" />
+                <Flame size={17} className={`text-warning-color ${streakValue > 0 ? 'flame-pulse' : ''}`} aria-hidden />
+                {streakValue}
+            </button>
+            <span
+                className="hidden h-10 items-center gap-1.5 px-3 text-sm font-semibold tabular-nums text-text-primary sm:inline-flex"
+                aria-label={`${xpValue} XP`}
+            >
+                <Award size={17} className="text-primary" aria-hidden />
+                {xpValue.toLocaleString('vi-VN')}
+            </span>
 
-            {/* Avatar with dropdown */}
-            <div ref={dropdownRef} className="relative">
-                <button
-                    type="button"
-                    className="w-8 h-8 rounded-full bg-linear-to-br from-accent to-secondary flex items-center justify-center text-text-primary font-bold cursor-pointer text-xs overflow-hidden ring-2 ring-transparent hover:ring-primary/40 transition-all"
-                    onClick={() => setDropdownOpen(prev => !prev)}
-                    title={user.username}
-                    aria-label="Mở menu tài khoản"
-                    aria-haspopup="menu"
-                    aria-expanded={dropdownOpen}
-                >
-                    {avatarUrl ? (
-                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                        user.username[0].toUpperCase()
-                    )}
-                </button>
-                <ProfileFrameOverlay frameKey={profileFrameKey} sizeClass="h-[160%] w-[160%]" />
-
-                {dropdownOpen && (
-                    <div className="absolute right-0 top-[calc(100%+8px)] z-[60] w-52 overflow-hidden rounded-2xl border border-border bg-surface py-1.5 opacity-100 shadow-[0_12px_32px_var(--shadow-color)] backdrop-blur-none" role="menu">
-                        <div className="px-4 py-2 border-b border-border/60 mb-1">
-                            <p className="text-xs font-display font-bold text-text-primary truncate">{user.username}</p>
-                            <p className="text-[10px] text-text-muted truncate">{user.email}</p>
-                        </div>
-
-                        <button
-                            onClick={() => { navigate(PATHS.profile); setDropdownOpen(false); }}
-                            className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 text-text-muted hover:text-text-primary hover:bg-primary/[0.06] transition-colors focus-visible:outline-none focus-visible:bg-primary/[0.08]"
-                            role="menuitem"
+            <DropdownMenu
+                items={items}
+                alignment="end"
+                presentation="adaptive"
+                renderTrigger={triggerProps => (
+                    <button
+                        {...triggerProps}
+                        type="button"
+                        className="relative ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full outline-offset-2"
+                        aria-label="Mở menu tài khoản"
+                    >
+                        <span
+                            ref={avatarOriginRef}
+                            className="relative inline-flex h-8 w-8 items-center justify-center"
                         >
-                            <User size={14} />
-                            Hồ sơ cá nhân
-                        </button>
-
-                        {isAdmin && (
-                            <>
-                                <div className="mx-3 my-1 h-px bg-border" />
-                                <button
-                                    onClick={() => { navigate(PATHS.admin); setDropdownOpen(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 font-display font-bold text-primary hover:bg-primary/[0.06] transition-colors focus-visible:outline-none focus-visible:bg-primary/[0.08]"
-                                    role="menuitem"
-                                >
-                                    <Shield size={14} />
-                                    Quản trị
-                                </button>
-                            </>
-                        )}
-
-                        <div className="mx-3 my-1 h-px bg-border" />
-                        <button
-                            onClick={handleLogout}
-                            className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 font-display font-bold text-danger-color hover:bg-danger-color/10 transition-colors focus-visible:outline-none focus-visible:bg-danger-color/10"
-                            role="menuitem"
-                        >
-                            <LogOut size={14} />
-                            Đăng xuất
-                        </button>
-                    </div>
+                            <Avatar src={avatarUrl} name={user.username} size={32} />
+                            <ProfileFrameOverlay frameKey={profileFrameKey} />
+                        </span>
+                    </button>
                 )}
-            </div>
+            />
+            <LearningSettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+            />
         </div>
     );
 };

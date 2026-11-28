@@ -1,12 +1,37 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import {defineConfig, loadEnv, type Plugin} from 'vite';
+
+// Replace layout-thrashing `padding` transition emitted by Astryx ToastViewport collapse slots.
+const stripPaddingTransitionPlugin = (): Plugin => ({
+  name: 'strip-padding-transition',
+  enforce: 'post',
+  transform(code, id) {
+    if (!id.includes('.css') || !code.includes('grid-template-rows,padding')) {
+      return null;
+    }
+    return {
+      code: code.replaceAll('transition-property:grid-template-rows,padding', 'transition-property:grid-template-rows'),
+      map: null,
+    };
+  },
+  generateBundle(_options, bundle) {
+    for (const chunk of Object.values(bundle)) {
+      if (chunk.type === 'asset' && chunk.fileName.endsWith('.css') && typeof chunk.source === 'string') {
+        chunk.source = chunk.source.replaceAll(
+          'transition-property:grid-template-rows,padding',
+          'transition-property:grid-template-rows',
+        );
+      }
+    }
+  },
+});
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [stripPaddingTransitionPlugin(), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

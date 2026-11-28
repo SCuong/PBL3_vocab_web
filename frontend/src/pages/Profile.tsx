@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     BookOpen,
     Flame,
@@ -12,6 +12,11 @@ import {
     ChevronRight,
     LogOut,
     Search,
+    Check,
+    Lock,
+    Play,
+    Trophy,
+    ShieldCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui';
@@ -25,6 +30,9 @@ import { vocabularyApi, type VocabularyListItem } from '../services/vocabularyAp
 import { dashboardApi, type LearnerDashboard as LearnerDashboardData } from '../services/dashboardApi';
 import { loadProfilePreferences } from '../utils/profilePreferences';
 import { normalizeAvatarUrl } from '../utils/avatarPresets';
+import { clearAvatarHeroOrigin, peekAvatarHeroOrigin } from '../utils/avatarHeroTransition';
+import { Button as AstryxButton } from '@astryxdesign/core/Button';
+import { Selector } from '@astryxdesign/core/Selector';
 import { useAppContext } from '../context/AppContext';
 import { PROFILE_FRAMES } from '../utils/profileFrames';
 import { ProfileFrameOverlay } from '../components/profile/ProfileFrameOverlay';
@@ -45,11 +53,11 @@ const formatDateVN = (iso: string) => {
 
 const formatDuration = (totalSeconds: number) => {
     if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
-    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    if (hours <= 0) return `${minutes}m`;
-    return `${hours}h ${format2Digits(minutes)}m`;
+    if (hours <= 0) return `${minutes} phút`;
+    return `${hours} giờ ${format2Digits(minutes)} phút`;
 };
 
 const computeLevelInfo = (xp: number) => {
@@ -83,7 +91,6 @@ const Profile = () => {
 
     const [isEditing, setIsEditing] = useState(false);
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
-    const [showLearnedWords, setShowLearnedWords] = useState(false);
     const [learnedWordsList, setLearnedWordsList] = useState<VocabularyListItem[]>([]);
     const [isLoadingLearnedWords, setIsLoadingLearnedWords] = useState(false);
     const [selectedStudyDate, setSelectedStudyDate] = useState<string | null>(null);
@@ -98,6 +105,191 @@ const Profile = () => {
     const [vocabCefr, setVocabCefr] = useState<CefrFilter>('ALL');
     const [isHistoryDetailOpen, setIsHistoryDetailOpen] = useState(false);
     const [dashboard, setDashboard] = useState<LearnerDashboardData | null>(null);
+    const heroAvatarRef = useRef<HTMLDivElement | null>(null);
+    const heroHaloRef = useRef<HTMLSpanElement | null>(null);
+    const heroIdentityRef = useRef<HTMLDivElement | null>(null);
+    const heroStatsRef = useRef<HTMLDivElement | null>(null);
+    const lowerSectionsRef = useRef<HTMLDivElement | null>(null);
+
+    // Choreographed shared-element curved FLIP morph from the navbar avatar into the Profile stage.
+    useLayoutEffect(() => {
+        const el = heroAvatarRef.current;
+        if (!el || typeof window === 'undefined') return;
+        const origin = peekAvatarHeroOrigin();
+        if (!origin) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            clearAvatarHeroOrigin();
+            return;
+        }
+
+        if (window.scrollY > 0) {
+            window.scrollTo(0, 0);
+        }
+
+        const target = el.getBoundingClientRect();
+        if (target.width <= 0 || target.height <= 0) return;
+
+        const dx = origin.left + origin.width / 2 - (target.left + target.width / 2);
+        const dy = origin.top + origin.height / 2 - (target.top + target.height / 2);
+        const startScale = Math.max(0.25, Math.min(1, origin.width / target.width));
+
+        // Quadratic Bézier arc control point (sweeps gently upward/outward instead of a stiff straight line).
+        const cpX = dx * 0.48;
+        const cpY = Math.min(dy, 0) - 54;
+        const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
+        const flightSamples = 14;
+        const flightKeyframes: Keyframe[] = [];
+
+        for (let i = 0; i <= flightSamples; i++) {
+            const linearT = i / flightSamples;
+            // Landing happens at 0.78 of total duration; remaining 22% is a crisp spring settle.
+            const offset = linearT * 0.78;
+            const p = easeOutQuint(linearT);
+            const inv = 1 - p;
+            const x = inv * inv * dx + 2 * inv * p * cpX;
+            const y = inv * inv * dy + 2 * inv * p * cpY;
+            // Scale blossoms smoothly and overshoots slightly (1.07x) on touchdown.
+            const scale = startScale + (1.07 - startScale) * p;
+            // Subtle aerodynamic tilt peaking mid-arc.
+            const tilt = Math.sin(linearT * Math.PI) * -5.5;
+            // Dynamic elevation shadow peaks mid-flight.
+            const shadowAlpha = (0.14 + Math.sin(linearT * Math.PI) * 0.24).toFixed(2);
+            const shadowBlur = Math.round(10 + Math.sin(linearT * Math.PI) * 22);
+            const shadowY = Math.round(6 + Math.sin(linearT * Math.PI) * 16);
+
+            flightKeyframes.push({
+                offset,
+                transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(3)}) rotate(${tilt.toFixed(2)}deg)`,
+                filter: `drop-shadow(0 ${shadowY}px ${shadowBlur}px rgba(104, 61, 211, ${shadowAlpha}))`,
+            });
+        }
+
+        // Elastic settle after touchdown.
+        flightKeyframes.push(
+            {
+                offset: 0.9,
+                transform: 'translate3d(0, 0, 0) scale(0.985) rotate(0.8deg)',
+                filter: 'drop-shadow(0 6px 14px rgba(104, 61, 211, 0.12))',
+            },
+            {
+                offset: 1,
+                transform: 'translate3d(0, 0, 0) scale(1) rotate(0deg)',
+                filter: 'drop-shadow(0 0 0 rgba(104, 61, 211, 0))',
+            }
+        );
+
+        el.style.zIndex = '60';
+        el.style.willChange = 'transform, filter';
+
+        const animations: Animation[] = [];
+
+        const heroAnim = el.animate(flightKeyframes, {
+            duration: 720,
+            easing: 'linear',
+            fill: 'none',
+        });
+        animations.push(heroAnim);
+
+        // Navbar avatar socket launch + smooth return after touchdown.
+        if (origin.originElement && origin.originElement.isConnected) {
+            animations.push(
+                origin.originElement.animate(
+                    [
+                        { opacity: 0.12, transform: 'scale(0.7)', offset: 0 },
+                        { opacity: 0.12, transform: 'scale(0.75)', offset: 0.65 },
+                        { opacity: 1, transform: 'scale(1.06)', offset: 0.88 },
+                        { opacity: 1, transform: 'scale(1)', offset: 1 },
+                    ],
+                    { duration: 680, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                )
+            );
+        }
+
+        // Subtle landing halo ripple right as the avatar touches down.
+        if (heroHaloRef.current) {
+            animations.push(
+                heroHaloRef.current.animate(
+                    [
+                        { opacity: 0, transform: 'scale(0.82)' },
+                        { opacity: 0.65, transform: 'scale(1.08)', offset: 0.32 },
+                        { opacity: 0, transform: 'scale(1.48)' },
+                    ],
+                    {
+                        delay: 470,
+                        duration: 480,
+                        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                        fill: 'none',
+                    }
+                )
+            );
+        }
+
+        // Choreographed stage reveals so the flying avatar leads the eye.
+        if (heroIdentityRef.current) {
+            animations.push(
+                heroIdentityRef.current.animate(
+                    [
+                        { opacity: 0, transform: 'translate3d(-16px, 0, 0)' },
+                        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+                    ],
+                    {
+                        delay: 200,
+                        duration: 420,
+                        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                        fill: 'backwards',
+                    }
+                )
+            );
+        }
+
+        if (heroStatsRef.current) {
+            animations.push(
+                heroStatsRef.current.animate(
+                    [
+                        { opacity: 0, transform: 'translate3d(0, 12px, 0)' },
+                        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+                    ],
+                    {
+                        delay: 270,
+                        duration: 420,
+                        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                        fill: 'backwards',
+                    }
+                )
+            );
+        }
+
+        if (lowerSectionsRef.current) {
+            animations.push(
+                lowerSectionsRef.current.animate(
+                    [
+                        { opacity: 0, transform: 'translate3d(0, 18px, 0)' },
+                        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+                    ],
+                    {
+                        delay: 310,
+                        duration: 460,
+                        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                        fill: 'backwards',
+                    }
+                )
+            );
+        }
+
+        const cleanup = () => {
+            el.style.zIndex = '';
+            el.style.willChange = '';
+        };
+        heroAnim.onfinish = () => {
+            clearAvatarHeroOrigin();
+            cleanup();
+        };
+
+        return () => {
+            animations.forEach((a) => a.cancel());
+            cleanup();
+        };
+    }, []);
 
     // Streak / XP / learning history come from backend analytics (same source as
     // the Dashboard), not local game data. Local values remain a fallback.
@@ -168,8 +360,6 @@ const Profile = () => {
     );
 
     useEffect(() => {
-        if (!showLearnedWords) return;
-
         const normalizedIds = Array.isArray(learnedWordIds)
             ? learnedWordIds.filter((id): id is number => Number.isFinite(id) && id > 0)
             : [];
@@ -197,7 +387,7 @@ const Profile = () => {
 
         void loadLearnedWords();
         return () => { isDisposed = true; };
-    }, [showLearnedWords, learnedWordIds, onAddToast]);
+    }, [learnedWordIds, onAddToast]);
 
     useEffect(() => {
         if (!currentUser?.userId) {
@@ -300,20 +490,28 @@ const Profile = () => {
         return accountCreatedDate ? formatDateVN(accountCreatedDate) : FALLBACK_JOINED_DATE;
     }, [accountCreatedDate]);
 
-    // Total learning time from per-session timeSpentSeconds.
+    // Total learning time from per-session timeSpentSeconds, falling back to backend session activity.
     const totalTimeLabel = useMemo(() => {
-        let totalSeconds = 0;
+        let localSeconds = 0;
         for (const day of Object.values(studyHistoryDetails) as any[]) {
             if (!day || !Array.isArray(day.sessions)) continue;
             for (const session of day.sessions) {
                 const seconds = Number(session?.timeSpentSeconds);
                 if (Number.isFinite(seconds) && seconds > 0) {
-                    totalSeconds += seconds;
+                    localSeconds += seconds;
                 }
             }
         }
-        return formatDuration(totalSeconds);
-    }, [studyHistoryDetails]);
+        let backendSeconds = 0;
+        if (dashboard?.recentActivity?.length) {
+            const studiedWords = dashboard.recentActivity.reduce(
+                (sum, item) => sum + Math.max(1, Number(item.wordsStudied ?? 0)),
+                0,
+            );
+            backendSeconds = Math.max(60, studiedWords * 12);
+        }
+        return formatDuration(Math.max(localSeconds, backendSeconds));
+    }, [studyHistoryDetails, dashboard?.recentActivity]);
 
     // Prefer backend analytics for streak / XP / learned count; fall back to local.
     const streakValue = dashboard?.streak ?? Number(user.streak || 0);
@@ -473,28 +671,30 @@ const Profile = () => {
             <div className="max-w-6xl mx-auto px-4 py-6 space-y-5 sm:px-6 sm:py-10 sm:space-y-6">
 
                 {/* ── Profile header card ─────────────────────────────── */}
-                <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.18)] rounded-[20px] p-4 sm:p-8">
+                <section className="profile-card p-4 sm:p-8">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                         <div className="flex items-start gap-4 sm:gap-6 min-w-0">
-                            <div className="relative shrink-0">
+                            <div ref={heroAvatarRef} className="relative shrink-0">
+                                <span
+                                    ref={heroHaloRef}
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute -inset-1.5 rounded-full border-2 border-primary/55 opacity-0 shadow-[0_0_24px_rgba(124,58,237,0.35)]"
+                                />
                                 {avatarUrl ? (
                                     <img
                                         src={avatarUrl}
                                         alt="Avatar"
-                                    className="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-border shadow-sm"
+                                        className="w-16 h-16 sm:w-24 sm:h-24 rounded-full object-cover"
                                     />
                                 ) : (
-                                    <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-2xl sm:text-4xl font-display font-bold text-text-on-accent border-4 border-border shadow-sm">
+                                    <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-primary flex items-center justify-center text-2xl sm:text-4xl font-bold text-text-on-accent">
                                         {initials}
                                     </div>
                                 )}
                                 <ProfileFrameOverlay frameKey={effectiveFrameKey} />
-                                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary border-2 border-surface flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-                                    ✦
-                                </span>
                             </div>
-                            <div className="min-w-0">
-                                <h1 className="text-2xl sm:text-3xl font-display font-bold text-text-primary leading-tight truncate">
+                            <div ref={heroIdentityRef} className="min-w-0">
+                                <h1 className="truncate text-2xl font-bold leading-tight tracking-[-0.02em] text-text-primary sm:text-3xl">
                                     {user.username || 'Người học'}
                                 </h1>
                                 <p className="text-sm text-text-muted mt-1 truncate">
@@ -508,38 +708,41 @@ const Profile = () => {
                         <div className="flex w-full items-center gap-2 shrink-0 md:w-auto">
                             <Button
                                 variant="primary"
-                                className="flex-1 justify-center px-4 py-2.5 md:flex-none md:px-5"
+                                className="flex-1 md:flex-none"
                                 onClick={() => setIsEditing(true)}
                             >
                                 <Pencil size={16} /> Chỉnh sửa hồ sơ
                             </Button>
-                            <button
-                                type="button"
+                            <AstryxButton
+                                variant="secondary"
+                                size="lg"
+                                isIconOnly
+                                icon={<Settings size={18} aria-hidden />}
+                                label="Chỉnh sửa giới thiệu"
+                                tooltip="Chỉnh sửa giới thiệu"
                                 onClick={openTaglineEditor}
-                                title="Chỉnh sửa giới thiệu"
-                                aria-label="Chỉnh sửa giới thiệu"
-                                className="w-11 h-11 rounded-full border border-border bg-surface hover:bg-surface-hover flex items-center justify-center text-text-muted hover:text-primary transition-colors cursor-pointer active:scale-95"
-                            >
-                                <Settings size={18} />
-                            </button>
+                            />
                         </div>
                     </div>
 
                     {/* ── Inline stats row with vertical dividers ─────────── */}
-                    <div className="mt-7 pt-6 border-t border-border grid grid-cols-2 md:grid-cols-4 md:divide-x divide-border gap-y-5">
+                    <div
+                        ref={heroStatsRef}
+                        className="mt-7 pt-6 border-t border-border grid grid-cols-2 md:grid-cols-4 md:divide-x divide-border gap-y-5"
+                    >
                         {stats.map((s) => (
                             <div key={s.key} className="flex flex-col items-start text-left px-2 sm:px-4 md:px-5">
                                 <div className={`flex items-center gap-1.5 ${s.accent}`}>
                                     {s.icon}
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                                    <span className="text-sm font-medium text-text-muted">
                                         {s.label}
                                     </span>
                                 </div>
-                                <div className="text-2xl md:text-[28px] font-display font-bold text-text-primary mt-1 leading-none">
+                                <div className="mt-2 text-2xl font-bold leading-none tracking-[-0.02em] tabular-nums text-text-primary md:text-[28px]">
                                     {s.value}
                                 </div>
                                 {s.subtext && (
-                                    <div className="text-[11px] text-text-muted mt-1.5 truncate max-w-full">
+                                    <div className="mt-1.5 max-w-full truncate text-xs text-text-muted">
                                         {s.subtext}
                                     </div>
                                 )}
@@ -548,10 +751,146 @@ const Profile = () => {
                     </div>
                 </section>
 
+                {/* ── Progress Analytics & Badges (moved from Dashboard) ── */}
+                <div ref={lowerSectionsRef} className="space-y-5 sm:space-y-6">
+                {(() => {
+                    const mastery = dashboard?.masteryProgress;
+                    const totalWords = mastery?.totalWords ?? 0;
+                    const learnedCount = mastery?.learnedWords ?? user.learnedWords ?? 0;
+                    const masteredCount = mastery?.masteredWords ?? 0;
+                    const reviewCount = mastery?.reviewWords ?? 0;
+                    const learningCount = Math.max(0, learnedCount - masteredCount);
+                    const lv1 = Math.max(0, reviewCount);
+                    const lv2 = Math.max(0, Math.ceil(Math.max(0, learningCount - lv1) * 0.6));
+                    const lv3 = Math.max(0, Math.max(0, learningCount - lv1) - lv2);
+                    const lv4 = Math.max(0, Math.floor(masteredCount * 0.4));
+                    const lv5 = Math.max(0, masteredCount - lv4);
+                    const bars = [
+                        { label: 'Mới nạp', count: lv1, cls: 'bg-[#C4B5FD]' },
+                        { label: 'Nhớ sơ', count: lv2, cls: 'bg-[#A78BFA]' },
+                        { label: 'Đang lớn', count: lv3, cls: 'bg-[#8B5CF6]' },
+                        { label: 'Vững', count: lv4, cls: 'bg-primary' },
+                        { label: 'Thạo', count: lv5, cls: 'bg-success-color' },
+                    ];
+                    const maxBar = Math.max(3, ...bars.map(b => b.count));
+                    const weekLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                    const todayDow = (new Date().getDay() + 6) % 7;
+                    const todayIso = new Date().toISOString().slice(0, 10);
+                    const studiedToday = (dashboard?.heatmap?.find(h => h.date?.startsWith(todayIso))?.wordsStudied ?? 0) > 0;
+                    const streakVal = dashboard?.streak ?? Number(user.streak ?? 0);
+
+                    const badgeLabelVi: Record<string, string> = {
+                        'first-session': 'Phiên học đầu tiên',
+                        'week-streak': 'Chuỗi 7 ngày',
+                        'hundred-words': '100 từ vựng',
+                        mastery: 'Bậc thầy ghi nhớ',
+                        'xp-1000': '1.000 XP',
+                    };
+                    const iconForBadge = (key: string) => {
+                        switch (key) {
+                            case 'first-session': return <Play size={15} />;
+                            case 'week-streak': return <Flame size={15} />;
+                            case 'hundred-words': return <BookOpen size={15} />;
+                            case 'mastery': return <Award size={15} />;
+                            case 'xp-1000': return <Trophy size={15} />;
+                            default: return <ShieldCheck size={15} />;
+                        }
+                    };
+                    const badges = (dashboard?.badges ?? []).map(b => ({
+                        key: b.key,
+                        label: badgeLabelVi[b.key] ?? b.label,
+                        unlocked: b.unlocked,
+                        icon: iconForBadge(b.key),
+                    }));
+
+                    return (
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                            <section className="rounded-[var(--radius-container)] border border-border bg-surface p-5 sm:p-6">
+                                <div className="mb-4 flex items-baseline justify-between gap-2">
+                                    <div>
+                                        <h2 className="text-base font-bold text-text-primary sm:text-lg">Độ bền trí nhớ</h2>
+                                        <p className="text-xs text-text-muted sm:text-sm">
+                                            {totalWords} từ trong kho · Hôm nay cần ôn {dashboard?.reviewForecast?.dueToday ?? reviewCount} · Ngày mai {dashboard?.reviewForecast?.dueTomorrow ?? 0}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-5 items-end gap-2.5 pt-2">
+                                    {bars.map(b => (
+                                        <div key={b.label} className="flex flex-col items-center gap-1.5">
+                                            <span className="text-xs font-bold tabular-nums text-text-primary">{b.count}</span>
+                                            <div className="flex h-20 w-full items-end overflow-hidden rounded-lg bg-bg-secondary">
+                                                <div
+                                                    className={`h-full w-full origin-bottom rounded-t-lg transition-transform duration-300 ${b.cls}`}
+                                                    style={{ transform: `scaleY(${Math.max(0.12, b.count / maxBar).toFixed(3)})` }}
+                                                />
+                                            </div>
+                                            <span className="text-center text-xs font-medium text-text-muted">{b.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 grid grid-cols-7 gap-1 border-t border-border pt-3.5" aria-label="Chuỗi ngày trong tuần">
+                                    {weekLabels.map((lbl, idx) => {
+                                        const isDone =
+                                            idx < todayDow
+                                                ? idx >= Math.max(0, todayDow - Math.max(0, streakVal - (studiedToday ? 1 : 0)))
+                                                : idx === todayDow && studiedToday;
+                                        const isToday = idx === todayDow;
+                                        return (
+                                            <div key={lbl} className="flex flex-col items-center gap-1 text-xs font-bold text-text-muted">
+                                                <span
+                                                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                                                        isDone
+                                                            ? 'bg-[#D97706] text-white'
+                                                            : isToday
+                                                              ? 'border-2 border-primary text-primary'
+                                                              : 'bg-bg-secondary'
+                                                    }`}
+                                                >
+                                                    {isDone ? <Check size={13} aria-hidden /> : null}
+                                                </span>
+                                                <span>{lbl}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+
+                            <section className="rounded-[var(--radius-container)] border border-border bg-surface p-5 sm:p-6">
+                                <div className="mb-3 flex items-baseline justify-between gap-2">
+                                    <h2 className="text-base font-bold text-text-primary sm:text-lg">Huy hiệu thành tích</h2>
+                                    <span className="text-xs font-semibold tabular-nums text-text-muted">
+                                        {badges.filter(b => b.unlocked).length} / {badges.length || 5} đã mở khóa
+                                    </span>
+                                </div>
+                                <ul className="divide-y divide-border">
+                                    {badges.map(b => (
+                                        <li key={b.key} className="flex items-center gap-3 py-2.5">
+                                            <span
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                                                    b.unlocked
+                                                        ? 'bg-primary text-text-on-accent'
+                                                        : 'border border-dashed border-border-emphasized text-text-muted'
+                                                }`}
+                                                aria-hidden
+                                            >
+                                                {b.unlocked ? b.icon : <Lock size={14} />}
+                                            </span>
+                                            <span className={`min-w-0 flex-1 truncate text-sm ${b.unlocked ? 'font-semibold text-text-primary' : 'text-text-muted'}`}>
+                                                {b.label}
+                                            </span>
+                                            <span className="text-xs text-text-muted">{b.unlocked ? 'Đã đạt' : 'Chưa đạt'}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        </div>
+                    );
+                })()}
+
                 {/* ── 2-column grid: Study history + Quick notes ──────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Study history */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
+                    <section className="bg-surface border border-border rounded-[var(--radius-container)] p-4 sm:p-7">
                         <div className="flex items-center justify-between gap-3 mb-2">
                             <h2 className="text-lg font-bold text-text-primary">Lịch sử học tập</h2>
                             <button
@@ -576,7 +915,7 @@ const Profile = () => {
                             <div className="mt-5 border-t border-border pt-5">
                                 <div className="flex items-center justify-between gap-3 mb-3">
                                     <h3 className="text-sm font-bold text-text-primary">Chi tiết lịch sử học tập</h3>
-                                    <span className="text-[11px] text-text-muted">
+                                    <span className="text-xs text-text-muted">
                                         {historyDetailEntries.length > 0 ? `${historyDetailEntries.length} ngày` : ''}
                                     </span>
                                 </div>
@@ -619,7 +958,7 @@ const Profile = () => {
                     </section>
 
                     {/* Quick notes */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
+                    <section className="bg-surface border border-border rounded-[var(--radius-container)] p-4 sm:p-7">
                         <div className="flex items-start justify-between gap-3 mb-5">
                             <div>
                                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
@@ -653,19 +992,23 @@ const Profile = () => {
                             </Button>
                         </div>
 
-                        {isLoadingStickyNotes ? (
+                        {isLoadingStickyNotes && sortedStickyNotes.length === 0 ? (
                             <p className="text-sm text-text-muted">Đang tải ghi chú...</p>
                         ) : sortedStickyNotes.length === 0 ? (
                             <p className="text-sm text-text-muted">Bạn chưa có ghi chú nào.</p>
                         ) : (
-                            <div className="max-h-[22rem] overflow-y-auto pr-1">
+                            <div
+                                className={`max-h-[22rem] overflow-y-auto pr-1 transition-opacity duration-150 ${
+                                    isLoadingStickyNotes ? 'opacity-60' : 'opacity-100'
+                                }`}
+                            >
                                 <div className="flex flex-col gap-3">
                                     {sortedStickyNotes.map((note) => (
                                         <div
                                             key={note.stickyNoteId}
                                             className={`rounded-2xl border p-3.5 text-text-primary shadow-sm ${getNoteColorClass(note.color)}`}
                                         >
-                                            <div className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5 flex items-center justify-between gap-3">
+                                            <div className="text-xs text-text-muted mb-1.5 flex items-center justify-between gap-3">
                                                 <span>{note.isPinned ? 'Đã ghim' : 'Ghi chú'}</span>
                                                 <span className="shrink-0">
                                                     {new Date(note.updatedAt).toLocaleDateString('vi-VN')}
@@ -684,31 +1027,18 @@ const Profile = () => {
 
                 {/* ── 2-column grid: Learned words + Security ─────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Vocabulary notebook (formerly Learned words) */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
-                        <div className="flex items-start justify-between gap-3 mb-4">
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                                    <BookOpen size={18} className="text-primary" /> Sổ từ vựng
-                                </h2>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
-                                        {learnedCount.toLocaleString('vi-VN')} từ đã thuộc
-                                    </span>
-                                </div>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                className="px-4 py-2 text-sm shrink-0"
-                                onClick={() => setShowLearnedWords((prev) => !prev)}
-                            >
-                                {showLearnedWords ? 'Ẩn' : 'Hiện'}
-                            </Button>
+                    {/* Vocabulary notebook (always visible) */}
+                    <section className="bg-surface border border-border rounded-[var(--radius-container)] p-4 sm:p-7">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                                <BookOpen size={18} className="text-primary" /> Sổ từ vựng
+                            </h2>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                                {learnedCount.toLocaleString('vi-VN')} từ đã thuộc
+                            </span>
                         </div>
 
-                        {!showLearnedWords ? (
-                            <p className="text-sm text-text-muted">Nhấn Hiện để xem sổ từ vựng của bạn.</p>
-                        ) : isLoadingLearnedWords ? (
+                        {isLoadingLearnedWords ? (
                             <p className="text-sm text-text-muted">Đang tải...</p>
                         ) : learnedWords.length === 0 ? (
                             <p className="text-sm text-text-muted">Bạn chưa có từ nào đã thuộc.</p>
@@ -718,29 +1048,36 @@ const Profile = () => {
                                     <div className="relative flex-1">
                                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                                         <input
-                                            type="text"
+                                            type="search"
+                                            name="vocab-notebook-search"
+                                            autoComplete="off"
+                                            spellCheck={false}
                                             value={vocabSearch}
                                             onChange={(e) => setVocabSearch(e.target.value)}
                                             placeholder="Tìm trong sổ..."
                                             className="w-full pl-9 pr-3 py-2 text-sm bg-surface border border-border text-text-primary placeholder:text-text-muted rounded-full outline-none focus:border-primary/50 transition-colors"
                                         />
                                     </div>
-                                    <select
-                                        value={vocabCefr}
-                                        onChange={(e) => setVocabCefr(e.target.value as CefrFilter)}
-                                        className="px-4 py-2 text-sm bg-surface border border-border text-text-primary rounded-full outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                                    >
-                                        {CEFR_OPTIONS.map((opt) => (
-                                            <option key={opt} value={opt}>
-                                                {opt === 'ALL' ? 'Tất cả CEFR' : opt}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="w-full sm:w-[155px] sm:shrink-0">
+                                        <Selector
+                                            label="Cấp độ CEFR"
+                                            isLabelHidden
+                                            size="md"
+                                            width="100%"
+                                            presentation="adaptive"
+                                            value={vocabCefr}
+                                            onChange={(nextValue) => setVocabCefr(nextValue as CefrFilter)}
+                                            options={CEFR_OPTIONS.map((opt) => ({
+                                                value: opt,
+                                                label: opt === 'ALL' ? 'Tất cả CEFR' : opt,
+                                            }))}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="border border-border rounded-2xl overflow-hidden">
                                     <div className="max-h-80 overflow-auto">
                                         <table className="w-full text-sm">
-                                            <thead className="bg-surface-hover text-text-muted text-[10px] uppercase tracking-wider sticky top-0 z-10">
+                                            <thead className="bg-surface-hover text-text-muted text-xs sticky top-0 z-10">
                                                 <tr>
                                                     <th className="text-left px-4 py-2.5 font-bold">Từ</th>
                                                     <th className="text-left px-3 py-2.5 font-bold">IPA</th>
@@ -765,7 +1102,7 @@ const Profile = () => {
                                                                         <td className="px-3 py-2.5 text-text-muted font-ipa text-xs">{item.ipa || '—'}</td>
                                                                 <td className="px-3 py-2.5 text-text-secondary">{item.meaning || '—'}</td>
                                                                 <td className="px-3 py-2.5">
-                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
                                                                         {(item.cefr || '—').toUpperCase()}
                                                                     </span>
                                                                 </td>
@@ -785,11 +1122,8 @@ const Profile = () => {
                     </section>
 
                     {/* Security */}
-                    <section className="bg-surface border border-border shadow-[0_4px_24px_-12px_rgba(124,93,250,0.15)] rounded-[20px] p-4 sm:p-7">
-                        <h2 className="text-lg font-bold text-text-primary mb-1">Bảo mật</h2>
-                        <p className="text-xs text-text-muted mb-5">
-                            Quản lý mật khẩu, email và tài khoản của bạn.
-                        </p>
+                    <section className="bg-surface border border-border rounded-[var(--radius-container)] p-4 sm:p-7">
+                        <h2 className="text-lg font-bold text-text-primary mb-4">Bảo mật</h2>
 
                         <div className="space-y-3">
                             <button
@@ -802,9 +1136,6 @@ const Profile = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-bold text-sm text-text-primary">Đổi mật khẩu</div>
-                                    <div className="text-xs text-text-muted mt-0.5">
-                                        Cập nhật mật khẩu để bảo vệ tài khoản.
-                                    </div>
                                 </div>
                                 <ChevronRight size={18} className="text-text-muted shrink-0" />
                             </button>
@@ -819,31 +1150,40 @@ const Profile = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-bold text-sm text-text-primary">Đăng xuất</div>
-                                    <div className="text-xs text-text-muted mt-0.5">
-                                        Đăng xuất khỏi thiết bị này.
-                                    </div>
                                 </div>
                                 <ChevronRight size={18} className="text-text-muted shrink-0" />
                             </button>
 
                             <button
                                 type="button"
-                                onClick={() => setIsDeleteAccountModalOpen(true)}
-                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border hover:border-red-300 hover:bg-red-50/70 transition-colors text-left cursor-pointer active:scale-[0.99]"
+                                disabled={currentUser?.role?.toUpperCase() === 'ADMIN'}
+                                onClick={() => {
+                                    if (currentUser?.role?.toUpperCase() !== 'ADMIN') {
+                                        setIsDeleteAccountModalOpen(true);
+                                    }
+                                }}
+                                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border transition-colors text-left ${
+                                    currentUser?.role?.toUpperCase() === 'ADMIN'
+                                        ? 'opacity-55 cursor-not-allowed bg-bg-secondary/50'
+                                        : 'hover:border-red-300 hover:bg-red-50/70 cursor-pointer active:scale-[0.99]'
+                                }`}
                             >
                                 <div className="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center shrink-0">
                                     <Trash2 size={18} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-bold text-sm text-red-600">Xóa tài khoản</div>
-                                    <div className="text-xs text-text-muted mt-0.5">
-                                        Hành động này không thể hoàn tác.
-                                    </div>
+                                    {currentUser?.role?.toUpperCase() === 'ADMIN' && (
+                                        <div className="text-xs text-text-muted mt-0.5">
+                                            Tài khoản quản trị được bảo vệ khỏi thao tác tự xóa.
+                                        </div>
+                                    )}
                                 </div>
                                 <ChevronRight size={18} className="text-red-400 shrink-0" />
                             </button>
                         </div>
                     </section>
+                </div>
                 </div>
 
             </div>
@@ -854,7 +1194,7 @@ const Profile = () => {
                         className="absolute inset-0 bg-black/40"
                         onClick={() => setIsTaglineModalOpen(false)}
                     />
-                    <div className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto bg-surface rounded-t-3xl shadow-2xl border border-border sm:rounded-3xl">
+                    <div className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto bg-surface rounded-t-3xl border border-border sm:rounded-[var(--radius-container)]">
                         <div className="px-6 py-4 border-b border-border">
                             <h3 className="font-bold text-text-primary">Chỉnh sửa giới thiệu</h3>
                             <p className="text-xs text-text-muted mt-1">
@@ -869,7 +1209,7 @@ const Profile = () => {
                                 placeholder={DEFAULT_TAGLINE}
                                 className="w-full px-4 py-3 text-sm bg-surface border border-border text-text-primary placeholder:text-text-muted rounded-2xl outline-none focus:border-primary/50 transition-colors resize-none"
                             />
-                            <div className="text-[11px] text-text-muted text-right">
+                            <div className="text-xs text-text-muted text-right">
                                 {taglineDraft.length} / 160
                             </div>
                         </div>

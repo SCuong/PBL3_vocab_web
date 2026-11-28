@@ -8,7 +8,7 @@ export const AdminRoute = ({ children }: { children: ReactNode }) => {
 
     if (isLoading) return null;
     if (!currentUser || currentUser.role?.toUpperCase() !== 'ADMIN') {
-        return <Navigate to={PATHS.home} replace />;
+        return <Navigate to={currentUser ? PATHS.learning : PATHS.home} replace />;
     }
     return <>{children}</>;
 };

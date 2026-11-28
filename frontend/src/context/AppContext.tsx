@@ -15,7 +15,6 @@ import {
     getTodayStudyDate,
     type StudySessionRecordInput,
 } from '../utils/studyHistory';
-import { type ToastItem } from '../hooks/useToasts';
 
 interface AppContextValue {
     currentUser: AuthenticatedUser | null;
@@ -23,8 +22,6 @@ interface AppContextValue {
     handleLogout: () => Promise<void>;
     handleUserUpdated: (user: AuthenticatedUser) => void;
     addToast: (message: string, type?: string) => void;
-    removeToast: (id: number) => void;
-    toasts: ToastItem[];
     gameData: any;
     fullGameData: any;
     addXP: (amount: number) => void;
@@ -62,7 +59,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const [topicFilters, setTopicFilters] = useState<VocabularyTopicItem[]>([]);
     const [learnerAnalytics, setLearnerAnalytics] = useState<LearnerDashboard | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const { toasts, addToast, removeToast } = useToasts();
+    const { addToast } = useToasts();
     const { gameData, setGameData, xpFloats, addXP, triggerStreakCheck } = useGameProgress(addToast);
 
     // Selected cosmetic profile frame (local-only, per user). Shared app-wide so
@@ -184,14 +181,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         let disposed = false;
-        const bootstrap = async () => {
-            const [session] = await Promise.all([authApi.me(), loadTopics()]);
-            if (!disposed && session?.succeeded && session.user) {
-                syncUserGameData(session.user);
+        void loadTopics();
+        const bootstrapAuth = async () => {
+            try {
+                const session = await authApi.me();
+                if (!disposed && session?.succeeded && session.user) {
+                    syncUserGameData(session.user);
+                }
+            } finally {
+                if (!disposed) setIsLoading(false);
             }
-            if (!disposed) setIsLoading(false);
         };
-        void bootstrap();
+        void bootstrapAuth();
         return () => { disposed = true; };
     }, [loadTopics, syncUserGameData]);
 
@@ -245,7 +246,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const value = useMemo<AppContextValue>(() => ({
         currentUser, syncUserGameData, handleLogout, handleUserUpdated,
-        addToast, removeToast, toasts,
+        addToast,
         gameData: gameData.currentUser,
         fullGameData: gameData,
         addXP, triggerStreakCheck, xpFloats,
@@ -259,7 +260,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
     }), [
         currentUser, syncUserGameData, handleLogout, handleUserUpdated,
-        addToast, removeToast, toasts,
+        addToast,
         gameData,
         addXP, triggerStreakCheck, xpFloats,
         learningProgressState, learningTopicGroups, topicFilters, learnedWordIds,

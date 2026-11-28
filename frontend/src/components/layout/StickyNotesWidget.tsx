@@ -218,45 +218,34 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
     }
 
     return (
-        <div className="fixed bottom-3 right-3 z-[470] sm:bottom-6 sm:right-6">
-            {!isLauncherHidden && (
-                <button
-                    onClick={toggleStickyNotes}
-                    className="inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl bg-primary px-3 text-sm font-semibold text-text-on-accent shadow-lg shadow-[var(--shadow-color)] transition-colors hover:bg-primary-hover active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary sm:h-auto sm:min-w-0 sm:px-4 sm:py-3"
-                    aria-label="Mở sticky notes"
-                >
-                    {isOpen ? <X size={20} /> : <NoteIcon className="h-6 w-6" />}
-                    <span className="hidden sm:inline">{isOpen ? 'Đóng' : 'Ghi chú'}</span>
-                </button>
-            )}
-
+        <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-[470] flex flex-col items-end gap-2 lg:bottom-5 lg:right-5">
             {isOpen && (
-                <div className={`${isLauncherHidden ? '' : 'mt-2 sm:mt-3'} w-[calc(100vw-1.5rem)] max-w-[380px] max-h-[calc(100dvh-5.5rem)] overflow-hidden rounded-2xl border border-border bg-surface text-text-primary shadow-2xl shadow-[var(--shadow-color)] sm:max-h-[70vh]`}>
-                    <div className="px-4 py-3 border-b border-border bg-bg-secondary/80 flex items-center justify-end">
-                        <div className="flex items-center gap-1">
+                <div className="w-[calc(100vw-1.5rem)] max-w-[380px] max-h-[calc(100dvh-10rem)] overflow-hidden rounded-[var(--radius-container)] border-2 border-border bg-surface text-text-primary shadow-[var(--shadow-high)] sm:max-h-[70vh]">
+                    <div className="flex items-center justify-between gap-2 border-b border-border bg-bg-secondary px-4 py-3">
+                        <span className="text-sm font-bold text-text-primary">Ghi chú nhanh</span>
+                        <div className="flex items-center gap-1.5">
                             <button
+                                type="button"
                                 onClick={handleCreate}
-                                className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light text-primary text-xs font-bold px-3 py-1.5 hover:bg-primary/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-light px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                             >
                                 <Plus size={14} /> Ghi chú mới
                             </button>
-                            {isLauncherHidden && (
-                                <button
-                                    type="button"
-                                    onClick={closeStickyNotes}
-                                    className="p-1.5 rounded-full text-text-muted hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                                    aria-label="Đóng sticky notes"
-                                >
-                                    <X size={16} />
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={closeStickyNotes}
+                                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                                aria-label="Đóng sticky notes"
+                            >
+                                <X size={16} />
+                            </button>
                         </div>
                     </div>
 
-                    <div className="p-3 space-y-3 overflow-y-auto max-h-[calc(100dvh-9.75rem)] bg-surface sm:max-h-[58vh]">
-                        {isLoading && <p className="text-sm text-text-muted">Đang tải notes...</p>}
+                    <div className="p-3 space-y-3 overflow-y-auto max-h-[calc(100dvh-14rem)] bg-surface sm:max-h-[56vh]">
+                        {isLoading && <p className="text-sm text-text-muted">Đang tải ghi chú…</p>}
                         {!isLoading && sortedNotes.length === 0 && (
-                            <p className="text-sm text-text-muted">Bạn chưa có note nào.</p>
+                            <p className="text-sm text-text-muted">Chưa có ghi chú nào.</p>
                         )}
 
                         {sortedNotes.map(note => (
@@ -271,7 +260,7 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
                                     onCompositionEnd={event => handleCompositionEnd(note.stickyNoteId, event.currentTarget.value)}
                                     onBlur={() => flushContentSave(note.stickyNoteId)}
                                     placeholder="Ghi chú nhanh của bạn..."
-                                    className="w-full min-h-24 resize-y rounded-lg bg-transparent px-1 py-0.5 outline-none text-sm text-text-primary placeholder:text-text-muted caret-primary focus:bg-surface/35"
+                                    className="w-full min-h-24 resize-y rounded-lg bg-transparent px-1 py-0.5 outline-none text-sm text-text-primary placeholder:text-text-muted caret-primary focus:bg-surface"
                                 />
 
                                 <div className="mt-2 flex items-center justify-between gap-2">
@@ -307,6 +296,18 @@ export const StickyNotesWidget = ({ isVisible, onNotify }: StickyNotesWidgetProp
                         ))}
                     </div>
                 </div>
+            )}
+
+            {!isLauncherHidden && (
+                <button
+                    type="button"
+                    onClick={toggleStickyNotes}
+                    className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-text-on-accent shadow-[var(--shadow-med)] transition-colors hover:bg-primary-hover active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary sm:h-11 sm:w-auto sm:px-4"
+                    aria-label={isOpen ? 'Đóng ghi chú' : 'Mở ghi chú'}
+                >
+                    {isOpen ? <X size={18} /> : <NoteIcon className="h-5 w-5" />}
+                    <span className="hidden sm:inline">{isOpen ? 'Đóng' : 'Ghi chú'}</span>
+                </button>
             )}
         </div>
     );

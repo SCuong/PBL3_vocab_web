@@ -3,18 +3,18 @@ import type { ReactNode } from 'react';
 const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 export const typography = {
-    heroTitle: 'font-display font-bold text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] leading-[1.08] tracking-normal text-text-primary',
-    pageTitle: 'font-display font-bold text-[1.875rem] sm:text-[2rem] leading-tight tracking-normal text-text-primary',
-    sectionTitle: 'font-display font-bold text-[1.5rem] sm:text-[1.75rem] leading-tight tracking-normal text-text-primary',
-    modalTitle: 'font-display font-bold text-xl leading-tight tracking-normal text-text-primary',
-    cardTitle: 'font-display font-bold text-base leading-snug tracking-normal text-text-primary',
-    itemTitle: 'font-display font-bold text-xl leading-snug tracking-normal text-text-primary',
-    eyebrow: 'text-xs font-display font-bold uppercase tracking-wide text-primary',
+    heroTitle: 'font-display font-bold text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] leading-[1.08] tracking-[-0.01em] text-text-primary',
+    pageTitle: 'font-display font-bold text-[1.875rem] sm:text-[2rem] leading-tight tracking-[-0.01em] text-text-primary',
+    sectionTitle: 'font-display font-bold text-[1.5rem] sm:text-[1.75rem] leading-tight tracking-[-0.01em] text-text-primary',
+    modalTitle: 'font-display font-bold text-xl leading-tight tracking-[-0.01em] text-text-primary',
+    cardTitle: 'font-display font-bold text-base leading-snug tracking-[-0.01em] text-text-primary',
+    itemTitle: 'font-display font-bold text-xl leading-snug tracking-[-0.01em] text-text-primary',
+    eyebrow: 'text-sm font-semibold text-primary',
     pageDescription: 'text-sm sm:text-base leading-relaxed text-text-muted',
     sectionDescription: 'text-sm sm:text-base leading-relaxed text-text-secondary',
     cardDescription: 'text-xs leading-relaxed text-text-muted',
-    statValue: 'font-display font-bold text-2xl leading-tight tracking-normal text-text-primary',
-    metricValue: 'font-display font-bold text-3xl leading-tight tracking-normal text-text-primary',
+    statValue: 'font-display font-bold text-2xl leading-tight tracking-[-0.01em] text-text-primary',
+    metricValue: 'font-display font-bold text-3xl leading-tight tracking-[-0.01em] text-text-primary',
 };
 
 type HeadingProps = {

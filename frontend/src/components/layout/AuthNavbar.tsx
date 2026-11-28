@@ -7,22 +7,17 @@ export const AuthNavbar = () => {
     const navigate = useNavigate();
 
     return (
-        <nav
-            className="sticky top-0 z-50 border-b border-border/40 bg-bg-light/85 backdrop-blur-xl"
-        >
-            <div className="relative h-16 flex items-center justify-center px-16">
+        <nav className="sticky top-0 z-50 shrink-0 border-b border-border/80 bg-surface/90 backdrop-blur-md" aria-label="Điều hướng">
+            <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
                 <button
+                    type="button"
                     onClick={() => navigate(PATHS.home)}
-                    className="flex items-center gap-3 cursor-pointer select-none transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
-                    aria-label="VocabLearning home"
+                    className="flex cursor-pointer items-center gap-2.5 rounded-[var(--radius-element)]"
+                    aria-label="VocabLearning, trang chủ"
                 >
-                    <Logo size={36} />
-                    <span className="font-display text-lg font-bold text-text-primary tracking-normal">
-                        VocabLearning
-                    </span>
+                    <Logo size={30} />
+                    <span className="text-[16px] font-bold tracking-[-0.015em] text-text-primary">VocabLearning</span>
                 </button>
-            </div>
-            <div className="fixed top-6 right-8 z-[60] max-sm:top-4 max-sm:right-4">
                 <ThemeToggle />
             </div>
         </nav>

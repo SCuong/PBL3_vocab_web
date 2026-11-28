@@ -9,6 +9,7 @@ export type VocabularyListItem = {
     topicId?: number;
     topicName: string;
     audioUrl: string;
+    imageUrl?: string;
 };
 
 export type VocabularyExampleItem = {
@@ -39,6 +40,7 @@ export type VocabularyLearningItem = {
     topicId?: number;
     topicName: string;
     audioUrl: string;
+    imageUrl?: string;
     example: string;
     exampleVi: string;
     exampleAudioUrl: string;
