@@ -1,29 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useToast } from '@astryxdesign/core/Toast';
 
-export type ToastItem = {
-    id: number;
-    message: string;
-    type?: string;
-};
-
+/** App-wide toast helper backed by Astryx's toast viewport (stacking, auto-hide, swipe). */
 export const useToasts = () => {
-    const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const showToast = useToast();
 
     const addToast = useCallback((message: string, type: string = 'info') => {
-        const id = Date.now();
-        setToasts(prev => [...prev, { id, message, type }]);
-        setTimeout(() => {
-            setToasts(prev => prev.filter(toast => toast.id !== id));
-        }, 4000);
-    }, []);
+        showToast({
+            body: message,
+            type: type === 'error' ? 'error' : 'info',
+            uniqueID: message,
+        });
+    }, [showToast]);
 
-    const removeToast = useCallback((id: number) => {
-        setToasts(prev => prev.filter(toast => toast.id !== id));
-    }, []);
-
-    return {
-        toasts,
-        addToast,
-        removeToast
-    };
+    return { addToast };
 };

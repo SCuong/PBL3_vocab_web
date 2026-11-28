@@ -53,6 +53,7 @@ CREATE TABLE vocabulary (
     word CITEXT NOT NULL,
     ipa VARCHAR(100) NULL,
     audio_url VARCHAR(2048) NULL,
+    image_url VARCHAR(2048) NULL,
     level VARCHAR(10) NOT NULL,
     meaning_vi TEXT NOT NULL,
     topic_id BIGINT NULL,

@@ -74,7 +74,7 @@ export const useGameProgress = (addToast: (message: string, type?: string) => vo
 
         if (nextStreak !== null && shouldAwardStreakBonus) {
             addXP(XP_RULES.STREAK_BONUS(nextStreak));
-            addToast(`Streak ${nextStreak} ngày! 🔥`, 'success');
+            addToast(`Chuỗi ${nextStreak} ngày!`, 'success');
         }
     }, [addToast, addXP]);
 

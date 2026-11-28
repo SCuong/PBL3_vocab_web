@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { LogOut, Shield, User } from 'lucide-react';
+import { BookOpen, Gamepad2, GraduationCap, Layers, Menu, Shield, Trophy, User, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button as AstryxButton } from '@astryxdesign/core/Button';
 import { Button, ThemeToggle } from '../ui';
 import { UserWidget } from './UserWidget';
 import { Logo } from '../../assets/Logo';
@@ -14,13 +15,29 @@ type NavbarProps = {
     reviewCount?: number;
 };
 
-const navLinks = [
-    { path: PATHS.home, label: 'Trang chủ' },
-    { path: PATHS.dashboard, label: 'Dashboard', authOnly: true },
-    { path: PATHS.vocabulary, label: 'Từ vựng' },
-    { path: PATHS.learning, label: 'Học tập' },
-    { path: PATHS.leaderboard, label: 'Bảng xếp hạng' },
+const navLinks: Array<{ path: string; label: string; authOnly?: boolean; guestOnly?: boolean }> = [
+    { path: PATHS.home, label: 'Trang chủ', guestOnly: true },
+    { path: PATHS.learning, label: 'Hành trình' },
+    { path: PATHS.games, label: 'Trò chơi' },
+    { path: PATHS.flashcards, label: 'Thẻ từ' },
+    { path: PATHS.vocabulary, label: 'Từ điển' },
+    { path: PATHS.leaderboard, label: 'Xếp hạng', authOnly: true },
 ];
+
+/** Phone tab bar for signed-in learners: the study loop stays one tap away. */
+const tabLinks = [
+    { path: PATHS.learning, label: 'Hành trình', icon: GraduationCap },
+    { path: PATHS.games, label: 'Trò chơi', icon: Gamepad2 },
+    { path: PATHS.flashcards, label: 'Thẻ từ', icon: Layers },
+    { path: PATHS.vocabulary, label: 'Từ điển', icon: BookOpen },
+    { path: PATHS.profile, label: 'Hồ sơ', icon: User },
+];
+
+const CountBadge = ({ count }: { count: number }) => (
+    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold leading-none tabular-nums text-text-on-accent">
+        {count > 99 ? '99+' : count}
+    </span>
+);
 
 export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewCount = 0 }: NavbarProps) => {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -30,14 +47,22 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
 
     const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
     const isOnAdmin = activePath.startsWith('/admin');
+    const isOnLearning = activePath === PATHS.learning || activePath.startsWith(`${PATHS.learning}/`);
 
-    // Active underline indicator — slides horizontally only (transform + width).
-    // Measured from layout (offsetLeft/offsetWidth), so it is immune to page
-    // scroll and never animates vertically.
-    const visibleLinks = navLinks.filter(link => !link.authOnly || currentUser);
+    // Active pill indicator: measured from layout so it glides horizontally behind the active tab.
+    const visibleLinks = navLinks.filter(link => {
+        if (link.authOnly && !currentUser) return false;
+        if (link.guestOnly && currentUser) return false;
+        return true;
+    });
+    const brandTarget = currentUser ? (isAdmin ? PATHS.adminOverview : PATHS.learning) : PATHS.home;
     const activeKey = isOnAdmin
         ? 'admin'
-        : (visibleLinks.some(l => l.path === activePath) ? activePath : null);
+        : isOnLearning
+          ? PATHS.learning
+          : visibleLinks.some(l => l.path === activePath)
+            ? activePath
+            : null;
     const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
     const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
     const [animate, setAnimate] = useState(false);
@@ -46,14 +71,10 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
         const measure = () => {
             const target = activeKey ? itemRefs.current[activeKey] : null;
             if (!target || target.offsetParent === null) {
-                setIndicator(prev => ({ ...prev, ready: false }));
+                setIndicator({ left: 0, width: 0, ready: false });
                 return;
             }
-            setIndicator({
-                left: target.offsetLeft + 12,
-                width: Math.max(target.offsetWidth - 24, 0),
-                ready: true,
-            });
+            setIndicator({ left: target.offsetLeft, width: target.offsetWidth, ready: true });
         };
         measure();
         const raf = requestAnimationFrame(() => setAnimate(true));
@@ -64,213 +85,163 @@ export const Navbar = ({ currentUser, gameData, onLogout, onStreakClick, reviewC
         };
     }, [activeKey, currentUser, isAdmin, reviewCount]);
 
+    const go = (path: string) => {
+        navigate(path);
+        setMobileOpen(false);
+    };
+
+    const linkClass = (active: boolean) =>
+        `relative z-10 inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors cursor-pointer ${
+            active ? 'font-semibold text-text-primary' : 'font-medium text-text-muted hover:text-text-primary'
+        }`;
+
     return (
-        <nav
-            className="sticky top-0 z-50 border-b border-border bg-bg-light/85 backdrop-blur-xl"
-        >
-            <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3 sm:gap-5 lg:gap-8">
-                <button
-                    onClick={() => navigate(PATHS.home)}
-                    className="flex items-center gap-3 flex-shrink-0 cursor-pointer transition-all duration-200 hover:opacity-85 active:scale-95"
-                    aria-label="VocabLearning home"
-                >
-                    <Logo size={36} />
-                    <span className="font-display text-lg font-bold text-text-primary tracking-normal hidden sm:inline">
-                        VocabLearning
-                    </span>
-                </button>
+        <>
+            <nav
+                className="sticky top-0 z-50 border-b border-border/80 bg-surface/95 will-change-transform"
+                aria-label="Điều hướng chính"
+            >
+                <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+                    <button
+                        type="button"
+                        onClick={() => go(brandTarget)}
+                        className="flex shrink-0 items-center gap-2 rounded-[var(--radius-element)] cursor-pointer"
+                        aria-label={currentUser ? 'VocabLearning, tổng quan' : 'VocabLearning, trang chủ'}
+                    >
+                        <Logo size={28} />
+                        <span className={`text-[16px] font-bold tracking-[-0.015em] text-text-primary ${currentUser ? 'hidden sm:inline' : 'inline'}`}>
+                            VocabLearning
+                        </span>
+                    </button>
 
-                {/* Desktop nav */}
-                <div className="relative hidden lg:flex items-center gap-1 ml-4">
-                    {visibleLinks.map(link => (
-                        <button
-                            key={link.path}
-                            ref={(el) => { itemRefs.current[link.path] = el; }}
-                            onClick={() => navigate(link.path)}
-                            className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors cursor-pointer ${
-                                activePath === link.path
-                                    ? 'text-primary font-semibold'
-                                    : 'text-text-muted hover:text-text-primary hover:bg-primary-light'
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                {link.label}
-                                {link.path === PATHS.learning && currentUser && reviewCount > 0 && (
-                                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-purple text-text-on-accent text-[10px] font-bold leading-none">
-                                        {reviewCount > 99 ? '99+' : reviewCount}
-                                    </span>
-                                )}
-                            </span>
-                        </button>
-                    ))}
-
-                    {/* Admin nav link — ADMIN role only */}
-                    {isAdmin && (
-                        <button
-                            ref={(el) => { itemRefs.current['admin'] = el; }}
-                            onClick={() => navigate(PATHS.admin)}
-                            className={`relative text-sm font-medium px-3 py-2 rounded-[0.625rem] transition-colors cursor-pointer flex items-center gap-1.5 ${
-                                isOnAdmin
-                                    ? 'text-primary font-semibold'
-                                    : 'text-text-muted hover:text-text-primary hover:bg-primary/10'
-                            }`}
-                        >
-                            <Shield size={13} />
-                            Quản trị
-                        </button>
-                    )}
-
-                    {/* Active indicator — horizontal slide only (transform + width) */}
-                    <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute -bottom-px left-0 h-0.5 bg-primary rounded-full"
-                        style={{
-                            width: indicator.width,
-                            transform: `translateX(${indicator.left}px)`,
-                            opacity: indicator.ready ? 1 : 0,
-                            transition: animate
-                                ? 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), width 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease'
-                                : 'none',
-                        }}
-                    />
-                </div>
-
-                {/* Desktop right side */}
-                <div className="hidden lg:flex items-center gap-3 ml-auto">
-                    <ThemeToggle />
-                    {currentUser ? (
-                        <div className="flex items-center gap-3">
-                            <UserWidget
-                                user={currentUser}
-                                gameData={gameData}
-                                onStreakClick={onStreakClick}
-                                onLogout={onLogout}
-                            />
-                            <Button variant="ghost" className="!p-2 !min-w-0" onClick={onLogout}>
-                                <LogOut size={18} />
-                            </Button>
-                        </div>
-                    ) : (
-                        <>
+                    {/* Desktop segmented pill navigation */}
+                    <div className="relative hidden items-center rounded-full border border-border bg-bg-secondary p-1 lg:flex">
+                        <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-y-1 left-0 rounded-full border border-[light-dark(var(--border-strong),#655494)] bg-[light-dark(var(--surface),#312852)] shadow-[0_1px_3px_var(--shadow-color)]"
+                            style={{
+                                width: indicator.width,
+                                transform: `translateX(${indicator.left}px)`,
+                                opacity: indicator.ready ? 1 : 0,
+                                transition: animate
+                                    ? 'transform 320ms var(--ease-out), width 320ms var(--ease-out), opacity 180ms var(--ease-out)'
+                                    : 'none',
+                            }}
+                        />
+                        {visibleLinks.map(link => {
+                            const isActive = activeKey === link.path;
+                            return (
+                                <button
+                                    key={link.path}
+                                    type="button"
+                                    ref={el => { itemRefs.current[link.path] = el; }}
+                                    onClick={() => go(link.path)}
+                                    className={linkClass(isActive)}
+                                    aria-current={isActive ? 'page' : undefined}
+                                >
+                                    {link.label}
+                                    {link.path === PATHS.learning && currentUser && reviewCount > 0 && <CountBadge count={reviewCount} />}
+                                </button>
+                            );
+                        })}
+                        {isAdmin && (
                             <button
-                                onClick={() => navigate(PATHS.login)}
-                                className="text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:text-text-primary hover:bg-primary-light transition-colors cursor-pointer"
+                                type="button"
+                                ref={el => { itemRefs.current.admin = el; }}
+                                onClick={() => go(PATHS.admin)}
+                                className={linkClass(isOnAdmin)}
+                                aria-current={isOnAdmin ? 'page' : undefined}
                             >
-                                Đăng nhập
+                                <Shield size={14} aria-hidden /> Quản trị
                             </button>
-                            <button
-                                onClick={() => navigate(PATHS.register)}
-                                className="text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full transition-all hover:bg-primary-hover hover:-translate-y-px cursor-pointer shadow-[0_2px_12px_var(--shadow-color)]"
-                            >
-                                Đăng ký
-                            </button>
-                        </>
-                    )}
-                </div>
+                        )}
+                    </div>
 
-                <ThemeToggle className="ml-auto lg:hidden" />
-
-                {/* Mobile hamburger */}
-                <button
-                    className="lg:hidden flex flex-col gap-[5px] p-2 cursor-pointer rounded-lg hover:bg-primary/10 transition-colors"
-                    onClick={() => setMobileOpen(!mobileOpen)}
-                    aria-label="Mở menu"
-                    aria-expanded={mobileOpen}
-                >
-                    <span className={`block w-[22px] h-0.5 bg-text-primary rounded transition-transform ${mobileOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
-                    <span className={`block w-[22px] h-0.5 bg-text-primary rounded transition-opacity ${mobileOpen ? 'opacity-0' : ''}`} />
-                    <span className={`block w-[22px] h-0.5 bg-text-primary rounded transition-transform ${mobileOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
-                </button>
-            </div>
-
-            {/* Mobile menu */}
-            {mobileOpen && (
-                <div className="lg:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border bg-bg-light p-3 sm:p-4 flex flex-col gap-2 animate-slide-down">
-                    {navLinks.filter(link => !link.authOnly || currentUser).map(link => (
-                        <button
-                            key={link.path}
-                            onClick={() => { navigate(link.path); setMobileOpen(false); }}
-                            className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                                activePath === link.path ? 'text-primary bg-primary-light font-semibold' : 'text-text-muted hover:bg-primary-light'
-                            }`}
-                        >
-                            {link.label}
-                            {link.path === PATHS.learning && currentUser && reviewCount > 0 && (
-                                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-purple text-text-on-accent text-[10px] font-bold leading-none">
-                                    {reviewCount > 99 ? '99+' : reviewCount}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-
-                    {/* Mobile admin link — ADMIN role only */}
-                    {isAdmin && (
-                        <>
-                            <div className="mx-2 my-1 h-px bg-border" />
-                            <button
-                                onClick={() => { navigate(PATHS.admin); setMobileOpen(false); }}
-                                className={`text-left px-4 py-3 rounded-xl text-sm font-display font-bold transition-colors cursor-pointer flex items-center gap-2 ${
-                                    isOnAdmin
-                                        ? 'text-primary bg-primary/10'
-                                        : 'text-primary/80 hover:bg-primary/10'
-                                }`}
-                            >
-                                <Shield size={15} />
-                                Admin Dashboard
-                            </button>
-                        </>
-                    )}
-
-                    {/* Mobile account section — logged-in only */}
-                    {currentUser && (
-                        <>
-                            <div className="mx-2 my-1 h-px bg-border" />
-                            <div className="flex items-center gap-3 px-4 py-2">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-primary to-secondary text-sm font-display font-bold text-text-on-accent">
-                                    {(currentUser.username?.trim?.()?.[0] ?? '?').toUpperCase()}
-                                </span>
-                                <div className="min-w-0">
-                                    <div className="truncate text-sm font-bold text-text-primary">{currentUser.username || 'Người học'}</div>
-                                    {currentUser.email && (
-                                        <div className="truncate text-xs text-text-muted">{currentUser.email}</div>
-                                    )}
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => { navigate(PATHS.profile); setMobileOpen(false); }}
-                                className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2 ${
-                                    activePath === PATHS.profile ? 'text-primary bg-primary-light font-semibold' : 'text-text-muted hover:bg-primary-light'
-                                }`}
-                            >
-                                <User size={16} /> Hồ sơ cá nhân
-                            </button>
-                        </>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-2 mt-2 px-2 sm:px-4">
+                    <div className="flex shrink-0 items-center gap-1">
+                        <ThemeToggle />
                         {currentUser ? (
-                            <Button variant="ghost" className="w-full justify-center" onClick={() => { onLogout(); setMobileOpen(false); }}>
-                                <LogOut size={18} /> Đăng xuất
-                            </Button>
+                            <UserWidget user={currentUser} gameData={gameData} onStreakClick={onStreakClick} onLogout={onLogout} />
                         ) : (
                             <>
-                                <button
-                                    onClick={() => { navigate(PATHS.login); setMobileOpen(false); }}
-                                    className="min-h-11 flex-1 text-sm font-semibold text-text-muted px-4 py-2 rounded-full hover:bg-primary-light cursor-pointer transition-colors"
-                                >
-                                    Đăng nhập
-                                </button>
-                                <button
-                                    onClick={() => { navigate(PATHS.register); setMobileOpen(false); }}
-                                    className="min-h-11 flex-1 text-sm font-bold text-text-on-accent bg-primary px-5 py-2 rounded-full cursor-pointer transition-all hover:bg-primary-hover"
-                                >
-                                    Đăng ký
-                                </button>
+                                <div className="hidden items-center gap-1.5 lg:flex">
+                                    <Button variant="ghost" size="sm" onClick={() => go(PATHS.login)}>Đăng nhập</Button>
+                                    <Button size="sm" onClick={() => go(PATHS.register)}>Đăng ký</Button>
+                                </div>
+                                <AstryxButton
+                                    className="lg:hidden"
+                                    variant="ghost"
+                                    size="lg"
+                                    isIconOnly
+                                    icon={mobileOpen ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
+                                    label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
+                                    aria-expanded={mobileOpen}
+                                    onClick={() => setMobileOpen(open => !open)}
+                                />
                             </>
                         )}
                     </div>
                 </div>
+
+                {/* Guest menu on phones */}
+                {!currentUser && mobileOpen && (
+                    <div className="animate-slide-down border-t border-border bg-bg-light px-4 pb-4 pt-2 lg:hidden">
+                        {navLinks.filter(link => !link.authOnly).map(link => (
+                            <button
+                                key={link.path}
+                                type="button"
+                                onClick={() => go(link.path)}
+                                className={`flex min-h-12 w-full items-center rounded-[var(--radius-element)] px-3 text-left text-[15px] ${
+                                    activePath === link.path ? 'bg-primary-light font-semibold text-primary' : 'font-medium text-text-primary'
+                                }`}
+                            >
+                                {link.label}
+                            </button>
+                        ))}
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            <Button variant="secondary" fullWidth onClick={() => go(PATHS.login)}>Đăng nhập</Button>
+                            <Button fullWidth onClick={() => go(PATHS.register)}>Đăng ký</Button>
+                        </div>
+                    </div>
+                )}
+            </nav>
+
+            {currentUser && (
+                <nav
+                    className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+                    aria-label="Điều hướng học tập"
+                >
+                    <div className={`mx-auto grid h-16 max-w-lg ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
+                        {[
+                            ...tabLinks,
+                            ...(isAdmin ? [{ path: PATHS.admin, label: 'Quản trị', icon: Shield }] : []),
+                        ].map(({ path, label, icon: Icon }) => {
+                            const active =
+                                activePath === path ||
+                                (path === PATHS.learning && activePath.startsWith('/learning')) ||
+                                (path === PATHS.admin && isOnAdmin);
+                            return (
+                                <button
+                                    key={path}
+                                    type="button"
+                                    onClick={() => go(path)}
+                                    aria-current={active ? 'page' : undefined}
+                                    className={`relative flex flex-col items-center justify-center gap-1 text-[11px] transition-colors ${
+                                        active ? 'font-semibold text-primary' : 'font-medium text-text-muted'
+                                    }`}
+                                >
+                                    <span className="relative">
+                                        <Icon size={21} strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+                                        {path === PATHS.learning && reviewCount > 0 && (
+                                            <span className="absolute -right-3 -top-1.5"><CountBadge count={reviewCount} /></span>
+                                        )}
+                                    </span>
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </nav>
             )}
-        </nav>
+        </>
     );
 };

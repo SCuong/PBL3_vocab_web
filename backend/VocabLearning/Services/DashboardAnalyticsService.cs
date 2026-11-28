@@ -68,9 +68,10 @@ namespace VocabLearning.Services
                     && progress.NextReviewDate.Value < tomorrow,
                     cancellationToken);
 
-            var dueToday = await CountDueReviewsAsync(userId, today, tomorrow, cancellationToken);
+            // Include overdue items alongside today's due reviews so Hero, MasteryProgress, and nav badge agree.
+            var dueToday = reviewWords;
             var dueTomorrow = await CountDueReviewsAsync(userId, tomorrow, tomorrow.AddDays(1), cancellationToken);
-            var dueThisWeek = await CountDueReviewsAsync(userId, today, weekEndExclusive, cancellationToken);
+            var dueThisWeek = reviewWords + await CountDueReviewsAsync(userId, tomorrow, weekEndExclusive, cancellationToken);
 
             var correctExercises = await _context.ExerciseResults
                 .AsNoTracking()

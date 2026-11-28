@@ -5,7 +5,7 @@ import { mockVocabApi } from './fixtures/mocks';
  * The /login route renders <Auth /> which is a flip-card component:
  * BOTH the login panel and the register panel exist in the DOM at all times
  * (the flip is a CSS animation, not a conditional mount). That means
- * `getByPlaceholder('Mật khẩu')` matches two inputs — one per panel.
+ * `getByLabel('Mật khẩu', { exact: true })` matches two inputs — one per panel.
  *
  * All login-form selectors below are therefore scoped to
  * `data-testid="login-panel"` so they uniquely target the login side.
@@ -22,8 +22,8 @@ test.describe('Auth flow', () => {
 
         const panel = loginPanel(page);
         await expect(panel.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
-        await expect(panel.getByPlaceholder('Tên đăng nhập hoặc email')).toBeVisible();
-        await expect(panel.getByPlaceholder('Mật khẩu')).toBeVisible();
+        await expect(panel.getByLabel('Tên đăng nhập hoặc email')).toBeVisible();
+        await expect(panel.getByLabel('Mật khẩu', { exact: true })).toBeVisible();
         await expect(panel.getByRole('button', { name: 'Vào học ngay' })).toBeVisible();
     });
 
@@ -31,8 +31,8 @@ test.describe('Auth flow', () => {
         await page.goto('/login');
 
         const panel = loginPanel(page);
-        const email = panel.getByPlaceholder('Tên đăng nhập hoặc email');
-        const password = panel.getByPlaceholder('Mật khẩu');
+        const email = panel.getByLabel('Tên đăng nhập hoặc email');
+        const password = panel.getByLabel('Mật khẩu', { exact: true });
 
         await email.fill('learner@example.com');
         await password.fill('Secret#123');
@@ -67,8 +67,8 @@ test.describe('Auth flow', () => {
 
         await page.goto('/login');
         const panel = loginPanel(page);
-        await panel.getByPlaceholder('Tên đăng nhập hoặc email').fill('learner@example.com');
-        await panel.getByPlaceholder('Mật khẩu').fill('Secret#123');
+        await panel.getByLabel('Tên đăng nhập hoặc email').fill('learner@example.com');
+        await panel.getByLabel('Mật khẩu', { exact: true }).fill('Secret#123');
         await panel.getByRole('button', { name: 'Vào học ngay' }).click();
 
         // Auth.handleSubmit does navigate(PATHS.home) on success — '/home'.
@@ -89,8 +89,8 @@ test.describe('Auth flow', () => {
 
         await page.goto('/login');
         const panel = loginPanel(page);
-        await panel.getByPlaceholder('Tên đăng nhập hoặc email').fill('wrong@example.com');
-        await panel.getByPlaceholder('Mật khẩu').fill('badpass');
+        await panel.getByLabel('Tên đăng nhập hoặc email').fill('wrong@example.com');
+        await panel.getByLabel('Mật khẩu', { exact: true }).fill('badpass');
         await panel.getByRole('button', { name: 'Vào học ngay' }).click();
 
         await expect(panel.getByText(/incorrect|sai|không/i).first()).toBeVisible();

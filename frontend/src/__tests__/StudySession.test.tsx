@@ -15,7 +15,7 @@ vi.mock('framer-motion', async () => {
   };
 });
 
-vi.mock('../utils/audio', () => ({ playPronunciationAudio: vi.fn() }));
+vi.mock('../utils/audio', () => ({ playPronunciationAudio: vi.fn(), stopPronunciationAudio: vi.fn() }));
 
 vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
 

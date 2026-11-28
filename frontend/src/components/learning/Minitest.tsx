@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import confetti from "canvas-confetti";
+import { Lightbulb, RotateCcw } from "lucide-react";
 import { Button } from "../ui";
 import { buildMinitestFillQuestions } from "../../utils/minitestQuestions";
 import { buildTranslationQuestions, type TranslationQuestion } from "../../utils/translationQuestions";
+import { playLumoVoice, playSfx } from "../../utils/sound";
 
 type MinitestProps = {
   topicId: number;
@@ -13,8 +15,10 @@ type MinitestProps = {
   onProgressChange?: (answered: number, total: number) => void;
 };
 
-// Sentence-arrangement comparison: trim, lowercase, drop simple punctuation,
-// collapse repeated spaces. Direction: English prompt -> arrange Vietnamese.
+type UnifiedItem =
+  | { kind: "fill"; key: string; index: number; q: any; isRetry?: boolean }
+  | { kind: "arrange"; key: string; index: number; q: TranslationQuestion; isRetry?: boolean };
+
 const normalizeSentence = (value: string): string =>
   (value ?? "")
     .trim()
@@ -32,19 +36,19 @@ const shuffle = <T,>(items: T[]): T[] => {
   return a;
 };
 
-export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish, hideProgressCard = false, onProgressChange }: MinitestProps) => {
-  const [activeSection, setActiveSection] = useState<1 | 2>(1);
-  const [fillAnswers, setFillAnswers] = useState<string[]>([]);
-  // Per question id -> ordered list of word-bank slot indices the user picked.
-  const [arranged, setArranged] = useState<Record<number, number[]>>({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // 10 questions total: Bài 1 = first 5 words, Bài 2 = up to 5 (prefer the other
-  // words so vocab isn't repeated; fall back to Bài-1 words only if needed).
+export const Minitest = ({
+  topicId: _topicId,
+  learnedWords,
+  topicWords,
+  onFinish,
+  hideProgressCard = false,
+  onProgressChange,
+}: MinitestProps) => {
   const fillWords = useMemo(
     () => (Array.isArray(learnedWords) ? learnedWords : []).slice(0, 5),
     [learnedWords],
   );
+
   const arrangementWords = useMemo(() => {
     const all = Array.isArray(learnedWords) ? learnedWords : [];
     const fillIds = new Set(fillWords.map((w: any) => w.id));
@@ -64,263 +68,402 @@ export const Minitest = ({ topicId: _topicId, learnedWords, topicWords, onFinish
     [arrangementWords],
   );
 
-  // Word bank per question: split the target answer into word tokens and shuffle
-  // once (stable until the question set changes). Slot index = identity, so
-  // duplicate words are still individually removable.
   const tokenBanks = useMemo(() => {
+    const cleanToken = (raw: string) => {
+      const stripped = raw.replace(/^[.,!?;:"'’“”…()]+|[.,!?;:"'’“”…()]+$/g, "");
+      if (!stripped) return "";
+      if (/^I($|['’](m|ve|ll|d)$)/.test(stripped)) return stripped;
+      return stripped.toLowerCase();
+    };
     const map: Record<number, string[]> = {};
     translationQuestions.forEach((q) => {
-      map[q.id] = shuffle(q.answer.split(/\s+/).filter(Boolean));
+      const tokens = q.answer.split(/\s+/).map(cleanToken).filter(Boolean);
+      map[q.id] = shuffle(tokens);
     });
     return map;
   }, [translationQuestions]);
 
-  useEffect(() => {
-    setFillAnswers(new Array(fillQuestions.length).fill(""));
-    setArranged({});
-    setIsSubmitted(false);
-    setActiveSection(1);
+  const initialQueue = useMemo<UnifiedItem[]>(() => {
+    const fills: UnifiedItem[] = fillQuestions.map((q: any, idx: number) => ({
+      kind: "fill",
+      key: `fill-${idx}`,
+      index: idx,
+      q,
+    }));
+    const arranges: UnifiedItem[] = translationQuestions.map((q, idx) => ({
+      kind: "arrange",
+      key: `arr-${idx}`,
+      index: idx,
+      q,
+    }));
+    return [...fills, ...arranges];
   }, [fillQuestions, translationQuestions]);
 
-  const arrangedText = (q: TranslationQuestion) =>
-    (arranged[q.id] ?? []).map((slot) => tokenBanks[q.id]?.[slot] ?? "").join(" ");
-  const isArrangementCorrect = (q: TranslationQuestion) =>
-    normalizeSentence(arrangedText(q)) === normalizeSentence(q.answer);
+  const [queue, setQueue] = useState<UnifiedItem[]>(initialQueue);
+  const [cursor, setCursor] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [selectedFill, setSelectedFill] = useState("");
+  const [pickedSlots, setPickedSlots] = useState<number[]>([]);
+  const [hintShown, setHintShown] = useState(false);
+  const [combo, setCombo] = useState(0);
+  const [firstTryFill, setFirstTryFill] = useState<Record<number, { userAnswer: string; ok: boolean }>>({});
+  const [firstTryArrange, setFirstTryArrange] = useState<Record<number, { userAnswer: string; ok: boolean }>>({});
+  const [submitted, setSubmitted] = useState(false);
 
-  const answeredCount =
-    fillAnswers.filter((a) => a !== "").length +
-    translationQuestions.filter((q) => (arranged[q.id] ?? []).length > 0).length;
-  const totalQuestions = fillQuestions.length + translationQuestions.length;
-
-  // Report live progress so the fullscreen top bar can show it.
   useEffect(() => {
-    onProgressChange?.(answeredCount, totalQuestions);
-  }, [answeredCount, totalQuestions, onProgressChange]);
+    setQueue(initialQueue);
+    setCursor(0);
+    setAnswered(false);
+    setIsCorrect(false);
+    setSelectedFill("");
+    setPickedSlots([]);
+    setHintShown(false);
+    setCombo(0);
+    setFirstTryFill({});
+    setFirstTryArrange({});
+    setSubmitted(false);
+  }, [initialQueue]);
 
-  const setArr = (qid: number, fn: (prev: number[]) => number[]) =>
-    setArranged((prev) => ({ ...prev, [qid]: fn(prev[qid] ?? []) }));
-  const addToken = (qid: number, slot: number) => setArr(qid, (a) => [...a, slot]);
-  const removeAt = (qid: number, pos: number) => setArr(qid, (a) => a.filter((_, i) => i !== pos));
-  const undo = (qid: number) => setArr(qid, (a) => a.slice(0, -1));
-  const clearAnswer = (qid: number) => setArr(qid, () => []);
+  const baseTotal = fillQuestions.length + translationQuestions.length;
+  const completedUnique = Object.keys(firstTryFill).length + Object.keys(firstTryArrange).length;
 
-  const handleSubmit = () => {
-    setIsSubmitted(true);
+  useEffect(() => {
+    onProgressChange?.(completedUnique, baseTotal);
+  }, [completedUnique, baseTotal, onProgressChange]);
+
+  const current = queue[cursor];
+
+  const handleChooseFill = useCallback(
+    (option: string) => {
+      if (!current || current.kind !== "fill" || answered) return;
+      const ok = option.trim().toLowerCase() === String(current.q.a).toLowerCase();
+      setSelectedFill(option);
+      setAnswered(true);
+      setIsCorrect(ok);
+      if (!current.isRetry && firstTryFill[current.index] === undefined) {
+        setFirstTryFill((prev) => ({ ...prev, [current.index]: { userAnswer: option, ok } }));
+      }
+      if (ok) {
+        setCombo((c) => c + 1);
+        playSfx("correct");
+      } else {
+        setCombo(0);
+        playSfx("wrong");
+        // Duolingo/Quizlet pattern: re-queue missed question at end of session
+        setQueue((prev) => [...prev, { ...current, key: `${current.key}-retry-${prev.length}`, isRetry: true }]);
+      }
+    },
+    [current, answered, firstTryFill],
+  );
+
+  const handleCheckArrange = useCallback(() => {
+    if (!current || current.kind !== "arrange" || answered) return;
+    const bank = tokenBanks[current.q.id] ?? [];
+    const userText = pickedSlots.map((slot) => bank[slot] ?? "").join(" ");
+    const ok = normalizeSentence(userText) === normalizeSentence(current.q.answer);
+    setAnswered(true);
+    setIsCorrect(ok);
+    if (!current.isRetry && firstTryArrange[current.index] === undefined) {
+      setFirstTryArrange((prev) => ({ ...prev, [current.index]: { userAnswer: userText, ok } }));
+    }
+    if (ok) {
+      setCombo((c) => c + 1);
+      playSfx("correct");
+    } else {
+      setCombo(0);
+      playSfx("wrong");
+      setQueue((prev) => [...prev, { ...current, key: `${current.key}-retry-${prev.length}`, isRetry: true }]);
+    }
+  }, [current, answered, tokenBanks, pickedSlots, firstTryArrange]);
+
+  const finalizeMinitest = useCallback(() => {
+    if (submitted) return;
+    setSubmitted(true);
 
     let sFill = 0;
-    fillAnswers.forEach((ans, i) => {
-      if (ans.trim().toLowerCase() === fillQuestions[i].a.toLowerCase()) sFill++;
+    const fillReview = fillQuestions.map((q: any, i: number) => {
+      const rec = firstTryFill[i];
+      const ok = Boolean(rec?.ok);
+      if (ok) sFill += 1;
+      return {
+        prompt: q.promptType === "example" ? q.q : `Nghĩa: ${q.q}`,
+        correctAnswer: q.a,
+        userAnswer: rec?.userAnswer ?? "",
+        isCorrect: ok,
+      };
     });
 
     let sTranslation = 0;
-    translationQuestions.forEach((q) => {
-      if (isArrangementCorrect(q)) sTranslation++;
+    const review = translationQuestions.map((q, i) => {
+      const rec = firstTryArrange[i];
+      const ok = Boolean(rec?.ok);
+      if (ok) sTranslation += 1;
+      return {
+        englishSentence: q.prompt,
+        correctTranslation: q.answer,
+        userAnswer: rec?.userAnswer ?? "",
+        isCorrect: ok,
+      };
     });
 
     const bonus = sTranslation === translationQuestions.length && translationQuestions.length > 0 ? 50 : 0;
     if (bonus > 0) {
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+      confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
     }
+    const xpEarned = sFill * 5 + sTranslation * 10 + bonus;
 
-    const review = translationQuestions.map((q) => ({
-      englishSentence: q.prompt,
-      correctTranslation: q.answer,
-      userAnswer: arrangedText(q),
-      isCorrect: isArrangementCorrect(q),
-    }));
-
-    onFinish(sFill + sTranslation, totalQuestions, {
+    onFinish(sFill + sTranslation, baseTotal, {
       fill: sFill,
+      fillTotal: fillQuestions.length,
       translation: sTranslation,
+      translationTotal: translationQuestions.length,
       bonus,
+      xpEarned,
+      fillReview,
       review,
     });
-  };
+  }, [submitted, fillQuestions, translationQuestions, firstTryFill, firstTryArrange, onFinish, baseTotal]);
 
-  const stepPill = (n: 1 | 2, label: string, done: boolean) => {
-    const active = activeSection === n;
+  const handleNext = useCallback(() => {
+    if (cursor + 1 >= queue.length) {
+      finalizeMinitest();
+      return;
+    }
+    setCursor((c) => c + 1);
+    setAnswered(false);
+    setIsCorrect(false);
+    setSelectedFill("");
+    setPickedSlots([]);
+    setHintShown(false);
+  }, [cursor, queue.length, finalizeMinitest]);
+
+  // Keyboard support: 1–4 for options, Enter to advance
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName;
+      const onInteractive = activeTag === "BUTTON" || activeTag === "INPUT" || activeTag === "TEXTAREA";
+      if (!current) return;
+      if (!answered && current.kind === "fill" && ["1", "2", "3", "4"].includes(e.key)) {
+        const opt = current.q.options?.[Number(e.key) - 1];
+        if (opt) handleChooseFill(opt);
+      } else if (answered && e.key === "Enter" && !onInteractive) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [current, answered, handleChooseFill, handleNext]);
+
+  if (!current) {
     return (
-      <div
-        className={`flex-1 rounded-xl border px-3 py-2 text-center text-xs font-bold sm:text-sm ${
-          active
-            ? "border-primary bg-primary/10 text-primary"
-            : done
-              ? "border-success-color/40 bg-success-color/10 text-success-color"
-              : "border-border bg-surface text-text-muted"
-        }`}
-      >
-        {done && !active ? "✓ " : ""}
-        {label}
+      <div className="mx-auto max-w-md rounded-[var(--radius-container)] border border-border bg-surface p-8 text-center text-sm text-text-muted">
+        Chưa đủ câu hỏi cho bài kiểm tra này.
       </div>
     );
-  };
+  }
+
+  const progressRatio = queue.length > 0 ? (cursor + (answered ? 1 : 0)) / queue.length : 0;
+  const lumoImg = !answered
+    ? "/mascot-lumo-thinking.webp"
+    : isCorrect
+      ? "/mascot-lumo-happy.webp"
+      : "/mascot-lumo-oops.webp";
+  const lumoSpeech = !answered
+    ? hintShown
+      ? current.kind === "fill"
+        ? `Gợi ý: Từ bắt đầu bằng "${String(current.q.a)[0]?.toUpperCase() ?? ""}..."`
+        : `Gợi ý: Bắt đầu bằng "${current.q.answer.split(" ")[0]}"`
+      : "Bình tĩnh làm từng câu nha — cần thì bấm Gợi ý!"
+    : isCorrect
+      ? combo >= 2
+        ? `Tuyệt vời! ${combo} câu đúng liên tiếp!`
+        : "Chính xác! Bạn nhớ vững lắm rồi."
+      : "Không sao, câu này sẽ quay lại ở cuối bài để bạn chinh phục lại!";
+
+  const bank = current.kind === "arrange" ? (tokenBanks[current.q.id] ?? []) : [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl rounded-[2rem] border border-primary/15 bg-surface/95 p-5 shadow-[0_18px_50px_var(--shadow-color)] backdrop-blur-sm sm:p-7">
-      {/* Step indicator */}
-      <div className="mb-6 flex gap-2">
-        {stepPill(1, "Bài 1: Chọn từ đúng", activeSection > 1)}
-        {stepPill(2, "Bài 2: Sắp xếp câu", isSubmitted)}
-      </div>
+    <div className="mx-auto w-full max-w-3xl px-1">
+      {!hideProgressCard && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <span className="text-xs font-bold text-text-muted tabular-nums">
+            Câu {cursor + 1} / {queue.length}
+          </span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-bg-secondary">
+            <div
+              className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-300"
+              style={{ transform: `scaleX(${Math.min(1, progressRatio)})` }}
+            />
+          </div>
+          {current.isRetry ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning-color/15 px-2.5 py-0.5 text-xs font-bold text-warning-color">
+              <RotateCcw size={12} aria-hidden /> Làm lại
+            </span>
+          ) : combo >= 2 ? (
+            <span className="rounded-full bg-[#F59E0B] px-2.5 py-0.5 text-xs font-extrabold text-[#171026]">
+              Combo ×{combo}
+            </span>
+          ) : null}
+        </div>
+      )}
 
-      {/* ── Bài 1: choose the correct word ── */}
-      {activeSection === 1 && (
-        <div className="space-y-5">
-          {fillQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-primary/10 bg-surface p-6 text-center text-sm text-text-secondary">
-              Bạn chưa có từ nào đã học trong chủ đề này để làm bài 1.
-            </div>
-          ) : (
-            fillQuestions.map((q: any, i: number) => (
-              <div key={q.id} className="rounded-2xl border border-primary/10 bg-surface p-4 sm:p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                    {i + 1}
-                  </span>
-                  <span className="text-xs font-bold uppercase tracking-wide text-primary">Chọn từ đúng</span>
-                </div>
-                <div className="mb-4 text-base font-medium italic leading-relaxed text-text-primary">
-                  {q.promptType === "example" ? q.q : `Nghĩa: ${q.q}`}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {q.options.map((option: string, oi: number) => {
-                    const isSelected = fillAnswers[i] === option;
-                    return (
-                      <label
-                        key={`${q.id}-${oi}`}
-                        className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
-                          isSubmitted ? "cursor-default" : "cursor-pointer"
-                        } ${isSelected ? "border-primary bg-primary/5" : "border-primary/10 bg-surface hover:border-primary/30"}`}
-                      >
-                        <input
-                          type="radio"
-                          name={`fill-question-${i}`}
-                          checked={isSelected}
-                          disabled={isSubmitted}
-                          onChange={() => {
-                            const next = [...fillAnswers];
-                            next[i] = option;
-                            setFillAnswers(next);
-                          }}
-                          className="h-4 w-4 shrink-0 accent-primary"
-                        />
-                        <span>{option}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+      <div className="relative">
+        <article className="rounded-[var(--radius-container)] border border-border bg-surface p-5 sm:p-7">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-primary">
+              {current.kind === "fill" ? "Chọn từ điền vào câu" : "Ghép câu tiếng Anh"}
+            </span>
+            {!answered && !hintShown && (
+              <button
+                type="button"
+                onClick={() => {
+                  setHintShown(true);
+                  playLumoVoice("greet");
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary-light px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/15 cursor-pointer"
+              >
+                <Lightbulb size={13} aria-hidden /> Gợi ý
+              </button>
+            )}
+          </div>
+
+          {current.kind === "fill" ? (
+            <>
+              <p className="text-lg font-bold leading-snug text-text-primary sm:text-xl">
+                {current.q.promptType === "example" ? current.q.q : `Từ tiếng Anh nào có nghĩa là: "${current.q.q}"?`}
+              </p>
+              <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
+                {(current.q.options ?? []).map((opt: string, idx: number) => {
+                  const isRightOpt = opt.trim().toLowerCase() === String(current.q.a).toLowerCase();
+                  const isPicked = selectedFill === opt;
+                  let cls =
+                    "flex min-h-[52px] items-center gap-3 rounded-[var(--radius-element)] border px-4 py-3 text-left text-[15px] font-semibold transition-colors cursor-pointer ";
+                  if (!answered) {
+                    cls += "border-border-emphasized bg-surface text-text-primary hover:border-primary hover:bg-primary-light/50";
+                  } else if (isRightOpt) {
+                    cls += "border-success-color bg-success-color/10 text-success-color";
+                  } else if (isPicked) {
+                    cls += "border-danger-color bg-danger-color/10 text-danger-color";
+                  } else {
+                    cls += "border-border bg-bg-secondary/40 text-text-muted opacity-65";
+                  }
+                  return (
+                    <button
+                      key={`${opt}-${idx}`}
+                      type="button"
+                      data-no-tap-sfx="true"
+                      disabled={answered}
+                      onClick={() => handleChooseFill(opt)}
+                      className={cls}
+                    >
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-bg-secondary font-mono text-xs font-bold text-text-muted">
+                        {idx + 1}
+                      </span>
+                      <span>{opt}</span>
+                    </button>
+                  );
+                })}
               </div>
-            ))
-          )}
-
-          <div className="flex justify-end pt-1">
-            <Button variant="primary" onClick={() => setActiveSection(2)}>
-              Sang bài 2 →
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Bài 2: arrange the sentence (word bank) ── */}
-      {activeSection === 2 && (
-        <div className="space-y-5">
-          {translationQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-primary/10 bg-surface p-6 text-center text-sm text-text-secondary">
-              Không có câu nào có bản dịch để sắp xếp.
-            </div>
+            </>
           ) : (
-            translationQuestions.map((q, qi) => {
-              const picked = arranged[q.id] ?? [];
-              const bank = tokenBanks[q.id] ?? [];
-              const promptLabel = q.direction === "en-to-vi" ? "Câu tiếng Anh" : "Câu tiếng Việt";
-              const arrangeLabel = q.direction === "en-to-vi" ? "Sắp xếp câu tiếng Việt" : "Sắp xếp câu tiếng Anh";
-              const targetHint = q.direction === "en-to-vi" ? "đáp án là tiếng Việt" : "đáp án là tiếng Anh";
-              return (
-                <div key={q.id} className="rounded-2xl border border-primary/10 bg-surface p-4 sm:p-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
-                      {qi + 1}
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wide text-accent">Sắp xếp câu</span>
-                  </div>
-                  <div className="mb-4">
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-text-muted">{promptLabel}</p>
-                    <p className="text-lg font-medium italic leading-relaxed text-text-primary">{q.prompt}</p>
-                  </div>
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-accent">
-                    {arrangeLabel}{" "}
-                    <span className="font-normal normal-case text-text-muted">({targetHint})</span>
-                  </p>
-
-                  {/* Answer area — click a chip to send it back to the bank */}
-                  <div className="mb-3 flex min-h-[52px] flex-wrap gap-2 rounded-xl border-2 border-dashed border-primary/20 bg-bg-secondary/40 p-3">
-                    {picked.length === 0 && (
-                      <span className="self-center text-sm text-text-muted">Chạm các từ bên dưới để xếp câu…</span>
-                    )}
-                    {picked.map((slot, pos) => (
-                      <button
-                        key={`${q.id}-picked-${pos}`}
-                        type="button"
-                        disabled={isSubmitted}
-                        onClick={() => removeAt(q.id, pos)}
-                        className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-default"
-                      >
-                        {bank[slot]}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Word bank — unused tokens */}
-                  <div className="flex flex-wrap gap-2">
-                    {bank.map((tok, slot) =>
-                      picked.includes(slot) ? null : (
-                        <button
-                          key={`${q.id}-bank-${slot}`}
-                          type="button"
-                          disabled={isSubmitted}
-                          onClick={() => addToken(q.id, slot)}
-                          className="rounded-lg border border-primary/15 bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:cursor-default"
-                        >
-                          {tok}
-                        </button>
-                      ),
-                    )}
-                  </div>
-
-                  {/* Controls */}
-                  <div className="mt-3 flex gap-3 text-xs font-bold">
+            <>
+              <p className="text-lg font-bold leading-snug text-text-primary sm:text-xl">
+                “{current.q.prompt}”
+              </p>
+              <div className="mt-4 flex min-h-[58px] flex-wrap items-center gap-2 rounded-[var(--radius-element)] border border-dashed border-border-emphasized bg-bg-light p-3">
+                {pickedSlots.length === 0 ? (
+                  <span className="text-sm text-text-muted">Chạm các từ bên dưới theo đúng thứ tự tiếng Anh…</span>
+                ) : (
+                  pickedSlots.map((slot, pos) => (
                     <button
+                      key={`${slot}-${pos}`}
                       type="button"
-                      disabled={isSubmitted || picked.length === 0}
-                      onClick={() => undo(q.id)}
-                      className="text-text-muted transition-colors hover:text-primary disabled:opacity-40"
+                      disabled={answered}
+                      onClick={() => setPickedSlots((prev) => prev.filter((_, i) => i !== pos))}
+                      className="rounded-lg border border-primary/30 bg-primary-light px-3 py-1.5 text-sm font-bold text-primary cursor-pointer"
                     >
-                      ↶ Hoàn tác
+                      {bank[slot]}
                     </button>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {bank.map((token, slot) => {
+                  const used = pickedSlots.includes(slot);
+                  return (
                     <button
+                      key={`${token}-${slot}`}
                       type="button"
-                      disabled={isSubmitted || picked.length === 0}
-                      onClick={() => clearAnswer(q.id)}
-                      className="text-text-muted transition-colors hover:text-danger-color disabled:opacity-40"
+                      disabled={answered || used}
+                      onClick={() => setPickedSlots((prev) => [...prev, slot])}
+                      className={`rounded-lg border border-border-emphasized bg-surface px-3 py-1.5 text-sm font-semibold text-text-primary transition-opacity cursor-pointer ${
+                        used ? "opacity-30" : "hover:border-primary"
+                      }`}
                     >
-                      ✕ Xóa đáp án
+                      {token}
                     </button>
-                  </div>
+                  );
+                })}
+              </div>
+
+              {!answered && (
+                <div className="mt-5 flex justify-end gap-2">
+                  {pickedSlots.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setPickedSlots([])}>
+                      Xóa hết
+                    </Button>
+                  )}
+                  <Button
+                    data-no-tap-sfx="true"
+                    disabled={pickedSlots.length < bank.length}
+                    onClick={handleCheckArrange}
+                  >
+                    Kiểm tra đáp án
+                  </Button>
                 </div>
-              );
-            })
+              )}
+            </>
           )}
 
-          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="ghost" onClick={() => setActiveSection(1)}>
-              ← Quay lại
-            </Button>
-            <Button variant="primary" disabled={isSubmitted} onClick={handleSubmit}>
-              Nộp bài ngay 🚀
-            </Button>
+          {answered && (
+            <div
+              className={`mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-element)] p-4 ${
+                isCorrect ? "bg-success-color/10 text-success-color" : "bg-danger-color/10 text-danger-color"
+              }`}
+            >
+              <div>
+                <p className="text-sm font-extrabold">
+                  {isCorrect ? "Chính xác!" : "Chưa đúng"}
+                </p>
+                <p className="mt-0.5 text-sm text-text-primary">
+                  Đáp án: <strong>{current.kind === "fill" ? current.q.a : current.q.answer}</strong>
+                </p>
+              </div>
+              <Button size="sm" onClick={handleNext}>
+                {cursor + 1 >= queue.length ? "Xem kết quả →" : "Tiếp tục →"}
+              </Button>
+            </div>
+          )}
+        </article>
+
+        {/* Lumo Sidekick on Right (Desktop) */}
+        <aside className="mt-4 flex items-center gap-3 rounded-[var(--radius-element)] border border-primary/20 bg-primary-light/60 p-3 xl:absolute xl:left-[calc(100%+20px)] xl:top-1/2 xl:mt-0 xl:w-52 xl:-translate-y-1/2 xl:flex-col xl:border-0 xl:bg-transparent xl:p-0 xl:text-center">
+          <div className="text-sm font-semibold text-text-primary xl:rounded-2xl xl:border xl:border-border-emphasized xl:bg-surface xl:p-3">
+            {lumoSpeech}
           </div>
-        </div>
-      )}
+          <img
+            src={lumoImg}
+            alt="Lumo"
+            width={92}
+            height={104}
+            onClick={() => playLumoVoice(isCorrect ? "celebrate" : "greet")}
+            className="h-auto w-12 shrink-0 cursor-pointer transition-transform hover:scale-105 xl:w-24"
+          />
+        </aside>
+      </div>
     </div>
   );
 };

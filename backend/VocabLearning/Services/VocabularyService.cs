@@ -58,7 +58,9 @@ namespace VocabLearning.Services
 
             if (topicId.HasValue)
             {
-                query = query.Where(vocabulary => vocabulary.TopicId == topicId.Value);
+                query = query.Where(vocabulary =>
+                    vocabulary.TopicId == topicId.Value
+                    || (vocabulary.Topic != null && vocabulary.Topic.ParentTopicId == topicId.Value));
             }
 
             var totalCount = await query.CountAsync(cancellationToken);
@@ -217,12 +219,12 @@ namespace VocabLearning.Services
 
             if (wordExists)
             {
-                return (false, "This word already exists.");
+                return (false, "Từ vựng này đã tồn tại.");
             }
 
             if (vocabulary.TopicId.HasValue && !_context.Topics.Any(topic => topic.TopicId == vocabulary.TopicId.Value))
             {
-                return (false, "Selected topic does not exist.");
+                return (false, "Chủ đề đã chọn không tồn tại.");
             }
 
             try
@@ -234,7 +236,7 @@ namespace VocabLearning.Services
             }
             catch (DbUpdateException)
             {
-                return (false, "Could not save vocabulary. Please check your data and try again.");
+                return (false, "Không thể lưu từ vựng. Vui lòng kiểm tra lại dữ liệu và thử lại.");
             }
         }
 
@@ -244,7 +246,7 @@ namespace VocabLearning.Services
 
             if (vocabulary == null || string.IsNullOrWhiteSpace(updatedVocabulary.Word))
             {
-                return (false, "Vocabulary was not found or word is empty.");
+                return (false, "Không tìm thấy từ vựng hoặc từ đang để trống.");
             }
 
             var cleanWord = updatedVocabulary.Word.Trim();
@@ -254,12 +256,12 @@ namespace VocabLearning.Services
 
             if (duplicateWord)
             {
-                return (false, "This word already exists.");
+                return (false, "Từ vựng này đã tồn tại.");
             }
 
             if (updatedVocabulary.TopicId.HasValue && !_context.Topics.Any(topic => topic.TopicId == updatedVocabulary.TopicId.Value))
             {
-                return (false, "Selected topic does not exist.");
+                return (false, "Chủ đề đã chọn không tồn tại.");
             }
 
             var normalizedLevel = NormalizeLevel(updatedVocabulary.Level);
@@ -271,6 +273,7 @@ namespace VocabLearning.Services
             vocabulary.Word = cleanWord;
             vocabulary.Ipa = updatedVocabulary.Ipa;
             vocabulary.AudioUrl = updatedVocabulary.AudioUrl;
+            vocabulary.ImageUrl = updatedVocabulary.ImageUrl;
             vocabulary.Level = normalizedLevel;
             vocabulary.MeaningVi = updatedVocabulary.MeaningVi;
             vocabulary.TopicId = updatedVocabulary.TopicId;

@@ -5,20 +5,50 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { Navigate, useLocation, useNavigate, useNavigationType } from "react-router-dom";
-import { ChevronRight, Volume2, ArrowLeft, ArrowRight, Search, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Badge, Button, NoteIcon } from "../ui";
-import { playPronunciationAudio } from "../../utils/audio";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search, X, Layers, BookOpen, ClipboardCheck, Check, RotateCw, Sparkles, MessageSquare, Volume2 } from "lucide-react";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { AnimatePresence, motion } from "framer-motion";
+import { AudioWaveButton, AppDialog, Badge, Button, NoteIcon } from "../ui";
+import { playLumoVoice, playSfx } from "../../utils/sound";
+import { playPronunciationAudio, stopPronunciationAudio } from "../../utils/audio";
+import { getAutoPlayPronunciation } from "../../utils/learningPreferences";
+import { getTopicIllustration, getVocabIllustration } from "../../utils/vocabIllustrations";
+import { DialoguePractice } from "./DialoguePractice";
 import { MatchingGame } from "./MatchingGame";
 import { Minitest } from "./Minitest";
 import { SM2ReviewButtons } from "./SM2ReviewButtons";
 import { useStickyNotes } from "../layout";
 import { useAppContext } from "../../context/AppContext";
 import { learningProgressApi, type ReviewOptionItem } from "../../services/learningProgressApi";
+import { vocabularyApi } from "../../services/vocabularyApi";
+import { mapLearningVocabularyToUiModel } from "../../utils/vocabularyMapper";
+import { getGuestTrialTopicId } from "../../utils/learningTopicGroups";
 import { PATHS } from "../../routes/paths";
-import studySessionBg from "../../assets/study-session-bg.svg";
 import { useTheme } from "../../hooks/useTheme";
+
+const FLASHCARD_DECK_VARIANTS = {
+  enter: (dir: number) => ({
+    x: dir * 78,
+    rotate: dir * 3.5,
+    scale: 0.94,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    rotate: 0,
+    scale: 1,
+    opacity: 1,
+  },
+  exit: (dir: number) => ({
+    x: dir * -110,
+    rotate: dir * -5,
+    scale: 0.93,
+    opacity: 0,
+    transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
+  }),
+};
 
 const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
 const REVIEW_PAGE_SIZE = 10;
@@ -85,36 +115,134 @@ const StudySession = () => {
     openStickyNotes,
     setStickyNotesLauncherHidden,
   } = useStickyNotes();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
+    currentUser,
     learningTopicGroups: topicGroups,
     learningProgressState,
+    addXP,
+    triggerStreakCheck,
     addToast: onAddToast,
     applyLearningProgress,
     refreshLearnerAnalytics,
     handleRecordStudyHistory: onRecordStudyHistory,
   } = useAppContext();
 
-  const locationState = location.state as { topicId?: number; words?: any[]; mode?: string | null } | null;
+  const isGuest = !currentUser;
+  const locationState = location.state as {
+    topicId?: number;
+    words?: any[];
+    mode?: string | null;
+    isGuestTrial?: boolean;
+  } | null;
 
-  // In-progress learning state is intentionally memory-only. Only a fresh client
-  // navigation (PUSH) enters study; reload / back / direct URL (POP / REPLACE)
-  // returns to selection.
-  const navigationType = useNavigationType();
-  const topicId = locationState?.topicId;
-  const studyWords = locationState?.words;
-  const isReviewMode = locationState?.mode === 'review';
+  const urlTopicId = Number(searchParams.get("topicId"));
+  const topicId =
+    locationState?.topicId ??
+    (Number.isFinite(urlTopicId) && urlTopicId > 0 ? urlTopicId : undefined);
+  const urlMode = searchParams.get("mode");
+  const urlTab = searchParams.get("tab");
+  const isReviewMode = !isGuest && (locationState?.mode === 'review' || urlMode === 'review');
+  const guestTrialTopicId = useMemo(
+    () => (isGuest ? getGuestTrialTopicId(topicGroups) : null),
+    [isGuest, topicGroups],
+  );
+
+  const [fetchedWords, setFetchedWords] = useState<any[] | null>(
+    locationState?.words && locationState.words.length > 0 ? locationState.words : null,
+  );
+  const [loadingTopicWords, setLoadingTopicWords] = useState(
+    !locationState?.words && Boolean(topicId),
+  );
+
+  useEffect(() => {
+    if (locationState?.words && locationState.words.length > 0) {
+      setFetchedWords(locationState.words);
+      setLoadingTopicWords(false);
+      return;
+    }
+    if (!topicId) {
+      setLoadingTopicWords(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTopicWords(true);
+    vocabularyApi
+      .getLearningByTopic(topicId)
+      .then((items) => {
+        if (!cancelled) {
+          setFetchedWords(items.map(mapLearningVocabularyToUiModel));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedWords([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTopicWords(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId, locationState?.words]);
+
+  const studyWords = fetchedWords;
 
   const onFinish = useCallback((score?: number, total?: number, detail?: any) => {
     if (score !== undefined && total !== undefined) {
+      if (!isGuest) {
+        const xpEarned = typeof detail?.xpEarned === 'number' ? detail.xpEarned : 0;
+        if (xpEarned > 0) {
+          addXP(xpEarned);
+        }
+        triggerStreakCheck();
+        onRecordStudyHistory({
+          topicId: topicId ?? 0,
+          topicTitle: currentTopicTitleRef.current,
+          xp: xpEarned,
+          words: minitestWordsRef.current.map((w: any) => ({
+            id: w.id,
+            word: w.word,
+            meaning: w.meaning,
+          })),
+        });
+        void refreshLearnerAnalytics();
+      }
       navigate(PATHS.learningResult, { state: { score, total, detail } });
     } else {
       navigate(PATHS.learning);
     }
-  }, [navigate]);
+  }, [navigate, isGuest, addXP, triggerStreakCheck, onRecordStudyHistory, topicId, refreshLearnerAnalytics]);
 
-  const [tab, setTab] = useState<"flashcard" | "learn" | "minitest">(
-    isReviewMode ? "learn" : "flashcard",
-  );
+  const initialTab: "flashcard" | "learn" | "dialogue" | "minitest" =
+    urlTab === "dialogue"
+      ? "dialogue"
+      : isReviewMode || urlTab === "learn"
+        ? "learn"
+        : "flashcard";
+  const [tab, setTab] = useState<"flashcard" | "learn" | "dialogue" | "minitest">(initialTab);
+  const currentTopicTitleRef = useRef("Học từ vựng");
+  const minitestWordsRef = useRef<any[]>([]);
+  const filmstripRef = useRef<HTMLDivElement | null>(null);
+  const filmstripItemRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+
+  // Keep topicId + tab mirrored in the URL so F5 preserves topic & mode cleanly.
+  useEffect(() => {
+    if (!topicId) return;
+    const next = new URLSearchParams(searchParams);
+    let changed = false;
+    if (next.get("topicId") !== String(topicId)) {
+      next.set("topicId", String(topicId));
+      changed = true;
+    }
+    const desiredTab = tab === "minitest" ? "flashcard" : tab;
+    if (next.get("tab") !== desiredTab) {
+      next.set("tab", desiredTab);
+      changed = true;
+    }
+    if (changed) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [topicId, tab, searchParams, setSearchParams]);
   const [learnStep, setLearnStep] = useState<1 | 2 | 3>(1);
   const [learnMode, setLearnMode] = useState<"smart" | "custom">("smart");
   const [selectedWordIds, setSelectedWordIds] = useState<number[]>([]);
@@ -130,6 +258,7 @@ const StudySession = () => {
   const [minitestProgress, setMinitestProgress] = useState({ answered: 0, total: 0 });
   const [ipaFallbackNotice, setIpaFallbackNotice] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flashcardSearch, setFlashcardSearch] = useState('');
   const [showWordList, setShowWordList] = useState(false);
@@ -149,6 +278,8 @@ const StudySession = () => {
     total: number;
     time: number;
   } | null>(null);
+  const [guestLearnedWordIds, setGuestLearnedWordIds] = useState<Set<number>>(() => new Set());
+  const [guestCompletionSummary, setGuestCompletionSummary] = useState<{ count: number } | null>(null);
 
   useEffect(() => {
     sessionStorage.removeItem('ss_study_v1');
@@ -182,12 +313,15 @@ const StudySession = () => {
   );
 
   const learnedWordIdSet = useMemo(() => {
+    if (isGuest) {
+      return guestLearnedWordIds;
+    }
     if (!topicId || !learningProgressState?.topics) {
       return new Set<number>();
     }
 
     return new Set<number>(topicProgress?.learnedWordIds ?? []);
-  }, [learningProgressState?.topics, topicId, topicProgress]);
+  }, [isGuest, guestLearnedWordIds, learningProgressState?.topics, topicId, topicProgress]);
 
   const reviewWordIdSet = useMemo(
     () => new Set<number>(topicProgress?.reviewWordIds ?? []),
@@ -237,21 +371,44 @@ const StudySession = () => {
       || hasEarlierQueueOccurrence(activeSessionWords, activeWordId, currentIndex)
     );
   const activeReviewOptions = useMemo<ReviewOptionItem[]>(() => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const twoDays = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    if (isGuest) {
+      return [0, 3, 5].map((quality) => ({
+        quality,
+        days: quality === 0 ? 0 : quality === 3 ? (isActiveWordPhaseB ? 1 : 0) : (isActiveWordPhaseB ? 2 : 1),
+        nextReviewDate: quality === 5 && isActiveWordPhaseB ? twoDays : tomorrow,
+      }));
+    }
+
     const options = activeWordId ? (reviewOptionsMap[activeWordId] ?? []) : [];
     if (!isActiveWordPhaseB) {
       return options;
     }
 
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     return [0, 3, 5].map((quality) => {
       const existing = options.find(option => option.quality === quality);
+      if (quality === 0) {
+        return {
+          quality,
+          days: 0,
+          nextReviewDate: existing?.nextReviewDate ?? tomorrow,
+        };
+      }
+      if (quality === 3) {
+        return {
+          quality,
+          days: Math.max(1, existing?.days ?? 1),
+          nextReviewDate: existing?.nextReviewDate ?? tomorrow,
+        };
+      }
       return {
         quality,
-        days: 1,
-        nextReviewDate: existing?.nextReviewDate ?? tomorrow,
+        days: Math.max(2, existing?.days ?? 2),
+        nextReviewDate: existing?.nextReviewDate ?? twoDays,
       };
     });
-  }, [activeWordId, isActiveWordPhaseB, reviewOptionsMap]);
+  }, [isGuest, activeWordId, isActiveWordPhaseB, reviewOptionsMap]);
 
   const ipaValidWords = useMemo(
     () => selectedWords.filter((w: any) => w.transcription && w.transcription.trim() !== ""),
@@ -271,6 +428,13 @@ const StudySession = () => {
     [words, learnedWordIdSet],
   );
   const learnedWordsForMinitest = useMemo(() => {
+    if (isGuest) {
+      if (guestLearnedWordIds.size >= MINITEST_REQUIRED_WORDS) {
+        return words.filter((w) => guestLearnedWordIds.has(w.id));
+      }
+      return words;
+    }
+
     if (!topicId || !learningProgressState?.topics) {
       return [];
     }
@@ -284,7 +448,7 @@ const StudySession = () => {
 
     const learnedWordIdSet = new Set(topicProgress.learnedWordIds);
     return words.filter((w) => learnedWordIdSet.has(w.id));
-  }, [learningProgressState, topicId, words]);
+  }, [isGuest, guestLearnedWordIds, learningProgressState, topicId, words]);
 
   const filteredFlashcardWords = useMemo(() => {
     if (!flashcardSearch.trim()) return words;
@@ -305,9 +469,11 @@ const StudySession = () => {
           e.preventDefault();
           setIsFlipped((f) => !f);
         } else if (e.code === "ArrowLeft") {
+          setSlideDirection(-1);
           setCurrentIndex((i) => Math.max(0, i - 1));
           setIsFlipped(false);
         } else if (e.code === "ArrowRight") {
+          setSlideDirection(1);
           setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
           setIsFlipped(false);
         }
@@ -325,7 +491,49 @@ const StudySession = () => {
   useEffect(() => {
     if (tab !== 'flashcard') return;
     setRecentIndices(prev => [currentIndex, ...prev.filter(i => i !== currentIndex)].slice(0, 6));
+    const activeThumb = filmstripItemRefs.current[currentIndex];
+    if (activeThumb) {
+      activeThumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
   }, [currentIndex, tab]);
+
+  // Automatically pronounce the active vocabulary word when navigating in Flashcard or Learn modes.
+  const activeAutoSpeakWord = useMemo(() => {
+    if (tab === 'flashcard') return words[currentIndex] ?? null;
+    if (tab === 'learn' && learnStep === 2) return activeSessionWords[currentIndex] ?? null;
+    return null;
+  }, [tab, learnStep, words, activeSessionWords, currentIndex]);
+
+  useEffect(() => {
+    if (!activeAutoSpeakWord?.word || !getAutoPlayPronunciation()) return;
+    const timer = window.setTimeout(() => {
+      playPronunciationAudio(activeAutoSpeakWord.audioUrl, activeAutoSpeakWord.word);
+    }, 140);
+    return () => {
+      window.clearTimeout(timer);
+      stopPronunciationAudio();
+    };
+  }, [activeAutoSpeakWord?.id, activeAutoSpeakWord?.word, activeAutoSpeakWord?.audioUrl, tab, learnStep, currentIndex]);
+
+  // Preload adjacent flashcard photos so flipping & switching stays 120fps with 0ms decode lag.
+  useEffect(() => {
+    if (tab !== 'flashcard' || words.length === 0) return;
+    for (const offset of [0, 1, 2, -1]) {
+      const target = words[currentIndex + offset];
+      if (target?.imageUrl) {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = target.imageUrl;
+      }
+    }
+  }, [tab, currentIndex, words]);
+
+  // Auto-select a 5-word starter pack when opening Learn Step 1 in smart mode so the CTA is immediately actionable.
+  useEffect(() => {
+    if (tab === 'learn' && learnStep === 1 && !isReviewMode && learnMode === 'smart' && selectedWordIds.length === 0 && newWords.length > 0) {
+      setSelectedWordIds(newWords.slice(0, Math.min(5, newWords.length)).map((w: any) => w.id));
+    }
+  }, [tab, learnStep, isReviewMode, learnMode, newWords, selectedWordIds.length]);
 
   // Keep the server session through practice so MatchingGame can finalize it.
   useEffect(() => {
@@ -348,6 +556,7 @@ const StudySession = () => {
   }, [learnStep]);
 
   useEffect(() => {
+    if (isGuest) return;
     if (tab === 'learn' && learnStep === 2 && selectedWords.length > 0) {
       const requestId = ++reviewOptionsRequestIdRef.current;
       learningProgressApi.getBatchReviewOptions(
@@ -361,7 +570,7 @@ const StudySession = () => {
         })
         .catch(() => {});
     }
-  }, [tab, learnStep, selectedWords, sessionSubmittedIds]);
+  }, [isGuest, tab, learnStep, selectedWords, sessionSubmittedIds]);
 
   const handleReviewQuality = useCallback(async (
     quality: number,
@@ -384,6 +593,25 @@ const StudySession = () => {
       );
     // Phase C (review mode) uses backend scheduling only, never current queue reinsertion.
     const shouldReinsert = !isReviewMode && !isDueReviewWord && !isPhaseB && (quality === 0 || quality === 3);
+
+    if (isGuest) {
+      const updatedSubmittedIds = new Set([...sessionSubmittedIds, normalizedWordId]);
+      setSessionSubmittedIds(updatedSubmittedIds);
+
+      let newQueue = queue;
+      if (shouldReinsert) {
+        newQueue = [...queue, queue[index]];
+        setSessionQueue(newQueue);
+      }
+
+      if (index < newQueue.length - 1) {
+        setCurrentIndex(index + 1);
+        setIsFlipped(false);
+      } else {
+        onLast();
+      }
+      return;
+    }
 
     // Every mode requires a server-side draft. Never fall back to per-word progress writes.
     if (sessionId == null) {
@@ -436,6 +664,7 @@ const StudySession = () => {
     onAddToast,
     sessionSubmittedIds,
     isReviewMode,
+    isGuest,
     reviewWordIdSet,
     sessionId,
   ]);
@@ -460,10 +689,103 @@ const StudySession = () => {
     setReviewPage(0);
   }, [reviewWords]);
 
+  const startGuidedLesson = useCallback(async (lessonWords: any[]) => {
+    if (lessonWords.length === 0 || sessionEnsuring || !topicId) return;
+    const lessonIds = lessonWords.map((w: any) => w.id).filter((id: any) => Number.isFinite(Number(id)));
+    setSelectedWordIds(lessonIds);
+
+    if (isGuest) {
+      setSessionId(-1);
+      setLearnStep(2);
+      setCurrentIndex(0);
+      setIsFlipped(false);
+      setSessionQueue([...lessonWords]);
+      setSessionSubmittedIds(new Set());
+      return;
+    }
+
+    setSessionEnsuring(true);
+    try {
+      const mode = isReviewMode ? 'REVIEW' : 'STUDY';
+      try {
+        const stale = await learningProgressApi.getActiveLearningSession(mode, topicId);
+        if (stale) {
+          try { await learningProgressApi.abandonLearningSession(stale.sessionId); } catch {}
+        }
+      } catch {}
+
+      const session = await learningProgressApi.startLearningSession({
+        mode,
+        topicId,
+        vocabIds: Array.from(new Set(lessonIds)),
+      });
+
+      setSessionId(session.sessionId);
+      setLearnStep(2);
+      setCurrentIndex(0);
+      setIsFlipped(false);
+      setSessionQueue([...lessonWords]);
+      setSessionSubmittedIds(new Set());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Không thể bắt đầu phiên học.';
+      onAddToast(message, 'error');
+    } finally {
+      setSessionEnsuring(false);
+    }
+  }, [sessionEnsuring, topicId, isGuest, isReviewMode, onAddToast]);
+
+  const curriculumLessons = useMemo(() => {
+    const LESSON_SIZE = 5;
+    const STAGE_LABELS = ['Nền tảng', 'Mở rộng', 'Giao tiếp', 'Chinh phục'];
+    const chunks: Array<{
+      index: number;
+      title: string;
+      stageLabel: string;
+      cefrRange: string;
+      words: any[];
+      learnedCount: number;
+      isCompleted: boolean;
+    }> = [];
+
+    for (let i = 0; i < words.length; i += LESSON_SIZE) {
+      const slice = words.slice(i, i + LESSON_SIZE);
+      const lessonIdx = Math.floor(i / LESSON_SIZE);
+      const levels = Array.from(new Set(slice.map((w: any) => (w.cefr || '').toUpperCase()).filter(Boolean)));
+      const cefrRange = levels.length <= 1 ? (levels[0] || 'A1') : `${levels[0]}–${levels[levels.length - 1]}`;
+      const learnedCount = slice.filter((w: any) =>
+        isGuest ? guestLearnedWordIds.has(w.id) : learnedWordIdSet.has(w.id),
+      ).length;
+      chunks.push({
+        index: lessonIdx,
+        title: `Bài ${lessonIdx + 1}`,
+        stageLabel: STAGE_LABELS[lessonIdx] ?? `Chặng ${lessonIdx + 1}`,
+        cefrRange,
+        words: slice,
+        learnedCount,
+        isCompleted: slice.length > 0 && learnedCount >= slice.length,
+      });
+    }
+    return chunks;
+  }, [words, isGuest, guestLearnedWordIds, learnedWordIdSet]);
+
+  const activeCurriculumLesson = useMemo(() => {
+    return curriculumLessons.find((l) => !l.isCompleted) ?? curriculumLessons[0] ?? null;
+  }, [curriculumLessons]);
+
   const startSelectedStudyQueue = useCallback(async () => {
     if (selectedWords.length === 0 || sessionEnsuring) return;
 
     if (!topicId) return;
+
+    if (isGuest) {
+      setSessionId(-1);
+      setLearnStep(2);
+      setCurrentIndex(0);
+      setIsFlipped(false);
+      setSessionQueue([...selectedWords]);
+      setSessionSubmittedIds(new Set());
+      return;
+    }
 
     setSessionEnsuring(true);
     try {
@@ -492,7 +814,7 @@ const StudySession = () => {
     } finally {
       setSessionEnsuring(false);
     }
-  }, [selectedWords, sessionEnsuring, isReviewMode, topicId, selectedWordIds, onAddToast]);
+  }, [selectedWords, sessionEnsuring, isGuest, isReviewMode, topicId, selectedWordIds, onAddToast]);
 
   const pagedReviewWords = useMemo(
     () => reviewWords.slice(reviewPage * REVIEW_PAGE_SIZE, (reviewPage + 1) * REVIEW_PAGE_SIZE),
@@ -561,15 +883,12 @@ const StudySession = () => {
     setMatchingCompletionError(null);
   }, []);
 
-  const handleExit = useCallback(async () => {
-    if (sessionAbandoning || matchingCompleting) return;
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  const performExit = useCallback(async () => {
+    setShowExitConfirm(false);
     const hasActiveDraft = tab === 'learn' && learnStep >= 2 && sessionId != null;
-    if (hasActiveDraft && !window.confirm('Thoát phiên học? Tiến trình chưa hoàn tất sẽ không được lưu.')) {
-      return;
-    }
-
-    if (hasActiveDraft) {
+    if (hasActiveDraft && !isGuest) {
       setSessionAbandoning(true);
       try {
         await learningProgressApi.abandonLearningSession(sessionId);
@@ -579,18 +898,22 @@ const StudySession = () => {
         setSessionAbandoning(false);
       }
     }
-
     clearLocalDraft();
     onFinish();
-  }, [
-    sessionAbandoning,
-    matchingCompleting,
-    tab,
-    learnStep,
-    sessionId,
-    clearLocalDraft,
-    onFinish,
-  ]);
+  }, [tab, learnStep, sessionId, isGuest, clearLocalDraft, onFinish]);
+
+  const handleExit = useCallback(async () => {
+    if (sessionAbandoning || matchingCompleting) return;
+
+    const hasActiveDraft = tab === 'learn' && learnStep >= 2 && sessionId != null;
+    if (hasActiveDraft) {
+      playLumoVoice('curious');
+      setShowExitConfirm(true);
+      return;
+    }
+
+    await performExit();
+  }, [sessionAbandoning, matchingCompleting, tab, learnStep, sessionId, performExit]);
 
   const handleFinishMatching = useCallback(async (
     correct: number,
@@ -598,6 +921,25 @@ const StudySession = () => {
     time: number,
   ) => {
     if (matchingCompleting) return;
+
+    if (isGuest) {
+      const completedCount = selectedWordIds.length || total;
+      setGuestLearnedWordIds((prev) => {
+        const next = new Set(prev);
+        selectedWordIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelectedWordIds([]);
+      setSessionQueue([]);
+      setSessionSubmittedIds(new Set());
+      setSessionId(null);
+      setMatchType(null);
+      setIpaFallbackNotice(false);
+      setPendingMatchingResult(null);
+      setLearnStep(1);
+      setGuestCompletionSummary({ count: completedCount });
+      return;
+    }
 
     const result = { correct, total, time };
     setPendingMatchingResult(result);
@@ -639,9 +981,9 @@ const StudySession = () => {
       onAddToast(
         typeof xpGained === "number" && xpGained > 0
           ? typeof streak === "number" && streak > 0
-            ? `Hoàn thành! +${xpGained} XP · Chuỗi ${streak} ngày 🔥`
-            : `Hoàn thành! +${xpGained} XP 🎉`
-          : "Đã hoàn tất phiên học 🎉",
+            ? `Hoàn thành! +${xpGained} XP · Chuỗi ${streak} ngày`
+            : `Hoàn thành! +${xpGained} XP`
+          : "Đã hoàn tất phiên học",
         "success",
       );
       onFinish();
@@ -654,6 +996,7 @@ const StudySession = () => {
     }
   }, [
     matchingCompleting,
+    isGuest,
     sessionId,
     applyLearningProgress,
     refreshLearnerAnalytics,
@@ -666,7 +1009,27 @@ const StudySession = () => {
     onFinish,
   ]);
 
-  if (navigationType !== "PUSH" || !topicId || !studyWords) return <Navigate to={PATHS.learning} replace />;
+  const requiredMinitestWords = useMemo(
+    () => Math.min(MINITEST_REQUIRED_WORDS, Math.max(3, words.length)),
+    [words.length],
+  );
+
+  currentTopicTitleRef.current = topicTitle;
+  minitestWordsRef.current = minitestWords;
+
+  if (!topicId) return <Navigate to={PATHS.learning} replace />;
+
+  if (isGuest && guestTrialTopicId != null && topicId !== guestTrialTopicId) {
+    return <Navigate to={PATHS.learning} replace />;
+  }
+
+  if (loadingTopicWords) {
+    return (
+      <div className="max-w-md mx-auto p-12 text-center text-sm text-text-muted">
+        Đang tải danh sách từ vựng...
+      </div>
+    );
+  }
 
   if (words.length === 0)
     return (
@@ -679,207 +1042,392 @@ const StudySession = () => {
     );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
+    <div className="max-w-6xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
       {!isActiveFullscreenSession && !isMatchingFullscreen && !isMinitestFullscreen && (
         <>
       <nav className="flex items-center gap-2 overflow-hidden text-sm text-text-muted mb-5 sm:mb-6">
         <button
           onClick={handleExit}
-          className="hover:text-primary transition-colors cursor-pointer active:scale-95"
+          className="shrink-0 whitespace-nowrap hover:text-primary transition-colors cursor-pointer active:scale-95"
         >
           Học tập
         </button>
-        <ChevronRight size={14} />
+        <ChevronRight size={14} className="shrink-0" />
         <button
           onClick={handleExit}
-          className="hover:text-primary transition-colors cursor-pointer active:scale-95"
+          className="min-w-0 truncate hover:text-primary transition-colors cursor-pointer active:scale-95"
         >
           {breadcrumbCategoryTitle}
         </button>
-        <ChevronRight size={14} />
-        <span className="truncate text-primary font-bold">{breadcrumbTopicTitle}</span>
+        <ChevronRight size={14} className="shrink-0" />
+        <span className="min-w-0 truncate text-primary font-bold">{breadcrumbTopicTitle}</span>
       </nav>
 
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8 sm:mb-12">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={handleExit}
-            className="p-2 rounded-full min-h-0"
-          >
-            <ArrowLeft size={24} />
+      {isGuest && (
+        <div className="mb-6 flex flex-col gap-3 rounded-[var(--radius-container)] border border-primary/20 bg-primary-light px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-2 text-sm text-text-primary">
+            <Sparkles size={16} className="shrink-0 text-primary" aria-hidden />
+            <span>
+              <span className="font-semibold">Chế độ học thử.</span> Tiến trình không được lưu sau khi thoát — đăng ký miễn phí để lưu kết quả.
+            </span>
+          </p>
+          <Button variant="primary" className="shrink-0" onClick={() => navigate(PATHS.register)}>
+            Đăng ký lưu tiến độ
           </Button>
+        </div>
+      )}
+
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 sm:mb-6">
+        <div className="flex items-center gap-4">
+          <AstryxButton
+            variant="ghost"
+            size="lg"
+            isIconOnly
+            icon={<ArrowLeft size={20} aria-hidden />}
+            label="Thoát phiên học"
+            onClick={handleExit}
+          />
           <div>
-            <h1 className="text-[1.875rem] sm:text-[2rem] mb-2 font-display font-bold text-text-primary leading-tight tracking-normal">
+            <h1 className="mb-2 text-[1.625rem] font-bold leading-tight tracking-[-0.02em] text-text-primary sm:text-[2rem]">
               {topicTitle}
             </h1>{" "}
             <div className="flex gap-2 flex-wrap">
-              {isReviewMode ? (
-                <Badge variant="purple" className="text-xs font-bold">
-                  🔔 Chế độ ôn tập — {reviewWords.length} từ
-                </Badge>
+              {isGuest ? (
+                <>
+                  <Badge variant="purple">Học thử · {words.length} từ</Badge>
+                  {guestLearnedWordIds.size > 0 && (
+                    <Badge variant="green">Đã học thử {guestLearnedWordIds.size} từ</Badge>
+                  )}
+                </>
+              ) : isReviewMode ? (
+                <Badge variant="purple">Ôn tập · {reviewWords.length} từ</Badge>
               ) : (
                 <>
-                  <Badge variant="cyan" className="text-xs">
-                    🆕 {topicStats?.new ?? 0}
-                  </Badge>
-                  <Badge variant="purple" className="text-xs">
-                    🔔 {topicStats?.review ?? 0}
-                  </Badge>
+                  <Badge variant="cyan">{newWords.length} mới</Badge>
+                  <Badge variant="purple">{reviewWords.length} cần ôn</Badge>
                 </>
               )}
-              <Badge variant="green" className="text-xs font-bold">
-                ✅ {topicStats?.learned ?? 0}
-              </Badge>
+              {!isGuest && <Badge variant="green">{learnedWordIdSet.size} đã thuộc</Badge>}
             </div>
           </div>
         </div>
-        <div className="-mx-4 flex gap-1 overflow-x-auto bg-surface px-4 py-1 border-y-2 border-primary/10 sm:mx-0 sm:gap-2 sm:overflow-visible sm:rounded-pill sm:border-2 sm:px-1">
-          {(["flashcard", "learn", "minitest"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                if (t === "minitest") {
-                  if (learnedWordsForMinitest.length < MINITEST_REQUIRED_WORDS) {
-                    setShowMinitestInsufficient(true);
-                  } else {
-                    setShowMinitestConfirm(true);
-                  }
-                  return;
-                }
-                setTab(t);
-                setCurrentIndex(0);
-                setIsFlipped(false);
-              }}
-              className={`h-10 px-4 rounded-pill text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap sm:h-12 sm:px-6 sm:text-base ${tab === t ? "bg-primary text-text-on-accent shadow-xl" : "text-text-muted hover:text-primary"}`}
-            >
-              {t === "flashcard" && "📇 Flashcard"}
-              {t === "learn" && "📖 Học"}
-              {t === "minitest" && "🧪 Kiểm tra"}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Chế độ học"
+          size="lg"
+          value={tab}
+          onChange={(value) => {
+            const t = value as typeof tab;
+            if (t === "minitest") {
+              const hasEnoughForMinitest = isGuest
+                ? learnedWordsForMinitest.length > 0
+                : learnedWordsForMinitest.length >= requiredMinitestWords;
+              if (!hasEnoughForMinitest) {
+                setShowMinitestInsufficient(true);
+              } else {
+                setShowMinitestConfirm(true);
+              }
+              return;
+            }
+            setTab(t);
+            setCurrentIndex(0);
+            setIsFlipped(false);
+          }}
+        >
+          <SegmentedControlItem value="flashcard" label="Thẻ từ" icon={<Layers size={16} aria-hidden />} />
+          <SegmentedControlItem value="learn" label="Học" icon={<BookOpen size={16} aria-hidden />} />
+          <SegmentedControlItem value="dialogue" label="Hội thoại" icon={<MessageSquare size={16} aria-hidden />} />
+          <SegmentedControlItem value="minitest" label="Kiểm tra" icon={<ClipboardCheck size={16} aria-hidden />} />
+        </SegmentedControl>
       </header>
         </>
       )}
 
-      <AnimatePresence mode="wait">
+      <div>
         {tab === "flashcard" && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            key="flashcard-tab"
+          <div key="flashcard-tab"
             className="w-full"
           >
             <div className="w-full">
 
               {/* ── Flashcard carousel ────────────────────────────── */}
-              <div className="mb-6 flex items-center justify-center gap-6 max-w-4xl mx-auto sm:mb-8">
+              <div className="mb-4 flex items-center justify-center gap-6 max-w-4xl mx-auto sm:mb-5">
                 {/* Left arrow */}
                 <button
                   type="button"
                   disabled={currentIndex === 0}
-                  onClick={() => { setCurrentIndex((i) => i - 1); setIsFlipped(false); }}
-                  className="hidden flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer sm:flex"
+                  onClick={() => {
+                    setSlideDirection(-1);
+                    setCurrentIndex((i) => Math.max(0, i - 1));
+                    setIsFlipped(false);
+                  }}
+                  aria-label="Từ trước"
+                  className="duo-btn duo-btn-surface hidden h-12 w-12 flex-shrink-0 !rounded-full !p-0 sm:inline-flex"
                 >
-                  <ArrowLeft size={24} />
+                  <ArrowLeft size={20} />
                 </button>
 
                 {/* CARD with search + flashcard */}
-                <div className="relative min-w-0 rounded-3xl border-2 border-primary/10 bg-surface p-3 pb-4 flex-1 sm:p-5 sm:pb-6">
+                <div className="relative min-w-0 flex-1">
 
-                  {/* Search bar row — top of card */}
-                  <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6">
+                  {/* Search bar + Duolingo glossy progress bar */}
+                  <div className="mb-4 flex flex-col items-center gap-3 sm:mb-5">
+                    <div className="flex w-full items-center gap-3">
+                      <div className="duo-progress-track flex-1">
+                        <div
+                          className="duo-progress-fill"
+                          style={{ width: `${words.length > 0 ? Math.round(((currentIndex + 1) / words.length) * 100) : 0}%` }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-xs font-extrabold tabular-nums text-text-secondary">
+                        {currentIndex + 1} / {words.length}
+                      </span>
+                    </div>
                     <div className="relative w-full max-w-[260px] md:max-w-[320px]">
                       <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                       <input
                         type="text"
-                        placeholder="Tìm từ vựng"
+                        placeholder="Tìm từ vựng trong chủ đề..."
                         value={flashcardSearch}
                         onChange={(e) => setFlashcardSearch(e.target.value)}
                         onFocus={() => setShowWordList(true)}
-                        className="w-full pl-10 pr-4 py-3 text-sm bg-surface border-2 border-primary/15 rounded-full outline-none focus:border-primary/40 transition-all"
+                        className="vocab-input pl-10"
                       />
                     </div>
                   </div>
 
-                {/* Flashcard */}
-                <div className="relative h-[min(62dvh,430px)] min-h-[340px] perspective-1000 sm:h-[480px]">
-                  <AnimatePresence mode="wait">
+                {/* 120fps Physical 3D Flashcard Deck with Stacked Depth, Directional Spring Slide & Swipe */}
+                <div className="relative mb-5 h-[min(56dvh,395px)] min-h-[330px] [perspective:1400px] sm:h-[min(50dvh,395px)]">
+                  {/* Stacked Deck Under-cards */}
+                  {currentIndex < words.length - 2 && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 translate-y-4 scale-[0.92] rounded-2xl border border-border/70 bg-surface/65 transition-transform duration-300 ease-[var(--ease-out)]"
+                    />
+                  )}
+                  {currentIndex < words.length - 1 && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 translate-y-2 scale-[0.96] rounded-2xl border border-border bg-surface/90 shadow-xs transition-transform duration-300 ease-[var(--ease-out)]"
+                    />
+                  )}
+
+                  <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
                     <motion.div
                       key={`flashcard-${currentIndex}`}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
-                      className="absolute inset-0"
+                      custom={slideDirection}
+                      variants={FLASHCARD_DECK_VARIANTS}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 32,
+                        mass: 0.8,
+                      }}
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0.22}
+                      onDragEnd={(_, info) => {
+                        if ((info.offset.x < -70 || info.velocity.x < -420) && currentIndex < words.length - 1) {
+                          setSlideDirection(1);
+                          setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
+                          setIsFlipped(false);
+                        } else if ((info.offset.x > 70 || info.velocity.x > 420) && currentIndex > 0) {
+                          setSlideDirection(-1);
+                          setCurrentIndex((i) => Math.max(0, i - 1));
+                          setIsFlipped(false);
+                        }
+                      }}
+                      className="absolute inset-0 touch-pan-y"
                     >
                       <motion.div
-                        onClick={() => setIsFlipped(!isFlipped)}
-                        animate={{ rotateY: isFlipped ? 180 : 0 }}
-                        transition={{ duration: 0.5, ease: "easeInOut" }}
-                        className="w-full h-full relative preserve-3d cursor-pointer"
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement)?.closest('[data-no-flip="true"]')) return;
+                          setIsFlipped((f) => !f);
+                        }}
+                        animate={{
+                          rotateY: isFlipped ? 180 : 0,
+                          scale: isFlipped ? [1, 1.035, 1] : [1, 1.035, 1],
+                        }}
+                        whileHover={{ y: -3 }}
+                        transition={{
+                          rotateY: { type: "spring", stiffness: 250, damping: 22, mass: 0.85 },
+                          scale: { duration: 0.34, ease: [0.16, 1, 0.3, 1] },
+                          y: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
+                        }}
+                        className="relative h-full w-full cursor-pointer preserve-3d will-change-transform"
                       >
-                        <div className="absolute inset-0 backface-hidden learning-card flex flex-col items-center justify-center p-5 text-center h-full border-4 border-primary/20 bg-surface sm:p-12">
-                          <Badge variant="purple" className="mb-6 sm:mb-12 sm:scale-125">
-                            Thẻ từ vựng
-                          </Badge>
-                          <div className="max-w-full break-words text-[clamp(2.25rem,13vw,4rem)] font-display font-extrabold mb-4 text-primary leading-[1.05] sm:text-[4.5rem]">
-                            {words[currentIndex].word}
+                      {/* ── FRONT: Full-Bleed Cinema Photo Flashcard ── */}
+                      <div className="absolute inset-0 backface-hidden overflow-hidden rounded-2xl bg-[#111019] shadow-[0_24px_48px_-24px_rgba(17,16,25,0.5)]">
+                        <img
+                          src={getVocabIllustration(words[currentIndex].word, currentTopicTitleRef.current, words[currentIndex].imageUrl)}
+                          alt={`Minh họa ${words[currentIndex].word}`}
+                          decoding="async"
+                          className="h-full w-full object-cover"
+                        />
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0"
+                          style={{
+                            background:
+                              "linear-gradient(to top, rgba(13, 12, 20, 0.94) 0%, rgba(13, 12, 20, 0.52) 48%, rgba(13, 12, 20, 0.14) 100%)",
+                          }}
+                        />
+
+                        {/* Top bar over photo */}
+                        <div className="absolute inset-x-5 top-4 flex items-center justify-between gap-2 sm:inset-x-6 sm:top-5">
+                          <div className="flex items-center gap-2">
+                            {words[currentIndex].cefr && (
+                              <span className="inline-flex items-center rounded-full bg-[#171429]/85 px-3 py-1 text-xs font-extrabold text-white">
+                                {words[currentIndex].cefr}
+                              </span>
+                            )}
+                            <span className="hidden items-center rounded-full bg-[#171429]/70 px-3 py-1 text-xs font-semibold text-[#E5E7EB] sm:inline-flex">
+                              Chạm thẻ hoặc Space để lật
+                            </span>
                           </div>
-                          <div className="max-w-full break-words text-base text-text-muted font-ipa bg-purple/5 px-3 py-2 rounded-xl mb-6 sm:px-6 sm:text-2xl sm:mb-12">
-                            {words[currentIndex].transcription}
+                          <img
+                            src="/mascot-lumo.webp"
+                            alt=""
+                            aria-hidden="true"
+                            width={38}
+                            height={42}
+                            className="pointer-events-none hidden h-auto w-[36px] drop-shadow-md sm:block"
+                          />
+                        </div>
+
+                        {/* Bottom Cinema Headword + 3D Duolingo Controls */}
+                        <div className="absolute inset-x-5 bottom-5 flex flex-wrap items-end justify-between gap-4 sm:inset-x-7 sm:bottom-6">
+                          <div className="min-w-0 text-left">
+                            <div className="break-words text-[clamp(2.25rem,8vw,3.5rem)] font-extrabold leading-[1.04] tracking-[-0.03em] text-white">
+                              {words[currentIndex].word}
+                            </div>
+                            {words[currentIndex].transcription && (
+                              <p className="font-ipa mt-1.5 text-base font-medium text-[#E5E7EB] sm:text-xl">
+                                {words[currentIndex].transcription}
+                              </p>
+                            )}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Button
-                              variant="ghost"
-                              className="p-2 min-h-0 rounded-full"
-                              onClick={(e: any) => {
+                          <div
+                            data-no-flip="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="flex flex-wrap items-center gap-2.5"
+                          >
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                playPronunciationAudio(
-                                  words[currentIndex].audioUrl,
-                                  words[currentIndex].word,
-                                );
+                                playPronunciationAudio(words[currentIndex].audioUrl, words[currentIndex].word);
                               }}
+                              aria-label={`Phát âm ${words[currentIndex].word}`}
+                              className="duo-btn duo-btn-amber duo-btn-sm px-4"
                             >
-                              <Volume2 size={18} />
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              className="whitespace-nowrap px-5 py-3 text-sm sm:px-10 sm:py-4 sm:text-lg"
+                              <Volume2 size={15} aria-hidden /> Nghe
+                            </button>
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsFlipped(true);
+                              }}
+                              className="duo-btn duo-btn-glass duo-btn-sm px-4"
                             >
-                              Xem nghĩa ▼
-                            </Button>
+                              <RotateCw size={14} aria-hidden /> Xem nghĩa
+                            </button>
                           </div>
                         </div>
-                        <div className="absolute inset-0 backface-hidden rotate-y-180 learning-card bg-linear-to-br from-purple/10 via-pink/5 to-transparent border-4 border-purple/40 flex flex-col items-center justify-center p-5 text-center h-full sm:p-12">
-                          <Badge variant="pink" className="mb-6 sm:mb-12 sm:scale-125">
-                            Nghĩa
-                          </Badge>
-                          <div className="text-2xl sm:text-[2.5rem] font-bold mb-6 sm:mb-10 text-text-primary leading-tight">
+                      </div>
+
+                      {/* ── BACK: Obsidian Cinema Studio Meaning & Example ── */}
+                      <div className="absolute inset-0 backface-hidden rotate-y-180 grid h-full grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#171429] text-white shadow-[0_24px_48px_-24px_rgba(17,16,25,0.55)] sm:grid-cols-[0.82fr_1.18fr]">
+                        <div className="relative h-32 bg-[#0f0d1b] sm:h-full">
+                          <img
+                            src={getVocabIllustration(words[currentIndex].word, currentTopicTitleRef.current, words[currentIndex].imageUrl)}
+                            alt={`Minh họa ${words[currentIndex].word}`}
+                            decoding="async"
+                            className="h-full w-full object-cover opacity-90"
+                          />
+                          <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0"
+                            style={{
+                              background: "linear-gradient(to top, rgba(15, 13, 27, 0.92) 0%, transparent 65%)",
+                            }}
+                          />
+                          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-lg font-extrabold text-white">{words[currentIndex].word}</p>
+                              {words[currentIndex].transcription && (
+                                <p className="font-ipa text-xs text-[#D1D5DB]">{words[currentIndex].transcription}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col justify-center p-5 text-left sm:p-7">
+                          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#F59E0B]">Nghĩa tiếng Việt</p>
+                          <div className="mt-1 text-2xl font-extrabold leading-tight tracking-[-0.02em] text-white sm:text-[2rem]">
                             {words[currentIndex].meaning}
                           </div>
-                          <Button
-                            variant="ghost"
-                            className="p-2 min-h-0 rounded-full mb-4"
-                            onClick={(e: any) => {
-                              e.stopPropagation();
-                              playPronunciationAudio(
-                                words[currentIndex].exampleAudioUrl,
-                                words[currentIndex].example,
-                              );
-                            }}
-                          >
-                            <Volume2 size={18} />
-                          </Button>
-                          <div className="bg-surface/70 p-4 sm:p-8 rounded-3xl border-2 border-purple/20 w-full shadow-inner">
-                            <p className="italic font-serif text-base leading-relaxed sm:text-xl sm:leading-loose">"{words[currentIndex].example}"</p>
+                          <div className="mt-4 w-full rounded-xl border border-white/12 bg-white/6 p-3.5 text-left sm:p-4">
+                            <div className="flex items-start gap-2.5">
+                              <p className="flex-1 text-sm font-medium leading-relaxed text-white sm:text-[15px]">
+                                {words[currentIndex].example}
+                              </p>
+                              <button
+                                type="button"
+                                data-no-flip="true"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playPronunciationAudio(words[currentIndex].exampleAudioUrl, words[currentIndex].example);
+                                }}
+                                aria-label="Nghe câu ví dụ"
+                                className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/14 text-white transition-colors hover:bg-[#F59E0B] hover:text-[#171429]"
+                              >
+                                <Volume2 size={14} aria-hidden />
+                              </button>
+                            </div>
                             {words[currentIndex].translation && (
-                              <p className="text-sm text-text-muted mt-3">"{words[currentIndex].translation}"</p>
+                              <p className="mt-2 text-xs text-[#D1D5DB] sm:text-sm">“{words[currentIndex].translation}”</p>
+                            )}
+                          </div>
+                          <div
+                            data-no-flip="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="mt-4 flex flex-wrap items-center justify-between gap-2"
+                          >
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsFlipped(false);
+                              }}
+                              className="duo-btn duo-btn-glass duo-btn-sm"
+                            >
+                              <RotateCw size={13} aria-hidden /> Lật lại
+                            </button>
+                            {currentIndex < words.length - 1 && (
+                              <button
+                                type="button"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSlideDirection(1);
+                                  setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
+                                  setIsFlipped(false);
+                                }}
+                                className="duo-btn duo-btn-amber duo-btn-sm px-4"
+                              >
+                                Từ tiếp theo <ArrowRight size={14} aria-hidden />
+                              </button>
                             )}
                           </div>
                         </div>
+                      </div>
                       </motion.div>
                     </motion.div>
                   </AnimatePresence>
@@ -890,10 +1438,15 @@ const StudySession = () => {
                 <button
                   type="button"
                   disabled={currentIndex === words.length - 1}
-                  onClick={() => { setCurrentIndex((i) => i + 1); setIsFlipped(false); }}
-                  className="hidden flex-shrink-0 p-3 rounded-full border-2 border-primary/15 bg-surface hover:bg-surface hover:border-primary/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 cursor-pointer sm:flex"
+                  onClick={() => {
+                    setSlideDirection(1);
+                    setCurrentIndex((i) => Math.min(words.length - 1, i + 1));
+                    setIsFlipped(false);
+                  }}
+                  aria-label="Từ tiếp theo"
+                  className="duo-btn duo-btn-surface hidden h-12 w-12 flex-shrink-0 !rounded-full !p-0 sm:inline-flex"
                 >
-                  <ArrowRight size={24} />
+                  <ArrowRight size={20} />
                 </button>
               </div>
 
@@ -916,34 +1469,85 @@ const StudySession = () => {
                 </button>
               </div>
 
-              {/* ── Dot progress ────────────────────────────────── */}
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex justify-center gap-1.5">
-                  {words.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-2.5 rounded-full transition-all duration-300 ${i === currentIndex ? "w-6 bg-primary" : "w-2.5 bg-primary/10"}`}
-                    />
-                  ))}
+              {/* ── Cinema Filmstrip Thumbnail Rail (auto-centers active word + wheel & arrow scroll) ── */}
+              <div className="mx-auto flex max-w-3xl items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Cuộn dải ảnh sang trái"
+                  onClick={() => filmstripRef.current?.scrollBy({ left: -240, behavior: "smooth" })}
+                  className="hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-primary/40 hover:text-primary sm:inline-flex"
+                >
+                  <ChevronLeft size={16} aria-hidden />
+                </button>
+                <div
+                  ref={filmstripRef}
+                  onWheel={(e) => {
+                    if (!filmstripRef.current || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                    e.preventDefault();
+                    filmstripRef.current.scrollLeft += e.deltaY;
+                  }}
+                  className="flex flex-1 items-center gap-2 overflow-x-auto scroll-smooth px-2 py-2 no-scrollbar"
+                >
+                  {words.map((w: any, i: number) => {
+                    const isActive = i === currentIndex;
+                    return (
+                      <button
+                        key={w.id ?? i}
+                        ref={(el) => {
+                          filmstripItemRefs.current[i] = el;
+                        }}
+                        type="button"
+                        title={w.word}
+                        aria-label={`Chuyển tới từ ${w.word}`}
+                        aria-current={isActive ? "true" : undefined}
+                        onClick={() => {
+                          setSlideDirection(i >= currentIndex ? 1 : -1);
+                          setCurrentIndex(i);
+                          setIsFlipped(false);
+                        }}
+                        className={`relative h-11 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg transition-all duration-200 ease-[var(--ease-out)] ${
+                          isActive
+                            ? "scale-105 ring-2 ring-[#F59E0B] ring-offset-2 ring-offset-bg-light"
+                            : "opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={getVocabIllustration(w.word, currentTopicTitleRef.current, w.imageUrl)}
+                          alt=""
+                          aria-hidden="true"
+                          width={64}
+                          height={44}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
-                <span className="text-sm font-bold text-primary bg-primary/10 px-4 py-1 rounded-full">
-                  {currentIndex + 1} / {words.length}
-                </span>
+                <button
+                  type="button"
+                  aria-label="Cuộn dải ảnh sang phải"
+                  onClick={() => filmstripRef.current?.scrollBy({ left: 240, behavior: "smooth" })}
+                  className="hidden h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-primary/40 hover:text-primary sm:inline-flex"
+                >
+                  <ChevronRight size={16} aria-hidden />
+                </button>
               </div>
 
               {/* ── Word list modal ──────────────────────────────── */}
               {showWordList && (
                 <div className="fixed inset-0 z-50 flex items-end justify-center px-0 pt-8 sm:items-center sm:px-4 sm:py-8">
                   <div
-                    className="absolute inset-0 bg-black/40"
-                    onClick={() => setShowWordList(false)}
+                    className="absolute inset-0 bg-[color-mix(in_srgb,#0b0a12_55%,transparent)]"
+                    onClick={() => { setShowWordList(false); setFlashcardSearch(''); }}
                   />
-                  <div className="relative w-full max-w-lg max-h-[88dvh] bg-surface rounded-t-3xl shadow-2xl border border-border overflow-hidden sm:rounded-3xl">
+                  <div className="relative w-full max-w-lg max-h-[88dvh] bg-surface rounded-t-3xl border border-border overflow-hidden sm:rounded-[var(--radius-container)]">
                     <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                       <div className="font-bold text-text-primary">Danh sách từ vựng</div>
                       <button
                         type="button"
-                        onClick={() => setShowWordList(false)}
+                        onClick={() => { setShowWordList(false); setFlashcardSearch(''); }}
                         className="text-sm font-semibold text-text-muted hover:text-primary transition-colors"
                       >
                         Đóng
@@ -965,7 +1569,7 @@ const StudySession = () => {
                     <div className="max-h-[calc(88dvh-8.5rem)] overflow-y-auto px-4 pb-4 sm:max-h-[60vh]">
                       {!flashcardSearch.trim() && recentIndices.filter(i => i !== currentIndex).length > 0 && (
                         <div className="pt-4 pb-2">
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted mb-2">🕐 Gần đây</p>
+                          <p className="text-xs font-bold text-text-muted mb-2">Gần đây</p>
                           {recentIndices.filter(i => i !== currentIndex).slice(0, 4).map(i => (
                             <button
                               key={i}
@@ -980,8 +1584,8 @@ const StudySession = () => {
                         </div>
                       )}
                       <div className="pt-3">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted mb-2">
-                          ☰ Tất cả từ vựng ({flashcardSearch.trim() ? filteredFlashcardWords.length : words.length})
+                        <p className="text-xs font-bold text-text-muted mb-2">
+                          Tất cả từ vựng ({flashcardSearch.trim() ? filteredFlashcardWords.length : words.length})
                         </p>
                         {filteredFlashcardWords.length === 0 ? (
                           <p className="text-sm text-text-muted text-center py-4">Không tìm thấy từ.</p>
@@ -1009,392 +1613,240 @@ const StudySession = () => {
               )}
 
             </div>
-          </motion.div>
+          </div>
         )}
 
         {tab === "learn" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            key="learn-tab"
-          >
-            {learnStep !== 2 && !isMatchingFullscreen && <div className="max-w-3xl mx-auto mb-16">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-500 ${learnStep >= 1 ? "bg-primary border-primary text-text-on-accent" : "bg-surface border-primary/10 text-text-muted"}`}>
-                    {learnStep > 1 ? "✓" : "1"}
-                  </div>
-                </div>
-                <div className="flex-1 mx-2 h-1 relative bg-primary/10 rounded-full overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-linear-to-r from-cyan to-primary rounded-full transition-all duration-500"
-                    style={{ width: learnStep >= 2 ? "100%" : "0%" }}
-                  />
-                </div>
-                <div className="flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-500 ${learnStep >= 2 ? "bg-primary border-primary text-text-on-accent" : "bg-surface border-primary/10 text-text-muted"}`}>
-                    {learnStep > 2 ? "✓" : "2"}
-                  </div>
-                </div>
-                <div className="flex-1 mx-2 h-1 relative bg-primary/10 rounded-full overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-linear-to-r from-cyan to-primary rounded-full transition-all duration-500"
-                    style={{ width: `${segment2Fill}%` }}
-                  />
-                </div>
-                <div className="flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 transition-all duration-500 ${learnStep >= 3 ? "bg-primary border-primary text-text-on-accent" : "bg-surface border-primary/10 text-text-muted"}`}>
-                    3
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-between mt-3">
-                {(["Chọn từ", "Xem qua", "Luyện tập"] as const).map((label, i) => (
-                  <span key={label} className={`text-xs font-bold uppercase w-12 text-center ${learnStep >= i + 1 ? "text-primary" : "text-text-muted"}`}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>}
-
+          <div key="learn-tab">
             {learnStep === 1 && (
-              <div className="max-w-4xl mx-auto">
-                {!isReviewMode && (
-                  <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                    <button
-                      type="button"
-                      onClick={() => setLearnMode("smart")}
-                      className={`text-left learning-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "smart" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
-                    >
-                      <div className="font-bold text-lg mb-1">⚡ Smart</div>
-                      <p className="text-sm text-text-muted">
-                        Học từ mới theo gói 5/10/15 từ. Không trộn từ ôn tập.
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLearnMode("custom")}
-                      className={`text-left learning-card p-5 border-2 transition-all cursor-pointer active:scale-[0.98] ${learnMode === "custom" ? "border-primary bg-primary/5" : "border-primary/10 hover:border-primary/30"}`}
-                    >
-                      <div className="font-bold text-lg mb-1">🛠️ Tùy chỉnh</div>
-                      <p className="text-sm text-text-muted">
-                        Tự chọn từng từ vựng để học theo nhu cầu của bạn.
-                      </p>
-                    </button>
-                  </div>
-                )}
-
-                {learnMode === "custom" ? (
-                  <div className="mb-16 max-w-3xl mx-auto">
-                    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
-                      <div>
-                        <h3 className="text-2xl font-bold">
-                          {selectedWordIds.length === 0
-                            ? "Chọn từ vựng để học"
-                            : `${selectedWordIds.length} từ mới đã chọn`}
+              <div className="mx-auto max-w-4xl pb-12">
+                {isReviewMode ? (
+                  /* ── Guided Review Spotlight (SM-2 due words) ── */
+                  <div className="relative overflow-hidden rounded-2xl bg-[#171429] p-6 text-white shadow-[0_24px_48px_-24px_rgba(17,16,25,0.5)] sm:p-8">
+                    <div className="flex flex-wrap items-center justify-between gap-6">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#F59E0B]">
+                          Ôn tập định kỳ · SM-2
+                        </p>
+                        <h3 className="mt-1.5 text-2xl font-extrabold tracking-[-0.025em] text-white sm:text-3xl">
+                          {reviewWords.length > 0
+                            ? `${reviewWords.length} từ đến hạn ôn tập`
+                            : "Bạn đã hoàn thành toàn bộ lượt ôn hôm nay!"}
                         </h3>
-                        <p className="text-sm text-text-muted mt-1">Nhấp vào từ để chọn / bỏ chọn</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="primary"
-                          disabled={selectedWordIds.length === 0 || sessionEnsuring}
-                          onClick={startSelectedStudyQueue}
-                        >
-                          {sessionEnsuring ? "Đang khởi tạo..." : "Bắt đầu học →"}
-                        </Button>
-                        <Button variant="ghost" onClick={() => setSelectedWordIds([])}>
-                          Bỏ chọn tất cả
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-primary/10 bg-surface/60 p-5 sm:p-6 shadow-sm">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-                        <div>
-                          <h4 className="font-bold text-lg text-text-primary">🆕 Từ mới</h4>
-                          <p className="text-xs text-text-muted mt-1">Chọn thủ công các từ mới muốn học trong phiên này.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-text-muted">
-                            {selectedWordIds.length > 0
-                              ? `${selectedWordIds.length} / ${customNewWords.length} từ`
-                              : `${customNewWords.length} từ`}
-                          </span>
-                          {customNewWords.length > 0 && (
+                        <p className="mt-2 max-w-[46ch] text-sm text-[#D1D5DB]">
+                          {reviewWords.length > 0
+                            ? "Hệ thống tự động chọn đúng các từ sắp quên để bạn củng cố trí nhớ dài hạn."
+                            : "Quay lại giáo trình bên dưới hoặc làm bài kiểm tra nhanh để tăng điểm XP."}
+                        </p>
+                        {reviewWords.length > 0 && (
+                          <div className="mt-5 flex flex-wrap items-center gap-3">
                             <button
-                              className="text-xs font-bold text-primary hover:underline cursor-pointer active:opacity-70 transition-opacity"
-                              onClick={() => setSelectedWordIds((prev) => Array.from(new Set([...prev, ...customNewWords.map((w: any) => w.id)])))}
+                              type="button"
+                              disabled={sessionEnsuring}
+                              onClick={() => void startGuidedLesson(reviewWords.slice(0, Math.min(10, reviewWords.length)))}
+                              className="duo-btn duo-btn-amber px-6"
                             >
-                              Chọn tất cả
+                              {sessionEnsuring ? "Đang khởi tạo..." : `Bắt đầu ôn ngay (${Math.min(10, reviewWords.length)} từ)`}
                             </button>
-                          )}
+                          </div>
+                        )}
+                      </div>
+                      <img
+                        src="/mascot-lumo-happy.webp"
+                        alt="Lumo"
+                        width={96}
+                        height={108}
+                        className="hidden h-auto w-24 shrink-0 sm:block"
+                      />
+                    </div>
+                  </div>
+                ) : activeCurriculumLesson ? (
+                  <div className="space-y-6">
+                    {/* ── Cinema Active Curriculum Lesson Spotlight ── */}
+                    <section className="group relative overflow-hidden rounded-2xl bg-[#111019] text-white shadow-[0_24px_48px_-24px_rgba(17,16,25,0.48)]">
+                      <img
+                        src={getTopicIllustration(currentTopicTitleRef.current, 0)}
+                        alt={currentTopicTitleRef.current}
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-700 ease-[var(--ease-out)] group-hover:scale-[1.03]"
+                      />
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background:
+                            "linear-gradient(95deg, rgba(15, 13, 27, 0.96) 0%, rgba(15, 13, 27, 0.84) 55%, rgba(15, 13, 27, 0.35) 100%)",
+                        }}
+                      />
+
+                      <div className="relative z-10 p-6 sm:p-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="inline-flex items-center rounded-full bg-white/14 px-3 py-1 text-xs font-extrabold text-[#F59E0B]">
+                            {activeCurriculumLesson.title} / {curriculumLessons.length} · {activeCurriculumLesson.stageLabel} ({activeCurriculumLesson.cefrRange})
+                          </span>
+                          <span className="text-xs font-bold tabular-nums text-[#E5E7EB]">
+                            {activeCurriculumLesson.learnedCount} / {activeCurriculumLesson.words.length} từ đã thuộc
+                          </span>
+                        </div>
+
+                        <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.025em] text-white sm:text-3xl">
+                          {activeCurriculumLesson.isCompleted
+                            ? `Bạn đã hoàn thành toàn bộ giáo trình ${currentTopicTitleRef.current}!`
+                            : `Chinh phục 5 từ tiếp theo theo lộ trình`}
+                        </h3>
+
+                        {/* 5 Visual Word Chips Preview */}
+                        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                          {activeCurriculumLesson.words.map((w: any) => (
+                            <div
+                              key={w.id}
+                              className="flex flex-col overflow-hidden rounded-xl border border-white/15 bg-white/10"
+                            >
+                              <img
+                                src={getVocabIllustration(w.word, currentTopicTitleRef.current, w.imageUrl)}
+                                alt={w.word}
+                                width={160}
+                                height={96}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-20 w-full object-cover"
+                              />
+                              <div className="px-2.5 py-2">
+                                <p className="truncate text-xs font-extrabold text-white">{w.word}</p>
+                                <p className="truncate text-[11px] text-[#D1D5DB]">{w.meaning}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={sessionEnsuring}
+                            onClick={() => void startGuidedLesson(activeCurriculumLesson.words)}
+                            className="duo-btn duo-btn-amber px-7"
+                          >
+                            {sessionEnsuring
+                              ? "Đang khởi tạo..."
+                              : activeCurriculumLesson.isCompleted
+                                ? `Ôn lại ${activeCurriculumLesson.title}`
+                                : `Bắt đầu ${activeCurriculumLesson.title} ngay`}
+                          </button>
+                          <span className="text-xs font-medium text-[#D1D5DB]">
+                            Gồm 2 bước: Ghi nhớ nhanh → Ghép từ &amp; luyện phản xạ (~2 phút)
+                          </span>
                         </div>
                       </div>
-                      {customNewWords.length === 0 ? (
-                        <div className="learning-card p-6 text-sm text-text-muted text-center">
-                          Không còn từ mới trong chủ đề này.
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {pagedCustomNewWords.map((w: any) => {
-                              const isSel = selectedWordIds.includes(w.id);
-                              return (
-                                <div
-                                  key={w.id}
-                                  onClick={() => setSelectedWordIds((p) => isSel ? p.filter((id) => id !== w.id) : [...p, w.id])}
-                                  className={`learning-card p-4 cursor-pointer border-4 transition-all ${isSel ? "border-success-color bg-success-color/10 scale-105" : "border-transparent hover:border-primary/20"}`}
-                                >
-                                  <div className="text-lg font-bold mb-0.5">{w.word}</div>
-                                  <div className="text-xs text-text-muted font-ipa">{w.transcription}</div>
+                    </section>
+
+                    {/* ── 4-Lesson Guided Curriculum Roadmap ── */}
+                    <div>
+                      <div className="mb-3.5 flex items-center justify-between">
+                        <h4 className="text-lg font-extrabold tracking-[-0.02em] text-text-primary">
+                          Lộ trình {curriculumLessons.length} bài học · {currentTopicTitleRef.current}
+                        </h4>
+                        <span className="text-xs font-bold text-text-secondary">
+                          Tăng dần từ A1 → B1
+                        </span>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {curriculumLessons.map((lesson) => {
+                          const isCurrent = activeCurriculumLesson.index === lesson.index && !lesson.isCompleted;
+                          const pct = lesson.words.length > 0 ? Math.round((lesson.learnedCount / lesson.words.length) * 100) : 0;
+
+                          return (
+                            <article
+                              key={lesson.index}
+                              className={`duo-card flex flex-col p-5 ${
+                                isCurrent ? "!border-primary ring-1 ring-primary/20" : ""
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold ${
+                                        lesson.isCompleted
+                                          ? "bg-[#10B981] text-white"
+                                          : isCurrent
+                                            ? "bg-primary text-white"
+                                            : "bg-bg-secondary text-text-secondary"
+                                      }`}
+                                    >
+                                      {lesson.isCompleted ? <Check size={14} strokeWidth={2.5} aria-hidden /> : lesson.index + 1}
+                                    </span>
+                                    <h5 className="text-base font-extrabold text-text-primary">
+                                      {lesson.title} · {lesson.stageLabel}
+                                    </h5>
+                                  </div>
+                                  <p className="mt-1.5 line-clamp-1 text-xs font-medium text-text-secondary">
+                                    {lesson.words.map((w: any) => w.word).join(" · ")}
+                                  </p>
                                 </div>
-                              );
-                            })}
-                          </div>
-                          {customNewTotalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-6">
-                              <button onClick={() => setCustomNewPage((p) => Math.max(0, p - 1))} disabled={customNewPage === 0} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">← Trước</button>
-                              {Array.from({ length: customNewTotalPages }, (_, i) => (
-                                <button key={i} onClick={() => setCustomNewPage(i)} className={`w-8 h-8 rounded-full text-sm font-bold transition-colors cursor-pointer active:scale-95 ${customNewPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}>{i + 1}</button>
-                              ))}
-                              <button onClick={() => setCustomNewPage((p) => Math.min(customNewTotalPages - 1, p + 1))} disabled={customNewPage === customNewTotalPages - 1} className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-primary/10 transition-colors cursor-pointer active:scale-95">Tiếp →</button>
-                            </div>
-                          )}
-                        </>
-                      )}
+                                <span className="shrink-0 rounded-full bg-bg-secondary px-2.5 py-0.5 text-[11px] font-extrabold text-text-secondary">
+                                  {lesson.cefrRange}
+                                </span>
+                              </div>
+
+                              {/* Overlapping 5-photo preview strip */}
+                              <div className="mt-4 flex items-center justify-between gap-3">
+                                <div className="flex -space-x-2">
+                                  {lesson.words.map((w: any) => (
+                                    <img
+                                      key={w.id}
+                                      src={getVocabIllustration(w.word, currentTopicTitleRef.current, w.imageUrl)}
+                                      alt=""
+                                      aria-hidden="true"
+                                      width={34}
+                                      height={34}
+                                      loading="lazy"
+                                      decoding="async"
+                                      className="h-8 w-8 rounded-full border-2 border-surface object-cover bg-bg-secondary"
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-xs font-bold tabular-nums text-text-secondary">
+                                  {lesson.learnedCount}/{lesson.words.length} từ
+                                </span>
+                              </div>
+
+                              <div className="mt-3.5 h-1.5 w-full overflow-hidden rounded-full bg-bg-secondary">
+                                <div
+                                  className="h-full rounded-full bg-[#10B981] transition-all duration-300"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="mt-4">
+                                <button
+                                  type="button"
+                                  disabled={sessionEnsuring}
+                                  onClick={() => void startGuidedLesson(lesson.words)}
+                                  className={`duo-btn duo-btn-sm w-full ${
+                                    isCurrent
+                                      ? "duo-btn-purple"
+                                      : lesson.isCompleted
+                                        ? "duo-btn-surface"
+                                        : "duo-btn-surface"
+                                  }`}
+                                >
+                                  {lesson.isCompleted
+                                    ? "Ôn lại bài này"
+                                    : isCurrent
+                                      ? `Học ${lesson.title} ngay`
+                                      : `Mở ${lesson.title}`}
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid lg:grid-cols-[1fr_320px] gap-6 mb-16 items-start">
-                    <div className="space-y-6">
-                      {isReviewMode ? (
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-lg">🔔 Ôn tập</h4>
-                            <span className="text-sm text-text-muted">
-                              {reviewWords.length} từ
-                            </span>
-                          </div>
-                          {reviewWords.length > 0 ? (
-                            <>
-                              <div className="grid gap-4 sm:grid-cols-2">
-                                {pagedReviewWords.map((w: any) => {
-                                  const isSel = selectedWordIds.includes(w.id);
-
-                                  return (
-                                    <div
-                                      key={w.id}
-                                      className={`learning-card p-5 transition-all border-4 cursor-not-allowed ${isSel ? "border-primary bg-primary/10" : "border-transparent opacity-40"}`}
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="text-xl font-bold">{w.word}</div>
-                                        <Badge variant="purple" className="text-[10px]">
-                                          {w.cefr || "-"}
-                                        </Badge>
-                                      </div>
-                                      <div className="text-xs text-text-muted font-ipa mt-1">
-                                        {w.transcription}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {reviewTotalPages > 1 && (
-                                <div className="flex items-center justify-center gap-2 mt-4">
-                                  <button
-                                    onClick={() => setReviewPage(p => Math.max(0, p - 1))}
-                                    disabled={reviewPage === 0}
-                                    className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 hover:bg-primary/10 transition-colors"
-                                  >
-                                    ← Trước
-                                  </button>
-                                  {Array.from({ length: reviewTotalPages }, (_, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => setReviewPage(i)}
-                                      className={`w-8 h-8 rounded-full text-sm font-bold transition-colors ${reviewPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}
-                                    >
-                                      {i + 1}
-                                    </button>
-                                  ))}
-                                  <button
-                                    onClick={() => setReviewPage(p => Math.min(reviewTotalPages - 1, p + 1))}
-                                    disabled={reviewPage === reviewTotalPages - 1}
-                                    className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 hover:bg-primary/10 transition-colors"
-                                  >
-                                    Tiếp →
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="learning-card p-6 text-sm text-text-muted text-center">
-                              Hiện chưa có từ đến hạn ôn.
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-lg">🆕 Từ mới</h4>
-                            <span className="text-sm text-text-muted">
-                              {selectedWordIds.length > 0
-                                ? `${selectedWordIds.length} / ${newWords.length} từ`
-                                : `${newWords.length} từ`}
-                            </span>
-                          </div>
-                          {newWords.length === 0 ? (
-                            <div className="learning-card p-6 text-sm text-text-muted text-center">
-                              Không còn từ mới trong chủ đề này.
-                            </div>
-                          ) : selectedWordIds.length === 0 ? (
-                            <div className="learning-card p-6 text-sm text-text-muted text-center">
-                              Chọn gói học bên phải để bắt đầu.
-                            </div>
-                          ) : (
-                            <>
-                              <div className="grid gap-4 sm:grid-cols-2">
-                                {pagedSmartWords.map((w: any) => (
-                                  <div
-                                    key={w.id}
-                                    className="learning-card p-5 transition-all border-4 cursor-not-allowed border-success-color bg-success-color/10 opacity-70"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="text-xl font-bold">{w.word}</div>
-                                      <Badge variant="cyan" className="text-[10px]">
-                                        {w.cefr || "-"}
-                                      </Badge>
-                                    </div>
-                                    <div className="text-xs text-text-muted font-ipa mt-1">
-                                      {w.transcription}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                              {smartTotalPages > 1 && (
-                                <div className="flex items-center justify-center gap-2 mt-4">
-                                  <button
-                                    onClick={() => setSmartPage(p => Math.max(0, p - 1))}
-                                    disabled={smartPage === 0}
-                                    className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 hover:bg-primary/10 transition-colors"
-                                  >
-                                    ← Trước
-                                  </button>
-                                  {Array.from({ length: smartTotalPages }, (_, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => setSmartPage(i)}
-                                      className={`w-8 h-8 rounded-full text-sm font-bold transition-colors ${smartPage === i ? "bg-primary text-text-on-accent" : "hover:bg-primary/10 text-text-muted"}`}
-                                    >
-                                      {i + 1}
-                                    </button>
-                                  ))}
-                                  <button
-                                    onClick={() => setSmartPage(p => Math.min(smartTotalPages - 1, p + 1))}
-                                    disabled={smartPage === smartTotalPages - 1}
-                                    className="px-3 py-1 rounded-lg text-sm font-bold disabled:opacity-30 hover:bg-primary/10 transition-colors"
-                                  >
-                                    Tiếp →
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <aside className="learning-card p-5 sticky top-[96px] space-y-4">
-                      <div className="text-sm text-text-muted">
-                        {isReviewMode ? "Ôn tập" : learnMode === "smart" ? "Học từ mới" : "Tùy chỉnh"}
-                      </div>
-                      <div className="font-bold text-lg">
-                        {isReviewMode
-                          ? `${selectedWordIds.length} từ cần ôn`
-                          : learnMode === "smart"
-                            ? `${selectedWordIds.length} từ mới`
-                            : `${selectedWordIds.length} từ đã chọn`}
-                      </div>
-
-                      <Button
-                        variant="primary"
-                        className="w-full"
-                        disabled={selectedWordIds.length === 0 || sessionEnsuring}
-                        onClick={startSelectedStudyQueue}
-                      >
-                        {sessionEnsuring
-                          ? "Đang khởi tạo..."
-                          : isReviewMode
-                            ? "Bắt đầu ôn tập"
-                            : "Bắt đầu học"}
-                      </Button>
-
-                      {isReviewMode && (
-                        <div className="space-y-2">
-                          <div className="text-xs font-bold text-text-muted uppercase tracking-wide">Chọn gói ôn</div>
-                          {[
-                            { label: "⚡ Nhanh 5 phút", count: 5 },
-                            { label: "📘 Tiêu chuẩn", count: 10 },
-                            { label: "🚀 Tăng tốc", count: 15 },
-                            { label: "🔥 Tổng ôn", count: reviewWords.length },
-                          ]
-                            .filter(p => p.count <= reviewWords.length)
-                            .filter((p, i, arr) => i === 0 || p.count !== arr[i - 1].count)
-                            .map(({ label, count }) => (
-                              <Button
-                                key={count}
-                                variant="ghost"
-                                className={`w-full text-sm ${selectedWordIds.length === count ? "border-2 border-primary text-primary bg-primary/10" : ""}`}
-                                onClick={() => applyReviewPreset(count)}
-                              >
-                                {label} ({count} từ)
-                              </Button>
-                            ))}
-                        </div>
-                      )}
-
-                      {!isReviewMode && learnMode === "smart" && (
-                        <div className="space-y-2">
-                          <div className="text-xs font-bold text-text-muted uppercase tracking-wide">Chọn gói học</div>
-                          <Button
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() => applySmartPreset(5)}
-                            disabled={newWords.length === 0}
-                          >
-                            ⚡ Nhanh 5 phút (5 từ)
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() => applySmartPreset(10)}
-                            disabled={newWords.length === 0}
-                          >
-                            📘 Tiêu chuẩn (10 từ)
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="w-full"
-                            onClick={() => applySmartPreset(15)}
-                            disabled={newWords.length === 0}
-                          >
-                            🚀 Tăng tốc (15 từ)
-                          </Button>
-                        </div>
-                      )}
-
-                      {!isReviewMode && learnMode === "smart" && (
-                        <Button
-                          variant="ghost"
-                          className="w-full"
-                          onClick={() => setSelectedWordIds([])}
-                        >
-                          Bỏ chọn tất cả
-                        </Button>
-                      )}
-                    </aside>
+                  <div className="duo-card p-8 text-center text-sm text-text-secondary">
+                    Chủ đề này chưa có từ vựng để tạo giáo trình.
                   </div>
                 )}
               </div>
@@ -1404,23 +1856,18 @@ const StudySession = () => {
               <div
                 className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
                   isDarkFocusedSession
-                    ? "bg-[#282138] text-[#f5f0ff]"
-                    : "bg-[#f3ecff] text-[#2b2140]"
+                    ? "bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                    : "bg-[var(--bg-secondary)] text-[var(--text-primary)]"
                 }`}
                 style={{
-                  backgroundImage: `url(${studySessionBg})`,
-                  backgroundColor: isDarkFocusedSession ? "#332942" : "#f3ecff",
-                  backgroundBlendMode: isDarkFocusedSession ? "multiply" : "normal",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "cover",
+                  backgroundColor: isDarkFocusedSession ? "var(--bg-secondary)" : "var(--bg-secondary)",
                 }}
               >
 
-                <header className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+                <header className={`relative z-10 shrink-0 border-b ${
                   isDarkFocusedSession
-                    ? "border-[#584a70] bg-[#302742]/95"
-                    : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+                    ? "border-[var(--border-color)] bg-[var(--surface)]/95"
+                    : "border-[var(--border-color)] bg-[var(--surface)]/95"
                 }`}>
                   <div className="mx-auto w-full max-w-5xl px-4 py-3 sm:px-6 sm:py-4">
                     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:grid-cols-[1fr_minmax(240px,480px)_1fr] sm:gap-6">
@@ -1430,8 +1877,8 @@ const StudySession = () => {
                         disabled={sessionAbandoning}
                         className={`flex h-10 shrink-0 items-center justify-self-start rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
                           isDarkFocusedSession
-                            ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5] hover:text-[#dac5f7]"
-                            : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0] hover:text-[#7440a8]"
+                            ? "border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--border-color)]"
+                            : "border-[var(--border-color)] bg-surface text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)]"
                         }`}
                         aria-label="Thoát phiên học"
                       >
@@ -1440,40 +1887,44 @@ const StudySession = () => {
                       </button>
                       <div className="min-w-0 text-center">
                         <div className={`flex items-baseline justify-center gap-1 text-sm font-bold tabular-nums sm:text-base ${
-                          isDarkFocusedSession ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                          isDarkFocusedSession ? "text-[var(--accent-color)]" : "text-[var(--accent-color)]"
                         }`}>
                           <span>{currentIndex + 1}</span>
-                          <span className={isDarkFocusedSession ? "text-[#b9a8d2]" : "text-[#76688e]"}>/ {activeSessionWords.length}</span>
+                          <span className={isDarkFocusedSession ? "text-[var(--text-muted)]" : "text-[var(--border-color)]"}>/ {activeSessionWords.length}</span>
                         </div>
                         <div className={`mt-2 h-2 overflow-hidden rounded-full ${
-                          isDarkFocusedSession ? "bg-[#4a3c60]" : "bg-[#e5d8f7]"
+                          isDarkFocusedSession ? "bg-[var(--accent-soft)]" : "bg-[var(--accent-soft)]"
                         }`}>
                           <div
                             className={`h-full rounded-full transition-[width] duration-300 ${
-                              isDarkFocusedSession ? "bg-[#b78ce9]" : "bg-[#8b5fc7]"
+                              isDarkFocusedSession ? "bg-[var(--accent-color)]" : "bg-[var(--accent-color)]"
                             }`}
                             style={{ width: `${((currentIndex + 1) / activeSessionWords.length) * 100}%` }}
                           />
                         </div>
                         <div className={`mt-1 hidden truncate text-[11px] sm:block ${
-                          isDarkFocusedSession ? "text-[#b9a8d2]" : "text-[#76688e]"
+                          isDarkFocusedSession ? "text-[var(--text-muted)]" : "text-[var(--border-color)]"
                         }`}>
                           {topicTitle} · {isReviewMode ? "Ôn tập" : "Học từ vựng"}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={openStickyNotes}
-                        className={`inline-flex h-10 shrink-0 items-center justify-self-end gap-2 rounded-2xl px-3 text-sm font-semibold transition active:scale-[0.98] sm:px-4 ${
-                          isDarkFocusedSession
-                            ? `text-[#d2b6f4] hover:bg-[#403451] ${isStickyNotesOpen ? "bg-[#463858]" : ""}`
-                            : `text-[#7440a8] hover:bg-[#eee4fa] ${isStickyNotesOpen ? "bg-[#e8daf8]" : ""}`
-                        }`}
-                        aria-expanded={isStickyNotesOpen}
-                      >
-                        <NoteIcon className="h-7 w-7" />
-                        <span className="hidden sm:inline">Ghi chú</span>
-                      </button>
+                      {!isGuest ? (
+                        <button
+                          type="button"
+                          onClick={openStickyNotes}
+                          className={`inline-flex h-10 shrink-0 items-center justify-self-end gap-2 rounded-2xl px-3 text-sm font-semibold transition active:scale-[0.98] sm:px-4 ${
+                            isDarkFocusedSession
+                              ? `text-[var(--accent-color)] hover:bg-[var(--accent-soft)] ${isStickyNotesOpen ? "bg-[var(--accent-soft)]" : ""}`
+                              : `text-[var(--accent-color)] hover:bg-[var(--accent-soft)] ${isStickyNotesOpen ? "bg-[var(--accent-soft)]" : ""}`
+                          }`}
+                          aria-expanded={isStickyNotesOpen}
+                        >
+                          <NoteIcon className="h-7 w-7" />
+                          <span className="hidden sm:inline">Ghi chú</span>
+                        </button>
+                      ) : (
+                        <span className="h-10 w-10 justify-self-end" aria-hidden />
+                      )}
                     </div>
                   </div>
                 </header>
@@ -1487,102 +1938,67 @@ const StudySession = () => {
                           key={`step2-${currentIndex}`}
                           initial={{ scale: 0.96 }}
                           animate={{ rotateY: isFlipped ? 180 : 0, scale: 1 }}
-                          transition={{ duration: 0.5, ease: "easeInOut" }}
+                          transition={{ type: "spring", stiffness: 250, damping: 24 }}
                           className="relative h-full w-full cursor-pointer preserve-3d"
                         >
-                          <div className={`absolute inset-0 backface-hidden flex h-full flex-col items-center justify-center rounded-[24px] border-2 p-6 text-center sm:p-10 ${
-                            isDarkFocusedSession
-                              ? "border-[#66557f] bg-[#3a304d]/95 text-[#f5f0ff] shadow-[0_16px_40px_rgba(20,14,31,0.28)]"
-                              : "border-[#d8c7f7] bg-white/95 text-[#2b2140] shadow-[0_16px_40px_rgba(88,65,125,0.16)]"
-                          }`}>
-                            <Badge variant="purple" className={`mb-6 sm:mb-8 ${
-                              isDarkFocusedSession
-                                ? "!border-[#735d91] !bg-[#493a60] !text-[#dcc5f7]"
-                                : "!border-[#cdb4f6] !bg-[#eee4fa] !text-[#7440a8]"
-                            }`}>
+                          <div className="learning-card absolute inset-0 backface-hidden flex h-full flex-col items-center justify-center rounded-[24px] p-6 text-center sm:p-10">
+                            <img
+                              src="/mascot-lumo.webp"
+                              alt=""
+                              aria-hidden="true"
+                              width={50}
+                              height={56}
+                              className="pointer-events-none absolute right-5 top-4 hidden h-auto w-[46px] opacity-90 sm:block"
+                            />
+                            <Badge variant="purple" className="mb-6 sm:mb-8">
                               Thẻ từ vựng
                             </Badge>
-                            <div className={`mb-3 max-w-full break-words text-[clamp(2.5rem,14vw,4rem)] font-display font-extrabold leading-[1.05] sm:text-[4rem] ${
-                              isDarkFocusedSession ? "text-[#d2b6f4]" : "text-[#7440a8]"
-                            }`}>
+                            <div className="mb-3 max-w-full break-words text-[clamp(2.5rem,14vw,4rem)] font-display font-extrabold leading-[1.05] text-primary sm:text-[4rem]">
                               {activeSessionWords[currentIndex].word}
                             </div>
-                            <div className={`mb-6 max-w-full break-words rounded-xl px-3 py-2 font-ipa text-base sm:mb-8 sm:px-5 sm:text-2xl ${
-                              isDarkFocusedSession ? "bg-[#302742] text-[#cbbce2]" : "bg-[#f3ecff] text-[#6f6185]"
-                            }`}>
+                            <div className="mb-6 max-w-full break-words rounded-xl bg-bg-secondary px-3 py-2 font-ipa text-base text-text-muted sm:mb-8 sm:px-5 sm:text-2xl">
                               {activeSessionWords[currentIndex].transcription}
                             </div>
-                            <div className="flex items-center gap-3">
-                              <Button
-                                variant="ghost"
-                                className={`min-h-0 rounded-full p-2 !backdrop-blur-none ${
-                                  isDarkFocusedSession
-                                    ? "!border-[#66557f] !bg-[#302742] !text-[#d2b6f4] hover:!bg-[#493a60] hover:!text-[#eadcff]"
-                                    : "!border-[#d8c7f7] !bg-white !text-[#7440a8] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
-                                }`}
-                                onClick={(e: any) => {
-                                  e.stopPropagation();
-                                  playPronunciationAudio(
-                                    activeSessionWords[currentIndex].audioUrl,
-                                    activeSessionWords[currentIndex].word,
-                                  );
-                                }}
-                              >
-                                <Volume2 size={18} />
-                              </Button>
-                              <Button variant="secondary" className={`px-6 py-3 sm:px-8 ${
-                                isDarkFocusedSession
-                                  ? "!border-[#735d91] !bg-[#302742] !text-[#d2b6f4] hover:!border-[#9f82c5] hover:!bg-[#493a60] hover:!text-[#eadcff]"
-                                  : "!border-[#cdb4f6] !bg-white !text-[#7440a8] hover:!border-[#9b72d0] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
-                              }`}>
-                                Xem nghĩa ▼
+                            <div className="flex flex-wrap items-center justify-center gap-3">
+                              <AudioWaveButton
+                                text={activeSessionWords[currentIndex].word}
+                                audioUrl={activeSessionWords[currentIndex].audioUrl}
+                                label={`Phát âm ${activeSessionWords[currentIndex].word}`}
+                              />
+                              <Button variant="secondary" className="px-6 py-3 sm:px-8">
+                                Xem nghĩa
                               </Button>
                             </div>
                           </div>
-                          <div className={`absolute inset-0 backface-hidden rotate-y-180 flex h-full flex-col items-center justify-center rounded-[24px] border-2 p-6 text-center sm:p-10 ${
-                            isDarkFocusedSession
-                              ? "border-[#66557f] bg-[#3a304d]/95 text-[#f5f0ff] shadow-[0_16px_40px_rgba(20,14,31,0.28)]"
-                              : "border-[#d8c7f7] bg-white/95 text-[#2b2140] shadow-[0_16px_40px_rgba(88,65,125,0.16)]"
-                          }`}>
-                            <Badge variant="pink" className={`mb-5 sm:mb-7 ${
-                              isDarkFocusedSession
-                                ? "!border-[#735d91] !bg-[#493a60] !text-[#dcc5f7]"
-                                : "!border-[#cdb4f6] !bg-[#eee4fa] !text-[#7440a8]"
-                            }`}>
+                          <div className="learning-card absolute inset-0 backface-hidden rotate-y-180 flex h-full flex-col items-center justify-center rounded-[24px] p-6 text-center sm:p-10">
+                            <img
+                              src="/mascot-lumo-thinking.webp"
+                              alt=""
+                              aria-hidden="true"
+                              width={50}
+                              height={56}
+                              className="pointer-events-none absolute right-5 top-4 hidden h-auto w-[46px] opacity-90 sm:block"
+                            />
+                            <Badge variant="pink" className="mb-5 sm:mb-7">
                               Nghĩa
                             </Badge>
-                            <div className={`mb-5 text-2xl font-bold leading-tight sm:text-[2.25rem] ${
-                              isDarkFocusedSession ? "text-[#f5f0ff]" : "text-[#2b2140]"
-                            }`}>
+                            <div className="mb-5 text-2xl font-bold leading-tight text-text-primary sm:text-[2.25rem]">
                               {activeSessionWords[currentIndex].meaning}
                             </div>
-                            <Button
-                              variant="ghost"
-                              className={`mb-3 min-h-0 rounded-full p-2 !backdrop-blur-none ${
-                                isDarkFocusedSession
-                                  ? "!border-[#66557f] !bg-[#302742] !text-[#d2b6f4] hover:!bg-[#493a60] hover:!text-[#eadcff]"
-                                  : "!border-[#d8c7f7] !bg-white !text-[#7440a8] hover:!bg-[#eee4fa] hover:!text-[#7440a8]"
-                              }`}
-                              onClick={(e: any) => {
-                                e.stopPropagation();
-                                playPronunciationAudio(
-                                  activeSessionWords[currentIndex].exampleAudioUrl,
-                                  activeSessionWords[currentIndex].example,
-                                );
-                              }}
-                            >
-                              <Volume2 size={18} />
-                            </Button>
-                            <div className={`w-full rounded-2xl border p-4 sm:p-6 ${
-                              isDarkFocusedSession
-                                ? "border-[#584a70] bg-[#302742] text-[#f5f0ff]"
-                                : "border-[#d8c7f7] bg-[#f8f3ff] text-[#2b2140]"
-                            }`}>
-                              <p className="font-serif text-base italic leading-relaxed sm:text-lg">"{activeSessionWords[currentIndex].example}"</p>
+                            <div className="mb-4">
+                              <AudioWaveButton
+                                text={activeSessionWords[currentIndex].example}
+                                audioUrl={activeSessionWords[currentIndex].exampleAudioUrl}
+                                variant="compact"
+                                size="sm"
+                                caption="Nghe ví dụ"
+                                label="Nghe câu ví dụ"
+                              />
+                            </div>
+                            <div className="w-full rounded-2xl border-2 border-border bg-bg-secondary/60 p-4 text-text-primary sm:p-6">
+                              <p className="text-base leading-relaxed sm:text-lg">{activeSessionWords[currentIndex].example}</p>
                               {activeSessionWords[currentIndex].translation && (
-                                <p className={`mt-3 text-sm ${
-                                  isDarkFocusedSession ? "text-[#cbbce2]" : "text-[#76688e]"
-                                }`}>"{activeSessionWords[currentIndex].translation}"</p>
+                                <p className="mt-3 text-sm text-text-muted">"{activeSessionWords[currentIndex].translation}"</p>
                               )}
                             </div>
                           </div>
@@ -1653,22 +2069,17 @@ const StudySession = () => {
             {learnStep === 3 && matchType && (
               <div
                 className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
-                  isMatchingDark ? "text-[#f5f0ff]" : "text-[#2b2140]"
+                  isMatchingDark ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]"
                 }`}
                 style={{
-                  backgroundImage: `url(${studySessionBg})`,
-                  backgroundColor: isMatchingDark ? "#332942" : "#f3ecff",
-                  backgroundBlendMode: isMatchingDark ? "multiply" : "normal",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "cover",
+                  backgroundColor: isMatchingDark ? "var(--bg-secondary)" : "var(--bg-secondary)",
                 }}
               >
                 <header
-                  className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+                  className={`relative z-10 shrink-0 border-b ${
                     isMatchingDark
-                      ? "border-[#584a70] bg-[#302742]/95"
-                      : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+                      ? "border-[var(--border-color)] bg-[var(--surface)]/95"
+                      : "border-[var(--border-color)] bg-[var(--surface)]/95"
                   }`}
                 >
                   <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -1678,8 +2089,8 @@ const StudySession = () => {
                       disabled={sessionAbandoning || matchingCompleting}
                       className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
                         isMatchingDark
-                          ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
-                          : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                          ? "border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                          : "border-[var(--border-color)] bg-surface text-[var(--text-primary)] hover:border-[var(--accent-color)]"
                       }`}
                       aria-label="Thoát phiên học"
                     >
@@ -1688,24 +2099,28 @@ const StudySession = () => {
                     </button>
                     <span
                       className={`font-display text-base font-bold ${
-                        isMatchingDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                        isMatchingDark ? "text-[var(--accent-color)]" : "text-[var(--accent-color)]"
                       }`}
                     >
                       Nối từ
                     </span>
-                    <button
-                      type="button"
-                      onClick={openStickyNotes}
-                      className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
-                        isMatchingDark
-                          ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
-                          : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
-                      }`}
-                      aria-label="Ghi chú"
-                    >
-                      <NoteIcon className="h-4 w-4" />
-                      <span className="ml-2 hidden sm:inline">Ghi chú</span>
-                    </button>
+                    {!isGuest ? (
+                      <button
+                        type="button"
+                        onClick={openStickyNotes}
+                        className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                          isMatchingDark
+                            ? "border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                            : "border-[var(--border-color)] bg-surface text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                        }`}
+                        aria-label="Ghi chú"
+                      >
+                        <NoteIcon className="h-4 w-4" />
+                        <span className="ml-2 hidden sm:inline">Ghi chú</span>
+                      </button>
+                    ) : (
+                      <span className="h-10 w-10 shrink-0" aria-hidden />
+                    )}
                   </div>
                 </header>
 
@@ -1746,28 +2161,40 @@ const StudySession = () => {
                 </div>
               </div>
             )}
-          </motion.div>
+          </div>
+        )}
+
+        {tab === "dialogue" && (
+          <div key="dialogue-tab" className="py-2">
+            <DialoguePractice
+              topicTitle={currentTopicTitleRef.current}
+              words={words}
+              onComplete={(xp) => {
+                if (!isGuest) {
+                  addXP(xp);
+                  triggerStreakCheck();
+                  void refreshLearnerAnalytics();
+                }
+                onAddToast(`Hoàn thành hội thoại! +${xp} XP`, "success");
+              }}
+            />
+          </div>
         )}
 
         {tab === "minitest" && isMinitestActive && (
           <div
             className={`fixed inset-0 z-[460] flex h-dvh flex-col overflow-hidden ${
-              isMinitestDark ? "text-[#f5f0ff]" : "text-[#2b2140]"
+              isMinitestDark ? "text-[var(--text-primary)]" : "text-[var(--text-primary)]"
             }`}
             style={{
-              backgroundImage: `url(${studySessionBg})`,
-              backgroundColor: isMinitestDark ? "#332942" : "#f3ecff",
-              backgroundBlendMode: isMinitestDark ? "multiply" : "normal",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundSize: "cover",
+              backgroundColor: isMinitestDark ? "var(--bg-secondary)" : "var(--bg-secondary)",
             }}
           >
             <header
-              className={`relative z-10 shrink-0 border-b backdrop-blur-sm ${
+              className={`relative z-10 shrink-0 border-b ${
                 isMinitestDark
-                  ? "border-[#584a70] bg-[#302742]/95"
-                  : "border-[#d8c7f7] bg-[#fbf8ff]/95"
+                  ? "border-[var(--border-color)] bg-[var(--surface)]/95"
+                  : "border-[var(--border-color)] bg-[var(--surface)]/95"
               }`}
             >
               <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -1777,8 +2204,8 @@ const StudySession = () => {
                   disabled={sessionAbandoning}
                   className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
                     isMinitestDark
-                      ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
-                      : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
+                      ? "border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                      : "border-[var(--border-color)] bg-surface text-[var(--text-primary)] hover:border-[var(--accent-color)]"
                   }`}
                   aria-label="Thoát bài kiểm tra"
                 >
@@ -1788,7 +2215,7 @@ const StudySession = () => {
                 <div className="min-w-0 flex-1 px-2 text-center">
                   <div
                     className={`flex items-baseline justify-center gap-1.5 text-sm font-bold tabular-nums ${
-                      isMinitestDark ? "text-[#d2b6f4]" : "text-[#7440a8]"
+                      isMinitestDark ? "text-[var(--accent-color)]" : "text-[var(--accent-color)]"
                     }`}
                   >
                     <span className="hidden sm:inline">Kiểm tra ·</span>
@@ -1798,12 +2225,12 @@ const StudySession = () => {
                   </div>
                   <div
                     className={`mx-auto mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full ${
-                      isMinitestDark ? "bg-[#4a3c60]" : "bg-[#e5d8f7]"
+                      isMinitestDark ? "bg-[var(--accent-soft)]" : "bg-[var(--accent-soft)]"
                     }`}
                   >
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
-                        isMinitestDark ? "bg-[#b78ce9]" : "bg-[#8b5fc7]"
+                        isMinitestDark ? "bg-[var(--accent-color)]" : "bg-[var(--accent-color)]"
                       }`}
                       style={{
                         width: `${minitestProgress.total > 0 ? (minitestProgress.answered / minitestProgress.total) * 100 : 0}%`,
@@ -1811,23 +2238,27 @@ const StudySession = () => {
                     />
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={openStickyNotes}
-                  className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
-                    isMinitestDark
-                      ? "border-[#66557f] bg-[#3a304d] text-[#f5f0ff] hover:border-[#9f82c5]"
-                      : "border-[#d8c7f7] bg-white text-[#2b2140] hover:border-[#9b72d0]"
-                  }`}
-                  aria-label="Ghi chú"
-                >
-                  <NoteIcon className="h-4 w-4" />
-                  <span className="ml-2 hidden sm:inline">Ghi chú</span>
-                </button>
+                {!isGuest ? (
+                  <button
+                    type="button"
+                    onClick={openStickyNotes}
+                    className={`flex h-10 shrink-0 items-center rounded-full border px-3 text-sm font-bold transition-colors active:scale-95 sm:px-4 ${
+                      isMinitestDark
+                        ? "border-[var(--border-color)] bg-[var(--surface)] text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                        : "border-[var(--border-color)] bg-surface text-[var(--text-primary)] hover:border-[var(--accent-color)]"
+                    }`}
+                    aria-label="Ghi chú"
+                  >
+                    <NoteIcon className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Ghi chú</span>
+                  </button>
+                ) : (
+                  <span className="h-10 w-10 shrink-0" aria-hidden />
+                )}
               </div>
             </header>
 
-            <div className="relative z-10 flex-1 overflow-y-auto px-3 py-6 sm:px-6 sm:py-8">
+            <div data-minitest-scroll className="relative z-10 flex-1 overflow-y-auto px-3 py-6 sm:px-6 sm:py-8">
               <Minitest
                 topicId={topicId}
                 learnedWords={minitestWords}
@@ -1839,21 +2270,18 @@ const StudySession = () => {
             </div>
           </div>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Confirm before starting the test. Only shown on the Kiểm tra tab click,
           never while the test is already active. */}
       {showMinitestConfirm && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[color-mix(in_srgb,#0b0a12_55%,transparent)]"
             onClick={() => setShowMinitestConfirm(false)}
           />
-          <div className="relative w-full max-w-sm rounded-3xl border border-primary/15 bg-surface p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-3xl">
-              🧪
-            </div>
-            <h3 className="font-display text-xl font-bold text-text-primary">
+          <div role="dialog" aria-modal="true" className="relative w-full max-w-sm rounded-[var(--radius-container)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-high)]">
+            <h3 className="text-lg font-bold text-text-primary">
               Bạn có muốn bắt đầu bài kiểm tra không?
             </h3>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
@@ -1865,7 +2293,7 @@ const StudySession = () => {
                 onClick={() => {
                   setShowMinitestConfirm(false);
                   // Randomize the test set once, capped at the required count.
-                  setMinitestWords(shuffleArray(learnedWordsForMinitest).slice(0, MINITEST_REQUIRED_WORDS));
+                  setMinitestWords(shuffleArray(learnedWordsForMinitest).slice(0, requiredMinitestWords));
                   setTab("minitest");
                   setCurrentIndex(0);
                   setIsFlipped(false);
@@ -1883,18 +2311,15 @@ const StudySession = () => {
       {showMinitestInsufficient && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[color-mix(in_srgb,#0b0a12_55%,transparent)]"
             onClick={() => setShowMinitestInsufficient(false)}
           />
-          <div className="relative w-full max-w-sm rounded-3xl border border-primary/15 bg-surface p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-warning-color/15 text-3xl">
-              📚
-            </div>
-            <h3 className="font-display text-xl font-bold text-text-primary">
+          <div role="dialog" aria-modal="true" className="relative w-full max-w-sm rounded-[var(--radius-container)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-high)]">
+            <h3 className="text-lg font-bold text-text-primary">
               Chưa đủ từ để kiểm tra
             </h3>
             <p className="mx-auto mt-2 max-w-xs text-sm text-text-muted">
-              Bạn cần học ít nhất {MINITEST_REQUIRED_WORDS} từ trong chủ đề này trước khi làm kiểm tra.
+              Bạn cần học ít nhất {requiredMinitestWords} từ trong chủ đề này trước khi làm kiểm tra.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
               <Button variant="ghost" onClick={() => setShowMinitestInsufficient(false)}>
@@ -1915,6 +2340,73 @@ const StudySession = () => {
           </div>
         </div>
       )}
+
+      {/* Guest trial session completion modal */}
+      {guestCompletionSummary && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-[color-mix(in_srgb,#0b0a12_55%,transparent)]"
+            onClick={() => setGuestCompletionSummary(null)}
+          />
+          <div role="dialog" aria-modal="true" className="relative w-full max-w-md rounded-[var(--radius-container)] border border-border bg-surface p-6 text-center shadow-[var(--shadow-high)] sm:p-7">
+            <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary">
+              <Sparkles size={22} aria-hidden />
+            </div>
+            <h3 className="text-xl font-bold text-text-primary">
+              Hoàn thành phiên học thử {guestCompletionSummary.count} từ!
+            </h3>
+            <p className="mx-auto mt-2 text-sm leading-relaxed text-text-muted">
+              Bạn vừa đi qua đủ nhịp Flashcard → Tự đánh giá SM-2 → Ghép từ. Đăng ký miễn phí để lưu tiến độ, nhận lịch ôn tự động và mở toàn bộ chủ đề.
+            </p>
+            <div className="mt-6 flex flex-col gap-2.5">
+              <Button fullWidth variant="primary" onClick={() => navigate(PATHS.register)}>
+                Tạo tài khoản miễn phí
+              </Button>
+              {learnedWordsForMinitest.length > 0 && (
+                <Button
+                  fullWidth
+                  variant="secondary"
+                  onClick={() => {
+                    setGuestCompletionSummary(null);
+                    setMinitestWords(shuffleArray(learnedWordsForMinitest).slice(0, MINITEST_REQUIRED_WORDS));
+                    setTab("minitest");
+                    setCurrentIndex(0);
+                    setIsFlipped(false);
+                    setIsMinitestActive(true);
+                  }}
+                >
+                  Thử bài Kiểm tra (Minitest)
+                </Button>
+              )}
+              <Button fullWidth variant="ghost" onClick={() => setGuestCompletionSummary(null)}>
+                Học thêm từ trong chủ đề này
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <AppDialog
+        isOpen={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        title="Tạm dừng phiên học này?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowExitConfirm(false)}>
+              Ở lại học tiếp
+            </Button>
+            <Button variant="danger" onClick={() => void performExit()}>
+              Thoát phiên
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <img src="/mascot-lumo-thinking.webp" alt="Lumo" width={64} height={72} className="h-auto w-16" />
+          <p className="text-sm text-text-muted">
+            Tiến trình chưa hoàn tất trong phiên này sẽ không được lưu vào lịch ôn.
+          </p>
+        </div>
+      </AppDialog>
     </div>
   );
 };

@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
-import { Button, typography } from '../ui';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { AppDialog, Button } from '../ui';
 import { authApi, type AuthenticatedUser } from '../../services/authApi';
-import { AVATAR_PRESETS, normalizeAvatarUrl } from '../../utils/avatarPresets';
+import {
+    LEARNER_AVATAR_PRESETS,
+    MASCOT_AVATAR_PRESETS,
+    normalizeAvatarUrl,
+} from '../../utils/avatarPresets';
+import { ProfileFrameOverlay } from './ProfileFrameOverlay';
 import { saveProfilePreferences } from '../../utils/profilePreferences';
 
 type ToastFn = (message: string, kind?: 'success' | 'info' | 'error') => void;
@@ -84,81 +90,110 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         }
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className={`profile-modal-overlay${active ? ' is-open' : ''}`} role="dialog" aria-modal="true">
-            <div className="profile-modal-card">
-                <div className="profile-modal-header">
-                    <h3 className={typography.modalTitle}>Chỉnh sửa hồ sơ</h3>
-                    <button
-                        type="button"
-                        aria-label="Đóng"
-                        className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer"
-                        onClick={onClose}
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="profile-modal-body space-y-8">
-                    <section className="space-y-4">
-                        <h4 className="font-bold text-sm uppercase tracking-wide text-text-muted">Thông tin tài khoản &amp; hiển thị</h4>
-                        <div className="flex items-center gap-4">
-                            {avatarUrl ? (
-                                <img
-                                    src={normalizeAvatarUrl(avatarUrl)}
-                                    alt="Avatar preview"
-                                    className="w-20 h-20 rounded-full object-cover border-2 border-primary/15"
-                                />
-                            ) : (
-                                <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary to-secondary flex items-center justify-center text-3xl font-display text-text-on-accent border-2 border-primary/15">
-                                    {initials}
-                                </div>
-                            )}
+        <AppDialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Chỉnh sửa hồ sơ"
+            width={560}
+            footer={(
+                <>
+                    <Button variant="ghost" onClick={onClose}>Hủy</Button>
+                    <Button onClick={handleSaveProfile} isLoading={isSavingProfile}>Lưu hồ sơ</Button>
+                </>
+            )}
+        >
+            <div className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-6 pl-6 pr-2 py-2">
+                            <div className="relative h-16 w-16 shrink-0 sm:h-20 sm:w-20">
+                                {avatarUrl ? (
+                                    <img
+                                        src={normalizeAvatarUrl(avatarUrl)}
+                                        alt="Avatar preview"
+                                        className="h-16 w-16 rounded-full object-cover sm:h-20 sm:w-20"
+                                    />
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-text-on-accent sm:h-20 sm:w-20 sm:text-3xl">
+                                        {initials}
+                                    </div>
+                                )}
+                                <ProfileFrameOverlay frameKey={selectedFrameKey} />
+                            </div>
                             <Button
                                 type="button"
-                                variant="ghost"
-                                className="px-4"
+                                variant="secondary"
                                 onClick={() => setIsAvatarPickerOpen((prev) => !prev)}
                             >
-                                {isAvatarPickerOpen ? 'Ẩn avatar' : 'Chọn avatar'}
+                                {isAvatarPickerOpen ? 'Ẩn bộ avatar' : 'Chọn avatar 2D'}
                             </Button>
                         </div>
 
                         {isAvatarPickerOpen && (
-                            <div className="grid grid-cols-5 gap-3">
-                                {AVATAR_PRESETS.map((avatar) => (
-                                    <button
-                                        key={avatar.id}
-                                        type="button"
-                                        aria-label={`Chọn avatar ${avatar.id}`}
-                                        className={`rounded-full border-2 p-0.5 cursor-pointer ${avatarUrl === avatar.url ? 'border-primary' : 'border-transparent hover:border-primary/40'}`}
-                                        onClick={() => {
-                                            setAvatarUrl(avatar.url);
-                                            setIsAvatarPickerOpen(false);
-                                        }}
-                                    >
-                                        <img src={avatar.url} alt="" className="w-14 h-14 rounded-full object-cover" />
-                                    </button>
-                                ))}
+                            <div className="space-y-4 rounded-[var(--radius-element)] border-2 border-border bg-bg-secondary/50 p-3.5">
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                                        Mascot Lumo 2D ({MASCOT_AVATAR_PRESETS.length})
+                                    </p>
+                                    <div className="grid grid-cols-5 justify-items-center gap-2">
+                                        {MASCOT_AVATAR_PRESETS.map((avatar) => (
+                                            <button
+                                                key={avatar.id}
+                                                type="button"
+                                                aria-label={avatar.label}
+                                                title={avatar.label}
+                                                className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 p-0.5 cursor-pointer transition-transform hover:scale-105 ${
+                                                    avatarUrl === avatar.url
+                                                        ? 'border-primary ring-2 ring-primary/25'
+                                                        : 'border-border hover:border-primary/50'
+                                                }`}
+                                                onClick={() => setAvatarUrl(avatar.url)}
+                                            >
+                                                <img src={avatar.url} alt="" className="h-full w-full rounded-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                                        Nhân vật 2D ({LEARNER_AVATAR_PRESETS.length})
+                                    </p>
+                                    <div className="grid grid-cols-5 justify-items-center gap-2">
+                                        {LEARNER_AVATAR_PRESETS.map((avatar) => (
+                                            <button
+                                                key={avatar.id}
+                                                type="button"
+                                                aria-label={avatar.label}
+                                                title={avatar.label}
+                                                className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 p-0.5 cursor-pointer transition-transform hover:scale-105 ${
+                                                    avatarUrl === avatar.url
+                                                        ? 'border-primary ring-2 ring-primary/25'
+                                                        : 'border-border hover:border-primary/50'
+                                                }`}
+                                                onClick={() => setAvatarUrl(avatar.url)}
+                                            >
+                                                <img src={avatar.url} alt="" className="h-full w-full rounded-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
 
                         {/* Profile frame picker (cosmetic, localStorage; unlock derived from badges) */}
                         <div className="space-y-2">
-                            <h5 className="text-sm font-bold text-text-primary">Khung hồ sơ</h5>
+                            <h3 className="text-sm font-semibold text-text-primary">Khung hồ sơ</h3>
                             <div className="grid grid-cols-3 gap-2">
                                 <button
                                     type="button"
                                     onClick={() => onSelectFrame(null)}
-                                    className={`flex flex-col items-center rounded-xl border-2 p-2 text-center transition-colors ${
+                                    className={`flex flex-col items-center rounded-[var(--radius-element)] border p-2 text-center transition-colors ${
                                         selectedFrameKey === null ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
                                     }`}
                                 >
-                                    <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-border text-text-muted">✕</span>
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-border-emphasized text-text-muted"><X size={16} aria-hidden /></span>
                                     <span className="mt-1 text-xs font-bold text-text-primary">Không khung</span>
-                                    <span className="text-[10px] text-text-muted">{selectedFrameKey === null ? 'Đang dùng' : 'Mặc định'}</span>
+                                    <span className="text-xs text-text-muted">{selectedFrameKey === null ? 'Đang dùng' : 'Mặc định'}</span>
                                 </button>
                                 {frameOptions.map((frame) => {
                                     const active = selectedFrameKey === frame.key;
@@ -168,7 +203,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                                             type="button"
                                             disabled={!frame.unlocked}
                                             onClick={() => frame.unlocked && onSelectFrame(frame.key)}
-                                            className={`flex flex-col items-center rounded-xl border-2 p-2 text-center transition-colors ${
+                                            className={`flex flex-col items-center rounded-[var(--radius-element)] border p-2 text-center transition-colors ${
                                                 active
                                                     ? 'border-primary bg-primary/5'
                                                     : frame.unlocked
@@ -179,10 +214,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                                             <img
                                                 src={frame.img}
                                                 alt=""
-                                                className={`h-14 w-14 object-contain ${frame.unlocked ? '' : 'grayscale opacity-70'}`}
+                                                className={`h-12 w-12 object-contain ${frame.unlocked ? '' : 'grayscale opacity-70'}`}
                                             />
                                             <span className="mt-1 text-xs font-bold text-text-primary">{frame.label}</span>
-                                            <span className="text-[10px] text-text-muted">
+                                            <span className="text-xs text-text-muted">
                                                 {frame.unlocked ? (active ? 'Đang dùng' : 'Đã mở khóa') : 'Chưa mở khóa'}
                                             </span>
                                         </button>
@@ -191,27 +226,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             </div>
                         </div>
 
-                        <input
-                            type="text"
-                            className="profile-input"
-                            placeholder="Tên người dùng"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                        />
-                        <input
-                            type="email"
-                            className="profile-input"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-                        <Button className="w-full" variant="primary" onClick={handleSaveProfile} disabled={isSavingProfile}>
-                            {isSavingProfile ? 'Đang lưu...' : 'Lưu hồ sơ'}
-                        </Button>
-                    </section>
+                <div className="space-y-4">
+                    <TextInput label="Tên người dùng" value={username} onChange={setUsername} autoComplete="nickname" size="lg" width="100%" />
+                    <TextInput type="email" label="Email" value={email} onChange={setEmail} autoComplete="email" size="lg" width="100%" />
                 </div>
             </div>
-        </div>
+        </AppDialog>
     );
 };
 

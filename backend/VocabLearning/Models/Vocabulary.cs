@@ -10,6 +10,8 @@ namespace VocabLearning.Models
 
         public string? AudioUrl { get; set; } = string.Empty;
 
+        public string? ImageUrl { get; set; } = string.Empty;
+
         public string? Level { get; set; } = string.Empty;
 
         public string? MeaningVi { get; set; } = string.Empty;

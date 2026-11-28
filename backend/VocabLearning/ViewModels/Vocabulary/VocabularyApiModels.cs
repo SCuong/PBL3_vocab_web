@@ -17,6 +17,8 @@ namespace VocabLearning.ViewModels.Vocabulary
         public string TopicName { get; set; } = string.Empty;
 
         public string AudioUrl { get; set; } = string.Empty;
+
+        public string ImageUrl { get; set; } = string.Empty;
     }
 
     public sealed class VocabularyExampleViewModel
@@ -47,6 +49,8 @@ namespace VocabLearning.ViewModels.Vocabulary
         public string TopicName { get; set; } = string.Empty;
 
         public string AudioUrl { get; set; } = string.Empty;
+
+        public string ImageUrl { get; set; } = string.Empty;
 
         public List<VocabularyExampleViewModel> Examples { get; set; } = new();
     }
@@ -81,6 +85,8 @@ namespace VocabLearning.ViewModels.Vocabulary
         public string TopicName { get; set; } = string.Empty;
 
         public string AudioUrl { get; set; } = string.Empty;
+
+        public string ImageUrl { get; set; } = string.Empty;
 
         public string Example { get; set; } = string.Empty;
 

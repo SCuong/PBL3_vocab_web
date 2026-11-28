@@ -121,6 +121,7 @@ namespace VocabLearning.Data
                 entity.Property(vocabulary => vocabulary.Word).HasColumnName("word");
                 entity.Property(vocabulary => vocabulary.Ipa).HasColumnName("ipa");
                 entity.Property(vocabulary => vocabulary.AudioUrl).HasColumnName("audio_url");
+                entity.Property(vocabulary => vocabulary.ImageUrl).HasColumnName("image_url");
                 entity.Property(vocabulary => vocabulary.Level).HasColumnName("level");
                 entity.Property(vocabulary => vocabulary.MeaningVi).HasColumnName("meaning_vi");
                 entity.Property(vocabulary => vocabulary.TopicId).HasColumnName("topic_id");

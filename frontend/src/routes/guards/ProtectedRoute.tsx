@@ -9,7 +9,13 @@ export const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 
     if (isLoading) return null;
     if (!currentUser) {
-        return <Navigate to={PATHS.login} state={{ from: location }} replace />;
+        return (
+            <Navigate
+                to={PATHS.login}
+                state={{ from: location, authNotice: 'Vui lòng đăng nhập để truy cập trang này.' }}
+                replace
+            />
+        );
     }
     return <>{children}</>;
 };

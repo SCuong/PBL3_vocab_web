@@ -2,8 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
     AlertTriangle,
     BarChart3, BookOpen, CalendarClock, Eye, EyeOff, Flame, Loader2, Pencil, Plus,
-    RefreshCw, Search, Trash2, Trophy,
-} from 'lucide-react';
+    RefreshCw, Search, Trash2, Trophy, Check } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { DataTable, ErrorNotice, FilterBar, IconButton, Input, Modal, Pagination, Select, TextArea, adminInputClass, adminLabelClass } from '../../components/admin/ui';
 import { useAppContext } from '../../context/AppContext';
@@ -98,6 +97,7 @@ interface UserFormModalProps {
 const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUserId }: UserFormModalProps) => {
     const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
     const [showPassword, setShowPassword] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
     const passwordId = useId();
     const isEdit = modalState.mode === 'edit';
     const editingUser = modalState.mode === 'edit' ? modalState.user : null;
@@ -121,23 +121,44 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
             setForm(EMPTY_FORM);
         }
         setShowPassword(false);
+        setLocalError(null);
     }, [modalState]);
 
     const setField =
         (key: keyof UserFormData) =>
-        (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+            setLocalError(null);
             setForm(prev => ({ ...prev, [key]: e.target.value }));
+        };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!form.username.trim() || form.username.trim().length < 3) {
+            setLocalError('Tên đăng nhập phải có ít nhất 3 ký tự.');
+            return;
+        }
+        if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+            setLocalError('Email không đúng định dạng.');
+            return;
+        }
+        if (!isEdit && !form.password) {
+            setLocalError('Vui lòng nhập mật khẩu cho tài khoản mới.');
+            return;
+        }
+        if (form.password && !isPasswordPolicyValid(passwordPolicy)) {
+            setLocalError('Mật khẩu chưa đạt đủ yêu cầu bảo mật bên dưới.');
+            return;
+        }
+        setLocalError(null);
         void onSubmit(form);
     };
     const inputClass = adminInputClass;
     const labelClass = adminLabelClass;
+    const displayError = localError || error;
 
     return (
         <Modal title={isEdit ? 'Chỉnh sửa người dùng' : 'Thêm người dùng'} onClose={onClose}>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form noValidate onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <Input
                             label="Tên đăng nhập"
@@ -184,7 +205,7 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                                 required={!isEdit}
                                 minLength={PASSWORD_MIN_LENGTH}
                                 maxLength={PASSWORD_MAX_LENGTH}
-                                placeholder={isEdit ? '••••••••' : `Tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`}
+                                placeholder={isEdit ? 'Để trống nếu không đổi mật khẩu' : `Tối thiểu ${PASSWORD_MIN_LENGTH} ký tự`}
                                 disabled={saving}
                             />
                             <button
@@ -199,14 +220,14 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                             </button>
                         </div>
                         {(!isEdit || form.password) && (
-                            <div className="mt-2 rounded-xl border border-primary/15 bg-surface/70 px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
+                            <div className="mt-2 rounded-[var(--radius-element)] border border-border bg-surface px-4 py-3 text-xs text-text-secondary space-y-1 text-left">
                                 <p className="font-semibold text-text-primary mb-1">Yêu cầu mật khẩu:</p>
                                 {PASSWORD_POLICY_LABELS.map(([key, label]) => {
                                     const ok = passwordPolicy[key];
                                     return (
                                         <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
                                             <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
-                                                {ok ? '✓' : ''}
+                                                {ok && <Check size={11} strokeWidth={3} aria-hidden />}
                                             </span>
                                             {label}
                                         </p>
@@ -246,10 +267,10 @@ const UserFormModal = ({ modalState, onClose, onSubmit, saving, error, currentUs
                         </p>
                     )}
 
-                    {error && (
+                    {displayError && (
                         <ErrorNotice>
                             <AlertTriangle size={14} className="shrink-0" />
-                            {error}
+                            {displayError}
                         </ErrorNotice>
                     )}
 
@@ -370,7 +391,7 @@ const LearnerDetailModal = ({
         ) : error || !detail ? (
             <ErrorNotice><AlertTriangle size={15} /> {error ?? 'Không có dữ liệu học tập.'}</ErrorNotice>
         ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
                 <div>
                     <p className="font-display text-lg font-bold text-text-primary">{detail.user.username}</p>
                     <p className="text-sm text-text-muted">{detail.user.email}</p>
@@ -396,10 +417,10 @@ const LearnerDetailModal = ({
                         ['Ôn ngày mai', detail.learning.reviewForecast.dueTomorrow, <CalendarClock size={16} />],
                         ['Ôn tuần này', detail.learning.reviewForecast.dueThisWeek, <CalendarClock size={16} />],
                     ].map(([label, value, icon]) => (
-                        <div key={String(label)} className="rounded-xl border border-border bg-surface p-3">
-                            <div className="mb-2 text-primary">{icon}</div>
+                        <div key={String(label)} className="rounded-[var(--radius-element)] border border-border bg-surface p-2.5">
+                            <div className="mb-1 text-primary">{icon}</div>
                             <p className="text-xs text-text-muted">{label}</p>
-                            <p className="mt-1 font-display text-lg font-bold text-text-primary">{value}</p>
+                            <p className="mt-0.5 font-display text-lg font-bold text-text-primary">{value}</p>
                         </div>
                     ))}
                 </div>
@@ -407,11 +428,11 @@ const LearnerDetailModal = ({
                 <div>
                     <h3 className="mb-3 font-display font-bold text-text-primary">Hoạt động gần đây</h3>
                     {detail.learning.recentActivity.length === 0 ? (
-                        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">Chưa có hoạt động học tập.</p>
+                        <p className="rounded-[var(--radius-element)] border border-border bg-surface p-4 text-sm text-text-muted">Chưa có hoạt động học tập.</p>
                     ) : (
                         <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
                             {detail.learning.recentActivity.map((activity, index) => (
-                                <div key={`${activity.sessionId ?? 'activity'}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
+                                <div key={`${activity.sessionId ?? 'activity'}-${index}`} className="flex items-center justify-between gap-3 rounded-[var(--radius-element)] border border-border bg-surface p-3">
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-semibold text-text-primary">{activity.topicName || 'Hoạt động học tập'}</p>
                                         <p className="text-xs text-text-muted">{activity.activityType} · {activity.wordsStudied} từ</p>
@@ -512,7 +533,7 @@ const LearningActionModal = ({
                     </>
                 )}
                 {action === 'delete-data' && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div className="rounded-[var(--radius-element)] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         Thao tác xóa toàn bộ dữ liệu học nhưng giữ tài khoản. Nhập <strong>{detail.user.username}</strong> hoặc email để xác nhận.
                     </div>
                 )}
@@ -800,11 +821,11 @@ const AdminUsers = () => {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-primary/10">
+                            <tr className="border-b border-border">
                                 {['ID', 'Tên đăng nhập', 'Email', 'Vai trò', 'Trạng thái', 'Đăng nhập', 'Ngày tạo', ''].map(h => (
                                     <th
                                         key={h}
-                                        className={`px-4 py-3.5 text-xs font-display font-bold text-text-muted uppercase tracking-wide ${h === '' ? 'text-right' : 'text-left'}`}
+                                        className={`px-4 py-3.5 text-sm font-medium text-text-muted ${h === '' ? 'text-right' : 'text-left'}`}
                                     >
                                         {h}
                                     </th>
@@ -827,7 +848,7 @@ const AdminUsers = () => {
                                 paged.map(user => (
                                     <tr
                                         key={user.userId}
-                                        className={`border-b border-primary/5 transition-colors ${
+                                        className={`border-b border-border transition-colors ${
                                             user.isDeleted
                                                 ? 'opacity-50'
                                                 : 'hover:bg-primary/[0.03]'
@@ -858,21 +879,21 @@ const AdminUsers = () => {
                                             />
                                         </td>
                                         <td className="px-4 py-3.5">
-                                            <div className="flex gap-1">
+                                            <div className="flex gap-1.5">
                                                 {user.hasLocalPassword && (
                                                     <span
                                                         aria-label="Có đăng nhập mật khẩu"
-                                                        className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
+                                                        className="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-muted"
                                                     >
-                                                        PW
+                                                        Mật khẩu
                                                     </span>
                                                 )}
                                                 {user.hasGoogleLogin && (
                                                     <span
                                                         aria-label="Có đăng nhập Google"
-                                                        className="text-xs bg-surface border border-border rounded px-1.5 py-0.5 text-text-muted"
+                                                        className="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-muted"
                                                     >
-                                                        G
+                                                        Google
                                                     </span>
                                                 )}
                                             </div>

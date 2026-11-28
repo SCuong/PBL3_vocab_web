@@ -1,16 +1,41 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, Volume2, X, Sparkles, Loader2, ChevronDown, RotateCcw, Lock } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+    ArrowLeft,
+    Check,
+    ChevronDown,
+    Lock,
+    Play,
+    RotateCcw,
+    Search,
+    Sparkles,
+    Volume2,
+    X,
+} from 'lucide-react';
+import { Button as AstryxButton } from '@astryxdesign/core/Button';
+import { Selector } from '@astryxdesign/core/Selector';
+import { Pagination } from '@astryxdesign/core/Pagination';
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { CEFR_LEVELS } from '../constants/appConstants';
-import { Badge, Button, PageTitle, typography } from '../components/ui';
+import { AudioWaveButton, Badge, Button } from '../components/ui';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { apiFetch } from '../services/apiClient';
+import { mapVocabularyToUiModel, type VocabularyUiItem } from '../utils/vocabularyMapper';
 import { playPronunciationAudio } from '../utils/audio';
-import { mapVocabularyToUiModel } from '../utils/vocabularyMapper';
+import { getAutoPlayPronunciation } from '../utils/learningPreferences';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
 
 const PAGE_SIZE = 24;
+
+const VOCAB_PAGE_CACHE = new Map<string, {
+    items: VocabularyUiItem[];
+    page: number;
+    totalPages: number;
+    totalCount: number;
+}>();
+
+const VOCAB_DETAIL_CACHE = new Map<number, VocabularyUiItem>();
 
 type AiCollocation = {
     phrase: string;
@@ -41,15 +66,6 @@ type VocabularyAiResponse = {
 
 type AiSectionKey = 'usage' | 'collocations' | 'confusingWords' | 'commonMistakes';
 
-type AiAssistantPanelProps = {
-    response: VocabularyAiResponse | null;
-    error: string;
-    isLoading: boolean;
-    openSection: AiSectionKey | null;
-    onToggleSection: (section: AiSectionKey) => void;
-    onRetry: () => void;
-};
-
 type AiAccordionSectionProps = {
     title: string;
     open: boolean;
@@ -58,23 +74,58 @@ type AiAccordionSectionProps = {
     bodyClassName?: string;
 };
 
+const isEditableElement = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const renderHighlightedExample = (sentence: string, targetWord: string): ReactNode => {
+    const cleanWord = targetWord.trim();
+    if (!cleanWord) return sentence;
+
+    const matcher = new RegExp(`(\\b${escapeRegExp(cleanWord)}[a-z]*\\b)`, 'gi');
+    const parts = sentence.split(matcher);
+    if (parts.length <= 1) return sentence;
+
+    return parts.map((part, idx) =>
+        idx % 2 === 1 ? (
+            <mark
+                key={`${part}-${idx}`}
+                className="rounded bg-primary-light px-0.5 font-semibold text-primary"
+            >
+                {part}
+            </mark>
+        ) : (
+            part
+        ),
+    );
+};
+
 const AiAccordionSection = ({ title, open, onToggle, children, bodyClassName }: AiAccordionSectionProps) => (
     <section>
         <button
             type="button"
-            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-text-primary cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-surface-hover active:scale-[0.995]"
+            className="flex w-full cursor-pointer items-center justify-between gap-3 py-3 text-left text-sm font-semibold text-text-primary transition-colors duration-150 ease-[var(--ease-out)] hover:text-primary"
             onClick={onToggle}
             aria-expanded={open}
         >
             {title}
-            <ChevronDown size={16} className={`shrink-0 transition-transform duration-300 ease-out ${open ? 'rotate-180' : ''}`} />
+            <ChevronDown
+                size={16}
+                className={`shrink-0 text-text-muted transition-transform duration-200 ease-[var(--ease-out)] ${open ? 'rotate-180' : ''}`}
+            />
         </button>
         <div
-            className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+            className={`grid transition-[grid-template-rows,opacity] duration-200 ease-[var(--ease-out)] ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
             aria-hidden={!open}
         >
             <div className="min-h-0 overflow-hidden">
-                <div className={`px-4 pb-4 text-sm leading-relaxed text-text-secondary transition-transform duration-300 ease-out ${open ? 'translate-y-0' : '-translate-y-1'} ${bodyClassName ?? ''}`}>
+                <div
+                    className={`pb-3.5 text-sm leading-relaxed text-text-secondary transition-transform duration-200 ease-[var(--ease-out)] ${open ? 'translate-y-0' : '-translate-y-1'} ${bodyClassName ?? ''}`}
+                >
                     {children}
                 </div>
             </div>
@@ -82,191 +133,319 @@ const AiAccordionSection = ({ title, open, onToggle, children, bodyClassName }: 
     </section>
 );
 
-const AiAssistantPanel = ({
+type AiAssistantBodyProps = {
+    response: VocabularyAiResponse | null;
+    error: string;
+    isLoading: boolean;
+    openSection: AiSectionKey | null;
+    onToggleSection: (section: AiSectionKey) => void;
+    onRetry: () => void;
+};
+
+const AiAssistantBody = ({
     response,
     error,
     isLoading,
     openSection,
     onToggleSection,
     onRetry,
-}: AiAssistantPanelProps) => {
+}: AiAssistantBodyProps) => {
+    if (isLoading) {
+        return (
+            <div className="space-y-2.5 pt-3" aria-live="polite">
+                <div className="h-14 animate-pulse rounded-[var(--radius-inner)] bg-bg-secondary" />
+                <div className="h-9 animate-pulse rounded-[var(--radius-inner)] bg-bg-secondary" />
+                <div className="h-9 animate-pulse rounded-[var(--radius-inner)] bg-bg-secondary" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="pt-3">
+                <p className="text-sm text-warning-color">{error}</p>
+                <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-2 inline-flex cursor-pointer items-center gap-1.5 text-sm font-bold text-primary hover:text-primary-hover"
+                >
+                    <RotateCcw size={14} /> Thử lại
+                </button>
+            </div>
+        );
+    }
+
+    if (!response) return null;
+
     return (
-        <aside className="rounded-card border border-border bg-bg-secondary/70 p-4 md:p-5 min-w-0">
-            <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <Sparkles size={17} />
-                    </span>
-                    <div>
-                        <h3 className="text-base font-bold text-text-primary">Trợ lý AI</h3>
-                        <p className="text-xs text-text-muted">Gợi ý học từ ngắn gọn</p>
+        <div className="space-y-3 pt-3">
+            <div className="border-l-2 border-primary/40 pl-3.5">
+                <p className="text-sm leading-relaxed text-text-primary">{response.summary}</p>
+                {response.isFallback && (
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <p className="text-xs text-text-muted">Đang hiển thị gợi ý cơ bản.</p>
+                        <button
+                            type="button"
+                            onClick={onRetry}
+                            className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-hover"
+                        >
+                            <RotateCcw size={13} /> Thử lại
+                        </button>
                     </div>
-                </div>
-                <Badge variant="cyan" className="normal-case">Beta</Badge>
+                )}
             </div>
 
-            {isLoading && (
-                <div className="space-y-3" aria-live="polite">
-                    <div className="h-24 rounded-lg bg-surface animate-pulse" />
-                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
-                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
-                    <div className="h-11 rounded-lg bg-surface animate-pulse" />
-                </div>
-            )}
+            <div className="divide-y divide-border/75 border-t border-border/75">
+                <AiAccordionSection
+                    title="Cách dùng nhanh"
+                    open={openSection === 'usage'}
+                    onToggle={() => onToggleSection('usage')}
+                >
+                    {response.quickUsage || 'Chưa có gợi ý cách dùng cho từ này.'}
+                </AiAccordionSection>
 
-            {!isLoading && error && (
-                <div className="rounded-lg border border-warning-color/25 bg-warning-color/10 p-4">
-                    <p className="text-sm text-text-secondary">{error}</p>
-                    <button
-                        type="button"
-                        onClick={onRetry}
-                        className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary hover:text-primary-hover cursor-pointer"
+                {response.collocations.length > 0 && (
+                    <AiAccordionSection
+                        title="Cụm từ hay gặp"
+                        open={openSection === 'collocations'}
+                        onToggle={() => onToggleSection('collocations')}
+                        bodyClassName="space-y-2.5"
                     >
-                        <RotateCcw size={15} /> Thử lại
-                    </button>
-                </div>
-            )}
-
-            {!isLoading && !error && response && (
-                <div className="space-y-3">
-                    <div className="rounded-lg border border-primary/15 bg-surface p-4">
-                        <p className="text-sm leading-relaxed text-text-primary">{response.summary}</p>
-                        {response.isFallback && (
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs text-text-muted">
-                                    Đang hiển thị gợi ý cơ bản.
+                        {response.collocations.map((item) => (
+                            <div key={`${item.phrase}-${item.example}`}>
+                                <p>
+                                    <strong className="text-text-primary">{item.phrase}</strong> · {item.meaning}
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={onRetry}
-                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-hover cursor-pointer"
-                                >
-                                    <RotateCcw size={13} /> Thử lại
-                                </button>
+                                {item.example && (
+                                    <p className="mt-0.5 text-xs italic text-text-muted">{item.example}</p>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        ))}
+                    </AiAccordionSection>
+                )}
 
-                    <div className="overflow-hidden rounded-lg border border-border bg-surface divide-y divide-border">
-                        <AiAccordionSection
-                            title="Cách dùng nhanh"
-                            open={openSection === 'usage'}
-                            onToggle={() => onToggleSection('usage')}
-                        >
-                            {response.quickUsage || 'Chưa có gợi ý cách dùng cho từ này.'}
-                        </AiAccordionSection>
+                {response.confusingWords.length > 0 && (
+                    <AiAccordionSection
+                        title="Phân biệt dễ nhầm"
+                        open={openSection === 'confusingWords'}
+                        onToggle={() => onToggleSection('confusingWords')}
+                        bodyClassName="space-y-2"
+                    >
+                        {response.confusingWords.map((item) => (
+                            <p key={item.word}>
+                                <strong className="text-text-primary">{item.word}:</strong> {item.difference}
+                            </p>
+                        ))}
+                    </AiAccordionSection>
+                )}
 
-                        <AiAccordionSection
-                            title="Cụm từ hay gặp"
-                            open={openSection === 'collocations'}
-                            onToggle={() => onToggleSection('collocations')}
-                            bodyClassName="space-y-3"
-                        >
-                            {response.collocations.length === 0 && 'Chưa có cụm từ gợi ý.'}
-                            {response.collocations.map(item => (
-                                <div key={`${item.phrase}-${item.example}`}>
-                                    <p><strong className="text-text-primary">{item.phrase}</strong> · {item.meaning}</p>
-                                    {item.example && <p className="mt-1 text-xs italic text-text-muted">{item.example}</p>}
-                                </div>
-                            ))}
-                        </AiAccordionSection>
-
-                        <AiAccordionSection
-                            title="Phân biệt dễ nhầm"
-                            open={openSection === 'confusingWords'}
-                            onToggle={() => onToggleSection('confusingWords')}
-                            bodyClassName="space-y-3"
-                        >
-                            {response.confusingWords.length === 0 && 'Chưa có từ dễ nhầm cần lưu ý.'}
-                            {response.confusingWords.map(item => (
-                                <p key={item.word}>
-                                    <strong className="text-text-primary">{item.word}:</strong> {item.difference}
-                                </p>
-                            ))}
-                        </AiAccordionSection>
-
-                        <AiAccordionSection
-                            title="Lỗi thường gặp"
-                            open={openSection === 'commonMistakes'}
-                            onToggle={() => onToggleSection('commonMistakes')}
-                            bodyClassName="space-y-4"
-                        >
-                            {response.commonMistakes.length === 0 && 'Chưa có lỗi thường gặp cần lưu ý.'}
-                            {response.commonMistakes.map(item => (
-                                <div key={`${item.wrong}-${item.correct}`}>
-                                    {item.wrong && <p className="text-danger-color line-through">{item.wrong}</p>}
-                                    <p className="font-semibold text-success-color">{item.correct}</p>
-                                    {item.explanation && <p className="mt-1 text-xs text-text-muted">{item.explanation}</p>}
-                                </div>
-                            ))}
-                        </AiAccordionSection>
-                    </div>
-                </div>
-            )}
-        </aside>
+                {response.commonMistakes.length > 0 && (
+                    <AiAccordionSection
+                        title="Lỗi thường gặp"
+                        open={openSection === 'commonMistakes'}
+                        onToggle={() => onToggleSection('commonMistakes')}
+                        bodyClassName="space-y-3"
+                    >
+                        {response.commonMistakes.map((item) => (
+                            <div key={`${item.wrong}-${item.correct}`}>
+                                {item.wrong && <p className="text-danger-color line-through">{item.wrong}</p>}
+                                <p className="font-semibold text-success-color">{item.correct}</p>
+                                {item.explanation && (
+                                    <p className="mt-0.5 text-xs text-text-muted">{item.explanation}</p>
+                                )}
+                            </div>
+                        ))}
+                    </AiAccordionSection>
+                )}
+            </div>
+        </div>
     );
 };
 
 const Vocabulary = () => {
-    const { topicFilters: topics, currentUser } = useAppContext();
+    const { topicFilters: topics, learnedWordIds, currentUser } = useAppContext();
     const navigate = useNavigate();
     const location = useLocation();
-    const [showLoginModal, setShowLoginModal] = useState(false);
-    const [loginModalActive, setLoginModalActive] = useState(false);
-    const [selectedWord, setSelectedWord] = useState<any>(null);
-    const onSelectWord = (word: any) => {
-        setSelectedWord(word);
-        void vocabularyApi.getById(word.id)
-            .then(detail => setSelectedWord(prev =>
-                prev?.id === word.id ? mapVocabularyToUiModel(detail) : prev))
-            .catch(() => { /* keep list-row data */ });
-    };
-    const onCloseWordDetail = () => setSelectedWord(null);
-    const [items, setItems] = useState<any[]>([]);
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const searchInputRef = useRef<HTMLInputElement | null>(null);
+    const rowRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+    const detailReqIdRef = useRef(0);
+    const listReqIdRef = useRef(0);
+    const initialWordParamRef = useRef(searchParams.get('word')?.trim() || '');
+
+    const [items, setItems] = useState<VocabularyUiItem[]>([]);
+    const [search, setSearch] = useState(() => initialWordParamRef.current);
+    const [debouncedSearch, setDebouncedSearch] = useState(() => initialWordParamRef.current);
     const [selectedCefr, setSelectedCefr] = useState('ALL');
-    const [selectedTopic, setSelectedTopic] = useState('ALL');
+    const [selectedTopic, setSelectedTopic] = useState(() => {
+        const rawTopic = searchParams.get('topic')?.trim();
+        return rawTopic && /^\d+$/.test(rawTopic) ? rawTopic : 'ALL';
+    });
+
     const [page, setPage] = useState(1);
-    const [pageInput, setPageInput] = useState('1');
     const [totalPages, setTotalPages] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
-    // Page entrance. Header/filters reveal one frame after mount. Cards reveal
-    // once, after the first list of results arrives — kept to the initial load
-    // so typing in search or paging never triggers a laggy full re-animation.
-    const [mounted, setMounted] = useState(false);
-    const [cardsRevealed, setCardsRevealed] = useState(false);
+    // Selected word (desktop always previews active entry; mobile switches between index & detail view).
+    const [selectedWord, setSelectedWord] = useState<VocabularyUiItem | null>(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
+    const [slowPlayback, setSlowPlayback] = useState(false);
+    const autoSpeakTimerRef = useRef<number | null>(null);
 
-    // AI State
+    // AI panel state (collapsed by default inside the dictionary sheet).
     const [aiResponse, setAiResponse] = useState<VocabularyAiResponse | null>(null);
     const [aiError, setAiError] = useState('');
     const [isLoadingAi, setIsLoadingAi] = useState(false);
     const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
     const [openAiSection, setOpenAiSection] = useState<AiSectionKey | null>('usage');
 
-    // Drives the .is-open class one frame after mount so the modal fade
-    // transitions from opacity:0 → 1 instead of snapping.
-    const [modalActive, setModalActive] = useState(false);
+    // Login prompt for Guests clicking AI explanation (keeps selectedWord intact).
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginModalActive, setLoginModalActive] = useState(false);
 
-    // Reset AI response when word changes; also retrigger the open animation.
+    const [mounted, setMounted] = useState(false);
+
+    const learnedWordIdSet = useMemo(() => new Set(learnedWordIds), [learnedWordIds]);
+
+    useEffect(() => {
+        const id = requestAnimationFrame(() => setMounted(true));
+        return () => cancelAnimationFrame(id);
+    }, []);
+
+    // Resolve ?topic= or ?topicName= query params (e.g. from the Home topic ticker).
+    useEffect(() => {
+        const rawTopic = searchParams.get('topic')?.trim();
+        if (rawTopic && /^\d+$/.test(rawTopic)) {
+            if (selectedTopic !== rawTopic) setSelectedTopic(rawTopic);
+            return;
+        }
+
+        const rawTopicName = searchParams.get('topicName')?.trim().toLowerCase();
+        if (rawTopicName && topics.length > 0) {
+            const normalizedQuery = rawTopicName.replace(/&/g, 'and').replace(/\s+/g, ' ');
+            const matched = topics.find((topic) => {
+                const normalizedName = topic.name.trim().toLowerCase().replace(/&/g, 'and').replace(/\s+/g, ' ');
+                return normalizedName === normalizedQuery;
+            });
+            if (matched) {
+                const nextValue = String(matched.topicId);
+                setSelectedTopic(nextValue);
+                setSearchParams(
+                    (prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete('topicName');
+                        next.set('topic', nextValue);
+                        return next;
+                    },
+                    { replace: true },
+                );
+            }
+        }
+    }, [searchParams, topics, selectedTopic, setSearchParams]);
+
+    const handleTopicChange = (value: string | null) => {
+        const nextTopic = value ?? 'ALL';
+        setSelectedTopic(nextTopic);
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('topicName');
+                if (nextTopic === 'ALL') next.delete('topic');
+                else next.set('topic', nextTopic);
+                return next;
+            },
+            { replace: true },
+        );
+    };
+
+    const topicOptions = useMemo(() => {
+        const nonEmpty = topics.filter((topic: any) =>
+            typeof topic.wordCount === 'number' ? topic.wordCount > 0 : true,
+        );
+        const source = nonEmpty.length > 0 ? nonEmpty : topics;
+        return source
+            .map((topic: any) => ({ value: String(topic.topicId), label: topic.name }))
+            .sort((a: any, b: any) => a.label.localeCompare(b.label));
+    }, [topics]);
+
+    // Select a word and lazily hydrate its full examples array with stale-response protection.
+    const selectWord = useCallback((word: VocabularyUiItem, openMobileSheet = false) => {
+        const cached = VOCAB_DETAIL_CACHE.get(word.id);
+        const resolved = cached ?? word;
+        setSelectedWord(resolved);
+        if (openMobileSheet) setIsMobileDetailOpen(true);
+        if (autoSpeakTimerRef.current !== null) {
+            window.clearTimeout(autoSpeakTimerRef.current);
+            autoSpeakTimerRef.current = null;
+        }
+        if (getAutoPlayPronunciation() && resolved.word) {
+            // Defer speech synthesis past the paint frame so 120Hz UI transitions stay instant.
+            autoSpeakTimerRef.current = window.setTimeout(() => {
+                autoSpeakTimerRef.current = null;
+                playPronunciationAudio(resolved.audioUrl, resolved.word);
+            }, 140);
+        }
+
+        if (cached) {
+            setIsDetailLoading(false);
+            return;
+        }
+
+        const reqId = ++detailReqIdRef.current;
+        setIsDetailLoading(true);
+        void vocabularyApi
+            .getById(word.id)
+            .then((detail) => {
+                const mapped = mapVocabularyToUiModel(detail);
+                VOCAB_DETAIL_CACHE.set(word.id, mapped);
+                if (reqId === detailReqIdRef.current) {
+                    setSelectedWord((prev) => (prev?.id === word.id ? mapped : prev));
+                }
+            })
+            .catch(() => {
+                /* keep summary row data */
+            })
+            .finally(() => {
+                if (reqId === detailReqIdRef.current) {
+                    setIsDetailLoading(false);
+                }
+            });
+    }, []);
+
+    // Reset AI panel when the active word id changes + preload neighbor word images for 0ms switching.
+    const selectedWordId = selectedWord?.id ?? null;
     useEffect(() => {
         setAiResponse(null);
         setAiError('');
         setIsLoadingAi(false);
         setIsAiPanelOpen(false);
         setOpenAiSection('usage');
-        if (!selectedWord) {
-            setModalActive(false);
-            return;
-        }
-        const id = requestAnimationFrame(() => setModalActive(true));
-        return () => cancelAnimationFrame(id);
-    }, [selectedWord]);
 
-    // Drives the enter fade/scale for the login-required modal.
+        if (!selectedWordId || items.length === 0) return;
+        const idx = items.findIndex((item) => item.id === selectedWordId);
+        if (idx === -1) return;
+        for (const offset of [-1, 1, 2]) {
+            const neighbor = items[idx + offset];
+            if (neighbor?.imageUrl) {
+                const preloader = new Image();
+                preloader.decoding = 'async';
+                preloader.src = neighbor.imageUrl;
+            }
+        }
+    }, [selectedWordId, items]);
+
+    useEffect(() => {
+        return () => {
+            if (autoSpeakTimerRef.current !== null) {
+                window.clearTimeout(autoSpeakTimerRef.current);
+            }
+        };
+    }, []);
+
     useEffect(() => {
         if (!showLoginModal) {
             setLoginModalActive(false);
@@ -276,18 +455,161 @@ const Vocabulary = () => {
         return () => cancelAnimationFrame(id);
     }, [showLoginModal]);
 
-    // Header + filters entrance on mount.
+    // Debounce search query.
     useEffect(() => {
-        const id = requestAnimationFrame(() => setMounted(true));
-        return () => cancelAnimationFrame(id);
-    }, []);
+        const timeout = window.setTimeout(() => {
+            setDebouncedSearch(search.trim());
+        }, 220);
+        return () => window.clearTimeout(timeout);
+    }, [search]);
 
-    // Cards entrance once the first page of results has loaded.
+    const loadPage = useCallback(
+        async (nextPage: number) => {
+            const reqId = ++listReqIdRef.current;
+            const cacheKey = `${nextPage}|${debouncedSearch}|${selectedCefr}|${selectedTopic}`;
+            const cached = VOCAB_PAGE_CACHE.get(cacheKey);
+            if (cached) {
+                setItems(cached.items);
+                setPage(cached.page);
+                setTotalPages(cached.totalPages);
+                setTotalCount(cached.totalCount);
+                setErrorMessage('');
+                setIsLoading(false);
+            } else {
+                setIsLoading(true);
+            }
+
+            try {
+                const response = await vocabularyApi.getPage({
+                    page: nextPage,
+                    pageSize: PAGE_SIZE,
+                    search: debouncedSearch,
+                    cefr: selectedCefr,
+                    topicId: selectedTopic === 'ALL' ? null : Number(selectedTopic),
+                });
+                if (reqId !== listReqIdRef.current) return;
+
+                const mappedItems = response.items.map(mapVocabularyToUiModel);
+                VOCAB_PAGE_CACHE.set(cacheKey, {
+                    items: mappedItems,
+                    page: response.page,
+                    totalPages: response.totalPages,
+                    totalCount: response.totalCount,
+                });
+                setItems(mappedItems);
+                setPage(response.page);
+                setTotalPages(response.totalPages);
+                setTotalCount(response.totalCount);
+                setErrorMessage('');
+            } catch (error: any) {
+                if (reqId !== listReqIdRef.current) return;
+                if (!cached) {
+                    setErrorMessage(error?.message || 'Không thể tải danh sách từ vựng.');
+                    setItems([]);
+                    setTotalCount(0);
+                    setTotalPages(0);
+                }
+            } finally {
+                if (reqId === listReqIdRef.current) {
+                    setIsLoading(false);
+                }
+            }
+        },
+        [debouncedSearch, selectedCefr, selectedTopic],
+    );
+
     useEffect(() => {
-        if (cardsRevealed || items.length === 0) return;
-        const id = requestAnimationFrame(() => setCardsRevealed(true));
-        return () => cancelAnimationFrame(id);
-    }, [items, cardsRevealed]);
+        setPage(1);
+        void loadPage(1);
+    }, [loadPage]);
+
+    useEffect(() => {
+        if (page <= 1) return;
+        void loadPage(page);
+    }, [page, loadPage]);
+
+    // Auto-select the matching ?word= entry or the first result whenever the page list changes.
+    useEffect(() => {
+        if (items.length === 0) {
+            setSelectedWord(null);
+            setIsMobileDetailOpen(false);
+            return;
+        }
+
+        const requestedWord = initialWordParamRef.current.toLowerCase();
+        if (requestedWord) {
+            const exact = items.find((item) => item.word.toLowerCase() === requestedWord);
+            if (exact) {
+                initialWordParamRef.current = '';
+                selectWord(exact, false);
+                return;
+            }
+        }
+
+        setSelectedWord((current) => {
+            if (current && items.some((item) => item.id === current.id)) {
+                return VOCAB_DETAIL_CACHE.get(current.id) ?? current;
+            }
+            return current;
+        });
+
+        if (!selectedWordId || !items.some((item) => item.id === selectedWordId)) {
+            selectWord(items[0], false);
+        }
+    }, [items, selectedWordId, selectWord]);
+
+    // Keyboard shortcuts: '/' focuses search, Up/Down glides through entries, Escape dismisses modal.
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                if (showLoginModal) {
+                    setShowLoginModal(false);
+                    return;
+                }
+                if (document.activeElement === searchInputRef.current) {
+                    if (search) setSearch('');
+                    else searchInputRef.current?.blur();
+                }
+                return;
+            }
+
+            if (event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+                if (!isEditableElement(event.target)) {
+                    event.preventDefault();
+                    searchInputRef.current?.focus();
+                    searchInputRef.current?.select();
+                }
+                return;
+            }
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (showLoginModal || items.length === 0) return;
+                const targetEl = event.target as HTMLElement | null;
+                if (targetEl && targetEl !== searchInputRef.current && isEditableElement(targetEl)) {
+                    return;
+                }
+                event.preventDefault();
+                const currentIdx = items.findIndex((item) => item.id === selectedWordId);
+                const nextIdx =
+                    event.key === 'ArrowDown'
+                        ? (currentIdx + 1) % items.length
+                        : (currentIdx - 1 + items.length) % items.length;
+                const nextItem = items[nextIdx];
+                if (nextItem) {
+                    selectWord(nextItem, false);
+                    rowRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
+                }
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [items, selectedWordId, selectWord, showLoginModal, search]);
+
+    const handlePageChange = (nextPage: number) => {
+        if (nextPage < 1 || nextPage > totalPages || nextPage === page || isLoading) return;
+        setPage(nextPage);
+    };
 
     const requestAiExplanation = async () => {
         if (!selectedWord) return;
@@ -300,11 +622,11 @@ const Vocabulary = () => {
 
             const response = await apiFetch('/api/AI/Explain', {
                 method: 'POST',
-                body: formData
+                body: formData,
             });
 
             if (response.ok) {
-                setAiResponse(await response.json() as VocabularyAiResponse);
+                setAiResponse((await response.json()) as VocabularyAiResponse);
             } else {
                 setAiError('Trợ lý AI chưa thể phân tích từ này. Vui lòng thử lại.');
             }
@@ -315,9 +637,13 @@ const Vocabulary = () => {
         }
     };
 
-    const handleAskAi = () => {
+    const handleToggleAi = () => {
         if (!currentUser) {
             setShowLoginModal(true);
+            return;
+        }
+        if (isAiPanelOpen) {
+            setIsAiPanelOpen(false);
             return;
         }
         setIsAiPanelOpen(true);
@@ -332,391 +658,577 @@ const Vocabulary = () => {
     };
 
     const toggleAiSection = (section: AiSectionKey) => {
-        setOpenAiSection(current => current === section ? null : section);
+        setOpenAiSection((current) => (current === section ? null : section));
     };
 
-    const topicOptions = useMemo(() => {
-        return topics
-            .map((topic: any) => ({ value: String(topic.topicId), label: topic.name }))
-            .sort((a: any, b: any) => a.label.localeCompare(b.label));
-    }, [topics]);
-
-    useEffect(() => {
-        const timeout = window.setTimeout(() => {
-            setDebouncedSearch(search.trim());
-        }, 250);
-
-        return () => window.clearTimeout(timeout);
-    }, [search]);
-
-    const visiblePages = useMemo(() => {
-        if (totalPages <= 0) return [] as number[];
-        const left = Math.max(2, page - 2);
-        const right = Math.min(totalPages - 1, page + 2);
-        const range: number[] = [];
-        for (let i = left; i <= right; i++) range.push(i);
-        return range;
-    }, [page, totalPages]);
-
-    const loadPage = async (nextPage: number) => {
-        setIsLoading(true);
-
-        try {
-            const response = await vocabularyApi.getPage({
-                page: nextPage,
-                pageSize: PAGE_SIZE,
-                search: debouncedSearch,
-                cefr: selectedCefr,
-                topicId: selectedTopic === 'ALL' ? null : Number(selectedTopic)
-            });
-
-            const mappedItems = response.items.map(mapVocabularyToUiModel);
-            setItems(mappedItems);
-            setPage(response.page);
-            setPageInput(String(response.page));
-            setTotalPages(response.totalPages);
-            setTotalCount(response.totalCount);
-            setErrorMessage('');
-        } catch (error: any) {
-            setErrorMessage(error?.message || 'Không thể tải danh sách từ vựng.');
-            setItems([]);
-            setTotalCount(0);
-            setTotalPages(0);
-        } finally {
-            setIsLoading(false);
+    const playbackRate = slowPlayback ? 0.75 : 1;
+    const activeExamples = useMemo(() => {
+        if (!selectedWord) return [];
+        if (selectedWord.examples.length > 0) return selectedWord.examples;
+        if (selectedWord.example) {
+            return [
+                {
+                    id: 0,
+                    exampleEn: selectedWord.example,
+                    exampleVi: selectedWord.translation,
+                    audioUrl: selectedWord.exampleAudioUrl,
+                },
+            ];
         }
-    };
+        return [];
+    }, [selectedWord]);
 
-    useEffect(() => {
-        setPage(1);
-        void loadPage(1);
-    }, [debouncedSearch, selectedCefr, selectedTopic]);
-
-    useEffect(() => {
-        if (page <= 1) {
-            return;
-        }
-
-        void loadPage(page);
-    }, [page]);
-
-    const handlePageChange = (nextPage: number) => {
-        if (nextPage < 1 || nextPage > totalPages || nextPage === page || isLoading) {
-            return;
-        }
-
-        setPage(nextPage);
-    };
-
-    const handleGoToPage = () => {
-        const nextPage = Number(pageInput);
-        if (!Number.isInteger(nextPage)) {
-            return;
-        }
-
-        handlePageChange(nextPage);
-    };
+    const isSelectedLearned = selectedWord ? learnedWordIdSet.has(selectedWord.id) : false;
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8 sm:mb-12">
-                <div className={`vocab-fade-in ${mounted ? 'is-visible' : ''}`}>
-                    <PageTitle>Từ vựng</PageTitle>
-                    <p className="text-sm text-text-muted mt-2">
-                        Trang {page} / {Math.max(totalPages, 1)} · Tổng {totalCount} từ vựng
-                    </p>
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 py-5 sm:px-6 lg:h-[calc(100dvh-57px)] lg:overflow-hidden lg:px-8 lg:py-5">
+            {/* Top Command Bar */}
+            <header className={`vocab-fade-in ${mounted ? 'is-visible' : ''} shrink-0 space-y-3`}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex items-baseline gap-3">
+                        <h1 className="text-[1.6rem] font-bold leading-tight tracking-[-0.02em] text-text-primary sm:text-[1.85rem]">
+                            Từ vựng
+                        </h1>
+                        <p className="text-sm text-text-muted">
+                            <span className="font-semibold tabular-nums text-text-primary">{totalCount}</span> từ
+                            {totalPages > 1 && <> · Trang {page}/{totalPages}</>}
+                        </p>
+                    </div>
+                    {isLoading && (
+                        <span className="inline-flex items-center gap-2 text-xs font-medium text-text-muted" role="status">
+                            <Spinner size="sm" /> Đang tải…
+                        </span>
+                    )}
                 </div>
-                <div className={`w-full md:w-[640px] grid grid-cols-1 md:grid-cols-3 gap-3 vocab-fade-in delay-[100ms] ${mounted ? 'is-visible' : ''}`}>
-                    <div className="relative md:col-span-2">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" size={20} />
+
+                <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+                    {/* Fast Search Input with '/' shortcut hint */}
+                    <div className="relative flex min-w-0 flex-1 items-center">
+                        <Search
+                            size={17}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute left-3.5 text-text-muted"
+                        />
                         <input
-                            type="text"
-                            placeholder="Tìm kiếm từ vựng..."
-                            className="vocab-input pl-12 pr-4"
+                            ref={searchInputRef}
+                            type="search"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Tra nhanh tiếng Anh hoặc nghĩa tiếng Việt..."
                             aria-label="Tìm kiếm từ vựng"
+                            className="h-11 w-full rounded-[var(--radius-element)] border-2 border-border bg-surface pl-10 pr-14 text-[14.5px] font-medium text-text-primary outline-none transition-colors duration-150 ease-[var(--ease-out)] placeholder:text-text-muted focus:border-primary"
                         />
-                    </div>
-                    <select
-                        value={selectedCefr}
-                        onChange={(e) => setSelectedCefr(e.target.value)}
-                        className="vocab-input cursor-pointer"
-                        aria-label="Lọc theo cấp độ CEFR"
-                    >
-                        <option value="ALL">Tất cả cấp độ</option>
-                        {CEFR_LEVELS.map(level => (
-                            <option key={level} value={level}>{level}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={selectedTopic}
-                        onChange={(e) => setSelectedTopic(e.target.value)}
-                        className="vocab-input md:col-span-3 cursor-pointer"
-                        aria-label="Lọc theo chủ đề"
-                    >
-                        <option value="ALL">Tất cả chủ đề</option>
-                        {topicOptions.map(topic => (
-                            <option key={topic.value} value={topic.value}>{topic.label}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            {isLoading && (
-                <div className="text-text-muted mb-6">Đang tải danh sách từ vựng...</div>
-            )}
-
-            {errorMessage && (
-                <div className="text-sm text-red-500 font-medium mb-6">{errorMessage}</div>
-            )}
-
-            {!isLoading && !errorMessage && items.length === 0 && (
-                <div className="vocab-empty mb-6">
-                    Không tìm thấy từ vựng phù hợp.
-                </div>
-            )}
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 vocab-defer">
-                {items.map((v: any, i: number) => (
-                    <div
-                        key={v.id}
-                        className={`vocab-fade-in ${cardsRevealed ? 'is-visible' : ''}`}
-                        style={{ transitionDelay: `${Math.min(i * 45, 360)}ms` }}
-                    >
-                        <div
-                            data-testid="vocab-card"
-                            data-vocab-id={v.id}
-                            className="vocab-card group"
-                            onClick={() => onSelectWord(v)}
-                        >
-                            <div className="flex justify-between items-start mb-4">
-                                <Badge variant="purple">{v.cefr}</Badge>
-                                <Button
-                                    variant="ghost"
-                                    className="p-2 min-h-0 rounded-full"
-                                    onClick={(e: any) => {
-                                        e.stopPropagation();
-                                        playPronunciationAudio(v.audioUrl, v.word);
-                                    }}
-                                    aria-label={`Phát âm từ ${v.word}`}
-                                >
-                                    <Volume2 size={16} />
-                                </Button>
-                            </div>
-                            <h3 className="text-2xl mb-1 group-hover:text-primary transition-colors">{v.word}</h3>
-                            <p className="text-text-muted font-ipa text-sm mb-4">
-                                {v.transcription}
-                            </p>
-                            <p className="text-text-secondary line-clamp-2">{v.meaning}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {!isLoading && totalPages > 1 && (
-                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-8 sm:gap-2">
-                    <Button variant="ghost" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
-                        Trước
-                    </Button>
-
-                    {/* Always page 1 */}
-                    <Button variant={page === 1 ? 'primary' : 'ghost'} onClick={() => handlePageChange(1)}>
-                        1
-                    </Button>
-
-                    {/* Ellipsis before window */}
-                    {visiblePages.length > 0 && visiblePages[0] > 2 && (
-                        <span className="px-2 text-text-muted">...</span>
-                    )}
-
-                    {/* Window around current (excludes 1 and last) */}
-                    {visiblePages.map((pageNumber) => (
-                        <Button
-                            key={pageNumber}
-                            variant={pageNumber === page ? 'primary' : 'ghost'}
-                            onClick={() => handlePageChange(pageNumber)}
-                        >
-                            {pageNumber}
-                        </Button>
-                    ))}
-
-                    {/* Ellipsis after window */}
-                    {visiblePages.length > 0 && visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-                        <span className="px-2 text-text-muted">...</span>
-                    )}
-
-                    {/* Always last page */}
-                    {totalPages > 1 && (
-                        <Button variant={page === totalPages ? 'primary' : 'ghost'} onClick={() => handlePageChange(totalPages)}>
-                            {totalPages}
-                        </Button>
-                    )}
-
-                    <Button variant="ghost" onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}>
-                        Sau
-                    </Button>
-                    <div className="flex w-full items-center justify-center gap-2 sm:ml-2 sm:w-auto">
-                        <input
-                            type="number"
-                            min={1}
-                            max={totalPages}
-                            value={pageInput}
-                            onChange={(e) => setPageInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    handleGoToPage();
-                                }
-                            }}
-                            className="vocab-input w-24 px-3 py-2"
-                            aria-label="Đến trang"
-                        />
-                        <Button variant="ghost" onClick={handleGoToPage}>
-                            Đi
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {selectedWord && (
-                <div
-                    data-testid="vocab-modal"
-                    className={`vocab-modal-overlay${modalActive ? ' is-open' : ''}`}
-                    onClick={onCloseWordDetail}
-                    role="dialog"
-                    aria-modal="true"
-                >
-                    <div
-                        data-testid="vocab-modal-content"
-                        className={`vocab-modal-card ${isAiPanelOpen ? 'max-w-6xl' : 'max-w-3xl'}`}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="vocab-modal-header">
-                            <div className="min-w-0">
-                                <Badge variant="cyan" className="mb-3">{selectedWord.cefr}</Badge>
-                                <h2 className={`${typography.sectionTitle} mb-1 break-words`}>{selectedWord.word}</h2>
-                                <p className="text-text-muted font-ipa text-sm">
-                                    {selectedWord.transcription}
-                                </p>
-                            </div>
+                        {search ? (
                             <button
                                 type="button"
-                                className="w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer shrink-0"
-                                onClick={onCloseWordDetail}
-                                aria-label="Đóng chi tiết từ vựng"
+                                onClick={() => {
+                                    setSearch('');
+                                    searchInputRef.current?.focus();
+                                }}
+                                aria-label="Xóa từ khóa tìm kiếm"
+                                className="absolute right-2.5 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
                             >
-                                <X size={18} />
+                                <X size={15} aria-hidden="true" />
                             </button>
-                        </div>
-
-                        <div className={`vocab-modal-body grid gap-5 ${isAiPanelOpen ? 'lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]' : 'grid-cols-1'}`}>
-                            <div className="min-w-0 space-y-6">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                                    <Button
-                                        variant="ghost"
-                                        className="w-full justify-center px-6 sm:w-auto"
-                                        onClick={() => playPronunciationAudio(selectedWord.audioUrl, selectedWord.word)}
-                                    >
-                                        <Volume2 size={18} /> Nghe phát âm
-                                    </Button>
-                                    {selectedWord.example && (
-                                        <Button
-                                            variant="ghost"
-                                            className="w-full justify-center px-6 sm:w-auto"
-                                            onClick={() => playPronunciationAudio(selectedWord.exampleAudioUrl, selectedWord.example)}
-                                        >
-                                            <Volume2 size={18} /> Nghe ví dụ
-                                        </Button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={handleAskAi}
-                                        disabled={isLoadingAi}
-                                        aria-pressed={isAiPanelOpen}
-                                        className={`w-full px-5 py-2.5 rounded-pill border font-display font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 hover:shadow-md hover:shadow-primary/15 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60 disabled:cursor-wait sm:w-auto ${
-                                            isAiPanelOpen
-                                                ? 'border-primary/35 bg-primary/10 text-primary'
-                                                : 'border-border bg-surface text-text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-primary'
-                                        }`}
-                                    >
-                                        {isLoadingAi ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={16} />}
-                                        Trợ lý AI
-                                    </button>
-                                </div>
-
-                                <div className="rounded-card border border-primary/10 bg-primary/[0.04] p-5">
-                                    <h3 className="text-sm font-bold uppercase tracking-wide text-primary mb-2">Ý nghĩa</h3>
-                                    <p className="text-lg mb-4">{selectedWord.meaning}</p>
-                                    {selectedWord.example && (
-                                        <>
-                                            <h3 className="text-sm font-bold uppercase tracking-wide text-purple mb-2">Ví dụ</h3>
-                                            <p className="italic text-text-secondary leading-relaxed">"{selectedWord.example}"</p>
-                                            {selectedWord.translation && (
-                                                <p className="text-sm text-text-muted mt-2 italic">"{selectedWord.translation}"</p>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {isAiPanelOpen && (
-                                <AiAssistantPanel
-                                    response={aiResponse}
-                                    error={aiError}
-                                    isLoading={isLoadingAi}
-                                    openSection={openAiSection}
-                                    onToggleSection={toggleAiSection}
-                                    onRetry={handleRetryAi}
-                                />
-                            )}
-                        </div>
+                        ) : (
+                            <kbd
+                                aria-hidden="true"
+                                className="pointer-events-none absolute right-3 hidden rounded-md border border-border bg-bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-semibold text-text-muted sm:inline-block"
+                            >
+                                /
+                            </kbd>
+                        )}
                     </div>
+
+                    {/* Quick CEFR Pills */}
+                    <div
+                        role="group"
+                        aria-label="Lọc theo cấp độ CEFR"
+                        className="flex h-11 items-center gap-1 overflow-x-auto no-scrollbar rounded-[var(--radius-element)] border-2 border-border bg-surface p-1"
+                    >
+                        {(['ALL', ...CEFR_LEVELS] as const).map((level) => {
+                            const active = selectedCefr === level;
+                            return (
+                                <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => setSelectedCefr(level)}
+                                    aria-pressed={active}
+                                    className={`h-full shrink-0 cursor-pointer rounded-[8px] px-2.5 text-xs font-semibold transition-colors duration-150 ease-[var(--ease-out)] ${
+                                        active
+                                            ? 'bg-primary-light text-primary'
+                                            : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
+                                    }`}
+                                >
+                                    {level === 'ALL' ? 'Mọi cấp' : level}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Topic Selector */}
+                    <div className="w-full lg:w-[225px] lg:shrink-0">
+                        <Selector
+                            label="Chủ đề"
+                            isLabelHidden
+                            size="lg"
+                            width="100%"
+                            presentation="adaptive"
+                            hasSearch
+                            searchPlaceholder="Tìm chủ đề…"
+                            value={selectedTopic}
+                            onChange={handleTopicChange}
+                            options={[
+                                { value: 'ALL', label: 'Mọi chủ đề' },
+                                ...topicOptions.map((topic) => ({
+                                    value: String(topic.value),
+                                    label: topic.label,
+                                })),
+                            ]}
+                        />
+                    </div>
+                </div>
+            </header>
+
+            {errorMessage && (
+                <div
+                    className="shrink-0 rounded-[var(--radius-element)] border border-danger-color/25 bg-danger-color/10 px-4 py-3 text-sm text-danger-color"
+                    role="alert"
+                >
+                    {errorMessage}
                 </div>
             )}
 
+            {/* Empty State */}
+            {!isLoading && !errorMessage && items.length === 0 ? (
+                <div className="vocab-empty flex-1">
+                    <img
+                        src="/mascot-lumo-reading.webp"
+                        alt=""
+                        aria-hidden="true"
+                        width={76}
+                        height={96}
+                        className="h-auto w-[76px]"
+                    />
+                    <p className="font-semibold text-text-primary">Không tìm thấy từ vựng phù hợp.</p>
+                    {(search || selectedCefr !== 'ALL' || selectedTopic !== 'ALL') && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                setSearch('');
+                                setSelectedCefr('ALL');
+                                handleTopicChange('ALL');
+                            }}
+                        >
+                            Xóa bộ lọc
+                        </Button>
+                    )}
+                </div>
+            ) : (
+                /* Master-Detail Split-Pane Desk Dictionary */
+                <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+                    {/* Left Index Rail */}
+                    <section
+                        aria-label="Danh sách từ vựng"
+                        className={`glass-card flex min-h-0 flex-col overflow-hidden ${
+                            isMobileDetailOpen ? 'hidden lg:flex' : 'flex'
+                        }`}
+                    >
+                        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5 text-xs text-text-muted">
+                            <span>
+                                <strong className="font-semibold tabular-nums text-text-primary">
+                                    {items.length}
+                                </strong>{' '}
+                                / {totalCount} từ
+                            </span>
+                            <span className="hidden items-center gap-1 lg:inline-flex" aria-hidden="true">
+                                <kbd className="rounded border border-border bg-bg-secondary px-1.5 py-0.5 font-mono text-[10px]">
+                                    ↑
+                                </kbd>
+                                <kbd className="rounded border border-border bg-bg-secondary px-1.5 py-0.5 font-mono text-[10px]">
+                                    ↓
+                                </kbd>
+                                <span className="ml-0.5">lướt từ</span>
+                            </span>
+                        </div>
+
+                        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+                            {items.map((item) => {
+                                const isSelected = selectedWord?.id === item.id;
+                                const isLearned = learnedWordIdSet.has(item.id);
+                                return (
+                                    <button
+                                        key={item.id}
+                                        ref={(el) => {
+                                            rowRefs.current[item.id] = el;
+                                        }}
+                                        type="button"
+                                        data-testid="vocab-card"
+                                        data-vocab-id={item.id}
+                                        aria-current={isSelected ? 'true' : undefined}
+                                        onClick={() => selectWord(item, true)}
+                                        className={`group flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-2.5 py-2 text-left transition-all duration-150 ease-[var(--ease-out)] ${
+                                            isSelected
+                                                ? 'border-primary/45 bg-primary-light shadow-xs'
+                                                : 'border-transparent hover:bg-surface-hover'
+                                        }`}
+                                    >
+                                        {item.imageUrl && (
+                                            <img
+                                                src={item.imageUrl}
+                                                alt=""
+                                                aria-hidden="true"
+                                                width={44}
+                                                height={44}
+                                                loading="lazy"
+                                                decoding="async"
+                                                className={`h-11 w-11 shrink-0 rounded-lg object-cover bg-bg-secondary ${
+                                                    isSelected ? 'ring-2 ring-primary/50' : ''
+                                                }`}
+                                            />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-baseline gap-2">
+                                                <span
+                                                    className={`truncate text-[15px] font-bold tracking-[-0.01em] ${
+                                                        isSelected
+                                                            ? 'text-primary'
+                                                            : 'text-text-primary group-hover:text-primary'
+                                                    }`}
+                                                >
+                                                    {item.word}
+                                                </span>
+                                                {item.transcription && (
+                                                    <span className="font-ipa shrink-0 truncate text-xs text-text-muted">
+                                                        {item.transcription}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="mt-0.5 truncate text-[13px] text-text-secondary">
+                                                {item.meaning}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                            {isLearned && (
+                                                <span
+                                                    title="Đã học"
+                                                    aria-label="Đã học"
+                                                    className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-success-color/15 text-success-color"
+                                                >
+                                                    <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+                                                </span>
+                                            )}
+                                            <span
+                                                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                                                    isSelected
+                                                        ? 'bg-surface text-primary'
+                                                        : 'bg-bg-secondary text-text-secondary'
+                                                }`}
+                                            >
+                                                {item.cefr}
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {!isLoading && totalPages > 1 && (
+                            <div className="flex shrink-0 justify-center border-t border-border bg-surface px-2 py-2.5">
+                                <Pagination
+                                    page={page}
+                                    totalPages={totalPages}
+                                    onChange={handlePageChange}
+                                    label="Phân trang từ vựng"
+                                />
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Right Editorial Dictionary Sheet (flat typographic hierarchy — zero nested cards) */}
+                    <article
+                        aria-label="Chi tiết từ vựng"
+                        className={`glass-card flex min-h-0 flex-col overflow-hidden ${
+                            isMobileDetailOpen ? 'flex' : 'hidden lg:flex'
+                        }`}
+                    >
+                        {!selectedWord ? (
+                            <div className="m-auto flex flex-col items-center gap-3 p-10 text-center text-sm text-text-muted">
+                                <img
+                                    src="/mascot-lumo-reading.webp"
+                                    alt=""
+                                    aria-hidden="true"
+                                    width={64}
+                                    height={80}
+                                    className="h-auto w-[64px]"
+                                />
+                                <p>Chọn một từ bên trái để xem phát âm, nghĩa và ví dụ.</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Mobile back bar */}
+                                <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5 lg:hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileDetailOpen(false)}
+                                        className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-semibold text-primary"
+                                    >
+                                        <ArrowLeft size={16} aria-hidden="true" /> Danh sách từ
+                                    </button>
+                                    <Badge variant="purple">{selectedWord.cefr}</Badge>
+                                </div>
+
+                                {/* Scrollable Cinema Dictionary Sheet Body */}
+                                <div className="min-h-0 flex-1 overflow-y-auto">
+                                    {/* Full-Bleed Cinema Photo Stage */}
+                                    <div className="relative h-56 w-full overflow-hidden bg-[#171429] sm:h-[280px]">
+                                        {selectedWord.imageUrl && (
+                                            <img
+                                                key={selectedWord.id}
+                                                src={selectedWord.imageUrl}
+                                                alt={`Minh họa từ ${selectedWord.word}`}
+                                                decoding="async"
+                                                className="cinema-img-reveal h-full w-full object-cover"
+                                            />
+                                        )}
+                                        <div
+                                            aria-hidden="true"
+                                            className="pointer-events-none absolute inset-0"
+                                            style={{
+                                                background:
+                                                    'linear-gradient(to top, rgba(13, 12, 20, 0.94) 0%, rgba(13, 12, 20, 0.52) 48%, rgba(13, 12, 20, 0.16) 100%)',
+                                            }}
+                                        />
+
+                                        {/* Top badges over photo */}
+                                        <div className="absolute left-5 top-4 right-5 flex flex-wrap items-center justify-between gap-2 sm:left-7 sm:right-7">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="inline-flex items-center rounded-full bg-[#171429]/85 px-3 py-1 text-xs font-extrabold text-white">
+                                                    {selectedWord.cefr}
+                                                </span>
+                                                {selectedWord.topicName && (
+                                                    <span className="inline-flex items-center rounded-full bg-[#171429]/75 px-3 py-1 text-xs font-semibold text-white">
+                                                        {selectedWord.topicName}
+                                                    </span>
+                                                )}
+                                                {isSelectedLearned && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#10B981] px-2.5 py-1 text-xs font-bold text-white">
+                                                        <Check size={12} strokeWidth={2.5} aria-hidden="true" /> Đã thuộc
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Bottom headword + 3D Duolingo audio controls */}
+                                        <div className="absolute inset-x-5 bottom-5 flex flex-wrap items-end justify-between gap-4 sm:inset-x-7 sm:bottom-6">
+                                            <div className="min-w-0">
+                                                <h2 className="break-words text-3xl font-extrabold leading-[1.06] tracking-[-0.03em] text-white sm:text-[2.65rem]">
+                                                    {selectedWord.word}
+                                                </h2>
+                                                {selectedWord.transcription && (
+                                                    <p className="font-ipa mt-1.5 text-sm font-medium text-[#E5E7EB] sm:text-base">
+                                                        {selectedWord.transcription}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        playPronunciationAudio(
+                                                            selectedWord.audioUrl,
+                                                            selectedWord.word,
+                                                            undefined,
+                                                            playbackRate,
+                                                        )
+                                                    }
+                                                    className="duo-btn duo-btn-amber duo-btn-sm px-4"
+                                                    aria-label={`Nghe phát âm ${selectedWord.word}`}
+                                                >
+                                                    <Volume2 size={15} aria-hidden="true" />
+                                                    Nghe phát âm
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSlowPlayback((prev) => !prev)}
+                                                    aria-pressed={slowPlayback}
+                                                    title="Chuyển tốc độ phát âm chuẩn (1.0×) hoặc chậm (0.75×)"
+                                                    className="duo-btn duo-btn-glass duo-btn-sm font-mono tabular-nums"
+                                                >
+                                                    {slowPlayback ? '0.75×' : '1.0×'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Editorial Detail Content */}
+                                    <div key={`detail-${selectedWord.id}`} className="cinema-content-in px-5 py-6 sm:px-7 sm:py-7">
+                                        {/* Vietnamese Gloss + Quick Study CTA */}
+                                        <div className="flex flex-wrap items-center justify-between gap-4">
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold uppercase tracking-[0.06em] text-text-secondary">
+                                                    Nghĩa tiếng Việt
+                                                </p>
+                                                <p className="mt-1 text-2xl font-extrabold leading-snug text-text-primary">
+                                                    {selectedWord.meaning}
+                                                </p>
+                                            </div>
+                                            {selectedWord.topicId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        navigate(`${PATHS.learningStudy}?topicId=${selectedWord.topicId}`)
+                                                    }
+                                                    className="duo-btn duo-btn-purple duo-btn-sm shrink-0 px-4"
+                                                >
+                                                    <Play size={13} fill="currentColor" aria-hidden="true" />
+                                                    Học chủ đề này
+                                                </button>
+                                            )}
+                                        </div>
+
+                                    {/* Bilingual Examples */}
+                                    <section className="mt-6 border-t border-border/80 pt-5">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-xs font-bold uppercase tracking-[0.06em] text-text-secondary">
+                                                Ví dụ trong câu{activeExamples.length > 0 ? ` (${activeExamples.length})` : ''}
+                                            </h3>
+                                            {isDetailLoading && (
+                                                <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+                                                    <Spinner size="sm" /> Đang tải ví dụ…
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {activeExamples.length > 0 ? (
+                                            <ul className="space-y-3">
+                                                {activeExamples.map((ex, idx) => (
+                                                    <li
+                                                        key={ex.id || idx}
+                                                        className="flex items-start justify-between gap-4 rounded-xl border border-border bg-bg-light p-4"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[15.5px] font-medium leading-relaxed text-text-primary">
+                                                                {renderHighlightedExample(ex.exampleEn, selectedWord.word)}
+                                                            </p>
+                                                            {ex.exampleVi && (
+                                                                <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+                                                                    {ex.exampleVi}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <AudioWaveButton
+                                                            text={ex.exampleEn}
+                                                            audioUrl={ex.audioUrl}
+                                                            playbackRate={playbackRate}
+                                                            variant="compact"
+                                                            size="sm"
+                                                            label={`Nghe câu ví dụ ${idx + 1}`}
+                                                            className="shrink-0"
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : !isDetailLoading ? (
+                                            <p className="text-sm text-text-muted">Chưa có câu ví dụ cho từ này.</p>
+                                        ) : (
+                                            <div className="h-16 animate-pulse rounded-[var(--radius-inner)] bg-bg-secondary" />
+                                        )}
+                                    </section>
+
+                                    {/* Collapsible AI Explanation Section (flat hairline divider — no nested card) */}
+                                    <section className="mt-6 border-t border-border/80 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleAi}
+                                            aria-expanded={isAiPanelOpen}
+                                            className="flex w-full cursor-pointer items-center justify-between gap-3 py-1 text-left transition-colors duration-150 ease-[var(--ease-out)] hover:text-primary"
+                                        >
+                                            <span className="flex items-center gap-2.5 text-sm font-semibold text-text-primary">
+                                                <Sparkles size={16} className="shrink-0 text-primary" aria-hidden="true" />
+                                                <span>Giải thích sắc thái &amp; cụm từ hay gặp</span>
+                                                <Badge variant="cyan" className="normal-case">
+                                                    Beta
+                                                </Badge>
+                                            </span>
+                                            <ChevronDown
+                                                size={16}
+                                                className={`shrink-0 text-text-muted transition-transform duration-200 ease-[var(--ease-out)] ${
+                                                    isAiPanelOpen ? 'rotate-180' : ''
+                                                }`}
+                                            />
+                                        </button>
+
+                                        {isAiPanelOpen && (
+                                            <AiAssistantBody
+                                                response={aiResponse}
+                                                error={aiError}
+                                                isLoading={isLoadingAi}
+                                                openSection={openAiSection}
+                                                onToggleSection={toggleAiSection}
+                                                onRetry={handleRetryAi}
+                                            />
+                                        )}
+                                    </section>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </article>
+                </div>
+            )}
+
+            {/* Login Prompt Modal (Guests clicking AI Explain) */}
             {showLoginModal && (
                 <div
-                    className={`fixed inset-0 z-[800] flex items-end justify-center p-0 transition-opacity duration-200 sm:items-center sm:p-4 md:p-6 ${loginModalActive ? 'opacity-100' : 'opacity-0'}`}
-                    style={{ background: 'rgba(15, 23, 42, 0.55)' }}
+                    className={`fixed inset-0 z-[800] flex items-end justify-center p-0 backdrop-blur-[6px] transition-opacity duration-200 sm:items-center sm:p-4 md:p-6 ${
+                        loginModalActive ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    style={{ background: 'color-mix(in srgb, #0b0a12 36%, transparent)' }}
                     onClick={() => setShowLoginModal(false)}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="ai-login-title"
                 >
                     <div
-                        className={`relative w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-t-3xl border border-primary/15 bg-surface p-5 pt-7 text-center shadow-[0_24px_60px_rgba(15,23,42,0.28)] transition-all duration-200 ease-out sm:rounded-card sm:p-7 ${loginModalActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="vocab-login-title"
+                        className={`relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-page)] border-2 border-border-emphasized bg-surface p-5 pt-7 text-center shadow-[var(--shadow-high)] transition-all duration-200 ease-[var(--ease-out)] sm:rounded-card sm:p-7 ${
+                            loginModalActive ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+                        }`}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <button
-                            type="button"
-                            className="absolute right-4 top-4 w-9 h-9 rounded-full hover:bg-primary/10 flex items-center justify-center cursor-pointer transition-all duration-150 active:scale-90"
+                        <AstryxButton
+                            className="!absolute right-4 top-4"
+                            variant="ghost"
+                            size="md"
+                            isIconOnly
+                            icon={<X size={18} aria-hidden="true" />}
+                            label="Đóng"
                             onClick={() => setShowLoginModal(false)}
-                            aria-label="Đóng"
+                        />
+                        <span
+                            className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary"
+                            aria-hidden="true"
                         >
-                            <X size={18} />
-                        </button>
-                        <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                            <Lock size={24} />
-                        </div>
-                        <h2 id="ai-login-title" className="text-xl font-display font-bold text-text-primary mb-2">
+                            <Lock size={22} />
+                        </span>
+                        <h2 id="vocab-login-title" className="mb-2 font-display text-xl font-bold text-text-primary">
                             Tính năng cần đăng nhập
                         </h2>
-                        <p className="text-sm text-text-muted leading-relaxed mb-6">
-                            Đăng nhập để sử dụng Trợ lý AI và lưu tiến trình học tập của bạn.
+                        <p className="mb-6 text-sm leading-relaxed text-text-muted">
+                            Đăng nhập để xem giải thích sắc thái, cụm từ hay gặp và lỗi thường tránh của từ này.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row">
                             <Button
                                 variant="primary"
-                                className="flex-1 justify-center active:scale-[0.98]"
+                                className="flex-1"
                                 onClick={() => navigate(PATHS.login, { state: { from: location } })}
                             >
                                 Đăng nhập
                             </Button>
-                            <Button
-                                variant="ghost"
-                                className="flex-1 justify-center hover:shadow-md hover:shadow-primary/10 active:scale-[0.98]"
-                                onClick={() => setShowLoginModal(false)}
-                            >
+                            <Button variant="ghost" className="flex-1" onClick={() => setShowLoginModal(false)}>
                                 Tiếp tục xem
                             </Button>
                         </div>

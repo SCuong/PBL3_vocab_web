@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, typography } from '../components/ui';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, CheckCircle2, Flame, Sparkles } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Button, FloatingField } from '../components/ui';
 import { authApi } from '../services/authApi';
 import { useAppContext } from '../context/AppContext';
 import { PATHS } from '../routes/paths';
@@ -50,7 +52,10 @@ declare global {
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 30;
-const EMAIL_VERIFICATION_REQUIRED_MESSAGE = 'Please verify your email before logging in.';
+const EMAIL_VERIFICATION_REQUIRED_MESSAGES = new Set([
+    'Please verify your email before logging in.',
+    'Vui lòng xác minh email trước khi đăng nhập.',
+]);
 const REGISTER_EMAIL_FORMAT_MESSAGE = 'Email không đúng định dạng.';
 const ALLOWED_EMAIL_TLDS = new Set([
     'com', 'net', 'org', 'edu', 'gov', 'vn', 'com.vn', 'edu.vn', 'gov.vn', 'net.vn',
@@ -93,11 +98,33 @@ const Auth = () => {
     const { syncUserGameData, addToast } = useAppContext();
     const navigate = useNavigate();
     const location = useLocation();
+    const prefersReduced = useReducedMotion();
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialMode = location.pathname === PATHS.register ? 'register' : 'login';
+    const locationState = location.state as {
+        authNotice?: string;
+        from?: { pathname?: string; search?: string };
+        verifiedEmail?: string;
+        autoVerifiedMessage?: string;
+    } | null;
+    const authRedirectNotice = locationState?.authNotice ?? '';
+    const initialMode =
+        location.pathname === PATHS.register
+            ? 'register'
+            : location.pathname === PATHS.forgotPassword
+              ? 'forgot'
+              : 'login';
     const [isLogin, setIsLogin] = useState(initialMode !== 'register');
-    const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
+    const [slideDir, setSlideDir] = useState<1 | -1>(1);
+    const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(initialMode === 'forgot');
     const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
+
+    const resolvePostLoginDestination = useCallback((user: { role?: string }) => {
+        const fromPath = locationState?.from?.pathname;
+        if (fromPath && fromPath !== PATHS.login && fromPath !== PATHS.register) {
+            return `${fromPath}${locationState?.from?.search ?? ''}`;
+        }
+        return user.role?.toUpperCase() === 'ADMIN' ? PATHS.adminOverview : PATHS.learning;
+    }, [locationState?.from?.pathname, locationState?.from?.search]);
     const [name, setName] = useState('');
     const [usernameOrEmail, setUsernameOrEmail] = useState('');
     const [email, setEmail] = useState('');
@@ -123,9 +150,6 @@ const Auth = () => {
     const [verificationLink, setVerificationLink] = useState('');
     const [registerEmailTouched, setRegisterEmailTouched] = useState(false);
     // 'idle' | 'active' | 'close' — mirrors the sample's container class
-    const [flipState, setFlipState] = useState<'idle' | 'active' | 'close'>(
-        initialMode === 'register' ? 'active' : 'idle'
-    );
 
     const resetForgotPasswordState = () => {
         setForgotPasswordSent(false);
@@ -157,15 +181,14 @@ const Auth = () => {
             const user = await authApi.googleLogin({ idToken });
             syncUserGameData(user);
             addToast('Đăng nhập Google thành công!', 'success');
-            navigate(PATHS.home);
+            navigate(resolvePostLoginDestination(user), { replace: true });
         } catch (error: any) {
             const message = error?.message || 'Đăng nhập Google thất bại.';
             setErrorMessage(message);
-            addToast(message, 'info');
         } finally {
             setIsGoogleSubmitting(false);
         }
-    }, [addToast, isGoogleSubmitting, navigate, syncUserGameData]);
+    }, [addToast, isGoogleSubmitting, navigate, resolvePostLoginDestination, syncUserGameData]);
 
     // Keep the latest credential handler in a ref so Google Identity Services can
     // be initialized exactly once (below) while still calling the current handler.
@@ -177,16 +200,19 @@ const Auth = () => {
 
     useEffect(() => {
         const nextLogin = initialMode !== 'register';
+        setSlideDir(nextLogin ? -1 : 1);
         setIsLogin(nextLogin);
-        setFlipState(nextLogin ? 'idle' : 'active');
         resetForgotPasswordState();
-        setIsForgotPasswordMode(false);
+        setIsForgotPasswordMode(initialMode === 'forgot');
         setIsResetPasswordMode(false);
         setErrorMessage('');
-        setSuccessMessage('');
+        setSuccessMessage(locationState?.autoVerifiedMessage ?? '');
+        if (locationState?.verifiedEmail) {
+            setUsernameOrEmail(locationState.verifiedEmail);
+        }
         setVerificationLink('');
         setRegisterEmailTouched(false);
-    }, [initialMode]);
+    }, [initialMode, locationState?.autoVerifiedMessage, locationState?.verifiedEmail]);
 
     useEffect(() => {
         const mode = (searchParams.get('mode') || '').toLowerCase();
@@ -195,7 +221,6 @@ const Auth = () => {
 
         if (mode === 'reset') {
             setIsLogin(true);
-            setFlipState('idle');
             setIsForgotPasswordMode(false);
             setIsResetPasswordMode(true);
             resetForgotPasswordState();
@@ -206,7 +231,6 @@ const Auth = () => {
 
         if (verified) {
             setIsLogin(true);
-            setFlipState('idle');
             setIsForgotPasswordMode(false);
             setIsResetPasswordMode(false);
             resetForgotPasswordState();
@@ -247,12 +271,13 @@ const Auth = () => {
 
             const renderGoogleButton = (container: HTMLElement) => {
                 const availableWidth = Math.floor(container.clientWidth);
-                if (availableWidth <= 0) {
+                if (availableWidth < 200) {
                     return;
                 }
 
-                const buttonWidth = Math.min(320, availableWidth);
-                if (container.dataset.googleRenderedWidth === String(buttonWidth)) {
+                const buttonWidth = Math.min(400, availableWidth);
+                const prevWidth = Number(container.dataset.googleRenderedWidth || '0');
+                if (prevWidth > 0 && Math.abs(buttonWidth - prevWidth) < 16) {
                     return;
                 }
 
@@ -264,7 +289,7 @@ const Auth = () => {
                     size: 'large',
                     type: 'standard',
                     text: container.dataset.googleButtonText === 'signup_with' ? 'signup_with' : 'signin_with',
-                    shape: 'pill',
+                    shape: 'rectangular',
                     width: buttonWidth
                 });
             };
@@ -272,9 +297,13 @@ const Auth = () => {
             const containers = document.querySelectorAll<HTMLElement>('[data-google-signin-button]');
             containers.forEach(renderGoogleButton);
 
+            let resizeTimer: number | undefined;
             resizeObserver?.disconnect();
             resizeObserver = new ResizeObserver((entries) => {
-                entries.forEach(({ target }) => renderGoogleButton(target as HTMLElement));
+                window.clearTimeout(resizeTimer);
+                resizeTimer = window.setTimeout(() => {
+                    entries.forEach(({ target }) => renderGoogleButton(target as HTMLElement));
+                }, 140);
             });
             containers.forEach((container) => resizeObserver?.observe(container));
         };
@@ -305,13 +334,13 @@ const Auth = () => {
             isCancelled = true;
             resizeObserver?.disconnect();
         };
-    }, [isForgotPasswordMode, isResetPasswordMode]);
+    }, [isForgotPasswordMode, isResetPasswordMode, isLogin]);
 
     const goBackToLogin = () => {
+        setSlideDir(-1);
         setIsForgotPasswordMode(false);
         setIsResetPasswordMode(false);
         setIsLogin(true);
-        setFlipState('idle');
         setErrorMessage('');
         setSuccessMessage('');
         setVerificationLink('');
@@ -321,6 +350,9 @@ const Auth = () => {
         setNewPassword('');
         setConfirmNewPassword('');
         setSearchParams({}, { replace: true });
+        if (location.pathname === PATHS.forgotPassword) {
+            navigate(PATHS.login, { replace: true });
+        }
     };
 
     const passwordPolicy = checkPasswordPolicy(password);
@@ -330,37 +362,40 @@ const Auth = () => {
     const hasValidResetLink = Boolean(forgotEmail.trim() && resetToken.trim());
 
     const renderPasswordPolicyChecklist = (policy: PasswordPolicyResult) => (
-        <div className="rounded-xl border border-primary/15 bg-surface/70 px-4 py-2 text-xs text-text-secondary space-y-1 text-left">
-            <p className="font-semibold text-text-primary mb-0.5">Yêu cầu mật khẩu:</p>
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs" aria-label="Yêu cầu mật khẩu">
             {PASSWORD_POLICY_LABELS.map(([key, label]) => {
                 const ok = policy[key];
                 return (
-                    <p key={key} className={`flex items-center gap-2 ${ok ? 'text-green-700' : ''}`}>
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${ok ? 'bg-green-200 text-green-700' : 'bg-surface-hover'}`}>
-                            {ok ? '✓' : ''}
+                    <li key={key} className={`flex items-center gap-1.5 ${ok ? 'text-success-color' : 'text-text-muted'}`}>
+                        <span
+                            className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full ${ok ? 'bg-success-color text-text-on-accent' : 'border border-border-emphasized'}`}
+                            aria-hidden
+                        >
+                            {ok && <Check size={10} strokeWidth={3} />}
                         </span>
-                        {label}
-                    </p>
+                        <span className="truncate">{label}</span>
+                        <span className="sr-only">{ok ? '(đạt)' : '(chưa đạt)'}</span>
+                    </li>
                 );
             })}
-        </div>
+        </ul>
     );
 
     const renderGoogleLoginArea = (buttonText: 'signin_with' | 'signup_with') => (
-        <div className="mb-4 w-full space-y-3">
-            <div
-                data-google-signin-button
-                data-google-button-text={buttonText}
-                aria-busy={isGoogleSubmitting}
-                className={`flex min-h-11 w-full max-w-full min-w-0 items-center justify-center overflow-hidden rounded-full ${
-                    isGoogleSubmitting ? 'pointer-events-none opacity-60' : ''
-                }`}
-            />
-            <div className="flex items-center gap-3 text-xs text-text-secondary">
+        <div className="mt-3.5 w-full space-y-2.5">
+            <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
                 <span className="h-px flex-1 bg-border" />
                 <span>hoặc</span>
                 <span className="h-px flex-1 bg-border" />
             </div>
+            <div
+                data-google-signin-button
+                data-google-button-text={buttonText}
+                aria-busy={isGoogleSubmitting}
+                className={`flex min-h-10 w-full max-w-full min-w-0 items-center justify-center overflow-hidden ${
+                    isGoogleSubmitting ? 'pointer-events-none opacity-60' : ''
+                }`}
+            />
         </div>
     );
 
@@ -373,17 +408,26 @@ const Auth = () => {
 
         try {
             if (isLogin) {
-                const user = await authApi.login({ usernameOrEmail, password, rememberMe: true });
+                const cleanIdentifier = usernameOrEmail.trim();
+                if (!cleanIdentifier || !password.trim()) {
+                    setErrorMessage('Vui lòng nhập đầy đủ tên đăng nhập/email và mật khẩu.');
+                    return;
+                }
+                const user = await authApi.login({ usernameOrEmail: cleanIdentifier, password, rememberMe: true });
                 syncUserGameData(user);
                 addToast('Đăng nhập thành công!', 'success');
-                navigate(PATHS.home);
+                navigate(resolvePostLoginDestination(user), { replace: true });
             } else {
                 const cleanName = normalizeDisplayName(name);
                 const cleanEmail = normalizeSignupEmail(email);
                 setRegisterEmailTouched(true);
 
-                if (!isValidDisplayName(cleanName)) {
+                if (cleanName.length < USERNAME_MIN_LENGTH || cleanName.length > USERNAME_MAX_LENGTH) {
                     setErrorMessage(`Tên hiển thị phải từ ${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH} ký tự.`);
+                    return;
+                }
+                if (!isValidDisplayName(cleanName)) {
+                    setErrorMessage('Tên hiển thị phải chứa ít nhất 3 chữ cái hoặc số hợp lệ.');
                     return;
                 }
                 if (!isValidSignupEmail(cleanEmail)) {
@@ -409,7 +453,18 @@ const Auth = () => {
                 setShowPassword(false);
                 setShowConfirmPassword(false);
                 setRegisterEmailTouched(false);
-                const message = result.message || 'Account created. Please verify your email before logging in.';
+                const message = result.message || 'Tạo tài khoản thành công. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.';
+                if (result.emailSent === false) {
+                    addToast(message, 'success');
+                    navigate(PATHS.login, {
+                        replace: true,
+                        state: {
+                            verifiedEmail: cleanEmail,
+                            autoVerifiedMessage: message,
+                        },
+                    });
+                    return;
+                }
                 addToast(message, 'success');
                 navigate(PATHS.verifyEmailSent, {
                     replace: true,
@@ -419,7 +474,6 @@ const Auth = () => {
         } catch (error: any) {
             const message = error?.message || 'Không thể kết nối tới hệ thống xác thực.';
             setErrorMessage(message);
-            addToast(message, 'info');
         } finally {
             setIsSubmitting(false);
         }
@@ -437,55 +491,40 @@ const Auth = () => {
         setIsResendingVerification(true);
         try {
             const result = await authApi.resendVerification({ email: emailToVerify });
-            const message = result.message || 'If this learner account needs verification, a new email has been sent.';
+            const message = result.message || 'Nếu tài khoản cần xác minh, chúng tôi đã gửi lại email mới.';
             setSuccessMessage(message);
             setVerificationLink(result.verificationLink || '');
-            addToast(message, 'success');
         } catch (error: any) {
             const message = error?.message || 'Không thể gửi lại email xác minh.';
             setErrorMessage(message);
-            addToast(message, 'info');
         } finally {
             setIsResendingVerification(false);
         }
     };
 
-    const switchToRegister = () => {
-        setIsLogin(false);
-        setFlipState('active');
-        setErrorMessage('');
-        setSuccessMessage('');
-        setVerificationLink('');
-        setRegisterEmailTouched(false);
-    };
-
-    const switchToLogin = () => {
-        setIsLogin(true);
-        setFlipState('close');
-        setErrorMessage('');
-        setSuccessMessage('');
-        setVerificationLink('');
-        setRegisterEmailTouched(false);
-        setConfirmPassword('');
-        setShowConfirmPassword(false);
-    };
-
     const handleForgotPasswordSubmit = async () => {
         if (isSubmitting) return;
-        if (!forgotEmail.trim()) { setErrorMessage('Vui lòng nhập email.'); return; }
-        setErrorMessage(''); setSuccessMessage(''); setIsSubmitting(true);
+        const cleanEmail = forgotEmail.trim();
+        if (!cleanEmail) {
+            setErrorMessage('Vui lòng nhập email.');
+            return;
+        }
+        if (!isValidSignupEmail(cleanEmail)) {
+            setErrorMessage(REGISTER_EMAIL_FORMAT_MESSAGE);
+            return;
+        }
+        setErrorMessage('');
+        setSuccessMessage('');
+        setIsSubmitting(true);
         try {
-            const result = await authApi.forgotPassword({ email: forgotEmail.trim() });
+            const result = await authApi.forgotPassword({ email: cleanEmail });
             setForgotPasswordSent(true);
             setForgotPasswordInboxUrl(result.inboxUrl);
             setForgotPasswordResetLink(result.resetLink);
             setForgotPasswordUsedFallback(result.usedFallbackLink);
-            setSuccessMessage(result.message);
-            addToast(result.message, result.usedFallbackLink ? 'info' : 'success');
         } catch (error: any) {
             const message = error?.message || 'Không thể gửi yêu cầu quên mật khẩu.';
             setErrorMessage(message);
-            addToast(message, 'info');
         } finally {
             setIsSubmitting(false);
         }
@@ -518,197 +557,203 @@ const Auth = () => {
         }
     };
 
-    // ─── Forgot / Reset Password screens (unchanged layout) ─────────────────────
-    if (isForgotPasswordMode || isResetPasswordMode) {
-        const title = isResetPasswordMode ? 'Đặt lại mật khẩu' : 'Quên mật khẩu';
-        return (
-            <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
-                <div className="absolute -top-40 -left-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
-                <div className="absolute -bottom-40 -right-40 w-80 h-80 bg-accent/20 rounded-full blur-3xl -z-10" style={{ animationDelay: '0.5s' }} />
-                <div className="max-w-md w-full">
-                    <div className="glass-card p-8 md:p-10 rounded-2xl md:rounded-3xl">
-                        <div className="text-center mb-8">
-                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-4">
-                                <span className="text-2xl">{isForgotPasswordMode ? '🔐' : '🔑'}</span>
-                            </div>
-                            <h2 className={`${typography.pageTitle} mb-2`}>{title}</h2>
-                            <p className="text-text-secondary text-sm">
-                                {isForgotPasswordMode ? 'Nhập email của bạn để nhận liên kết đặt lại mật khẩu' : 'Nhập thông tin để đặt lại mật khẩu mới'}
-                            </p>
-                        </div>
-                        <div className="space-y-4 mb-8">
-                            {isForgotPasswordMode ? (
-                                !forgotPasswordSent ? (
-                                    <input type="email" placeholder="Email tài khoản"
-                                        className="auth-input"
-                                        value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} />
-                                ) : (
-                                    <div className="space-y-3 rounded-xl border-2 border-accent/30 bg-surface/70 px-4 py-4 text-sm text-center">
-                                        <p className="text-accent font-semibold flex items-center justify-center gap-2"><span>✓</span>Email đã được gửi!</p>
-                                        <p className="text-text-secondary text-xs">
-                                            {forgotPasswordUsedFallback
-                                                ? 'Môi trường hiện tại chưa gửi được email thật. Bạn có thể mở trực tiếp trang đặt lại mật khẩu ở nút bên dưới.'
-                                                : 'Vui lòng kiểm tra hộp thư, mục Spam hoặc Promotions để tìm email từ chúng tôi.'}
-                                        </p>
-                                        <p className="text-text-primary font-medium break-all">{forgotEmail}</p>
-                                    </div>
-                                )
-                            ) : (
-                                hasValidResetLink ? (
-                                    <>
-                                        <div className="rounded-xl border border-border bg-surface/70 px-4 py-3 text-left">
-                                            <p className="text-xs text-text-secondary">Đặt lại mật khẩu cho</p>
-                                            <p className="mt-1 break-all text-sm font-semibold text-text-primary">{forgotEmail}</p>
-                                        </div>
-                                        <div className="relative">
-                                            <input type={showNewPassword ? 'text' : 'password'} placeholder="Mật khẩu mới"
-                                                className="auth-input pr-12"
-                                                value={newPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setNewPassword(e.target.value)} />
-                                            <button type="button" className="auth-eye-btn"
-                                                onClick={() => setShowNewPassword((p) => !p)}
-                                                aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>
-                                                {showNewPassword ? '🙈' : '👁'}
-                                            </button>
-                                        </div>
-                                        <div className="relative">
-                                            <input type={showConfirmNewPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu mới"
-                                                className="auth-input pr-12"
-                                                value={confirmNewPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmNewPassword(e.target.value)} />
-                                            <button type="button" className="auth-eye-btn"
-                                                onClick={() => setShowConfirmNewPassword((p) => !p)}
-                                                aria-label={showConfirmNewPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
-                                                {showConfirmNewPassword ? '🙈' : '👁'}
-                                            </button>
-                                        </div>
-                                        {renderPasswordPolicyChecklist(resetPasswordPolicy)}
-                                    </>
-                                ) : (
-                                    <div className="auth-error">
-                                        Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.
-                                    </div>
-                                )
-                            )}
-                            {errorMessage && (!isResetPasswordMode || hasValidResetLink) && <div className="auth-error">{errorMessage}</div>}
-                            {successMessage && <div className="auth-success">{successMessage}</div>}
-                        </div>
-                        <div className="space-y-3">
-                            {isForgotPasswordMode ? (
-                                <>
-                                    {!forgotPasswordSent ? (
-                                        <Button variant="primary" className="w-full" onClick={handleForgotPasswordSubmit} disabled={isSubmitting}>
-                                            {isSubmitting ? 'Đang gửi...' : 'Gửi liên kết đặt lại'}
-                                        </Button>
-                                    ) : forgotPasswordUsedFallback && forgotPasswordResetLink ? (
-                                        <a href={forgotPasswordResetLink} className="block">
-                                            <Button variant="primary" className="w-full">Mở trang đặt lại mật khẩu</Button>
-                                        </a>
-                                    ) : (
-                                        <a href={forgotPasswordInboxUrl} target="_blank" rel="noreferrer" className="block">
-                                            <Button variant="primary" className="w-full">Mở hộp thư</Button>
-                                        </a>
-                                    )}
-                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>Quay lại đăng nhập</Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button variant="primary" className="w-full" onClick={handleResetPasswordSubmit} disabled={isSubmitting || !hasValidResetLink}>
-                                        {isSubmitting ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
-                                    </Button>
-                                    <Button variant="ghost" className="w-full" onClick={goBackToLogin}>Quay lại đăng nhập</Button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const passwordField = ({
+        label,
+        value,
+        onChange,
+        shown,
+        onToggle,
+        onEnter,
+        autoComplete,
+    }: {
+        label: string;
+        value: string;
+        onChange: (value: string) => void;
+        shown: boolean;
+        onToggle: () => void;
+        onEnter?: () => void;
+        autoComplete: string;
+    }) => (
+        <FloatingField
+            label={label}
+            value={value}
+            onChange={(next) => onChange(next.slice(0, PASSWORD_MAX_LENGTH))}
+            onEnter={onEnter}
+            autoComplete={autoComplete}
+            maxLength={PASSWORD_MAX_LENGTH}
+            isPassword
+            shown={shown}
+            onToggleShown={onToggle}
+        />
+    );
 
-    // ─── Main Login / Register Flip Layout ───────────────────────────────────────
-    //
-    // Pattern from sample (CSSStyling.css):
-    //   #container  → .auth-flip-root        (perspective wrapper, preserve-3d)
-    //   .login       → .auth-panel-login      (left, white bg, z-0)
-    //   .register    → .auth-panel-register   (right, white bg, z-1)
-    //   .page.front  → .auth-page-front       (right, gradient, z-3, flips OUT on .active)
-    //   .page.back   → .auth-page-back        (right, gradient, z-2, flips IN  on .active)
-    //   class on container: '' | 'active' | 'close'
+    const notice = (tone: 'error' | 'success', message: string) => (
+        <div
+            role={tone === 'error' ? 'alert' : 'status'}
+            className={`rounded-2xl border-2 px-3.5 py-3 text-sm font-medium leading-snug break-words ${
+                tone === 'error'
+                    ? 'border-danger-color/30 bg-danger-color/10 text-danger-color'
+                    : 'border-success-color/30 bg-success-color/10 text-success-color'
+            }`}
+        >
+            {message}
+        </div>
+    );
 
-    return (
-        <div className="min-h-[calc(100dvh-65px)] flex items-center justify-center px-4 py-4 relative overflow-hidden">
-            {/* Background orbs */}
-            <div className="absolute -top-40 -left-40 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse-soft -z-10" />
-            <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-accent/20 rounded-full blur-3xl -z-10" style={{ animationDelay: '0.5s' }} />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-secondary/15 rounded-full blur-[80px] -z-10" />
+    const activePanelKey: 'login' | 'register' | 'forgot' | 'reset' = isResetPasswordMode
+        ? 'reset'
+        : isForgotPasswordMode
+          ? 'forgot'
+          : isLogin
+            ? 'login'
+            : 'register';
 
-            {/* Root flip container */}
-            <div className={`auth-flip-root ${flipState} lg:!min-h-[690px]`}>
+    const panelTestId =
+        activePanelKey === 'login'
+            ? 'login-panel'
+            : activePanelKey === 'register'
+              ? 'register-panel'
+              : undefined;
 
-                {/* ── Login panel (LEFT) ─────────────────────────────────── */}
-                <div className="auth-panel auth-panel-login !overflow-visible" data-testid="login-panel">
-                    <div className="auth-panel-content !px-8 !py-6">
-                        <div className="text-center mb-6">
-                            <h2 className="text-3xl font-bold text-text-primary">Đăng nhập</h2>
-                            <p className="text-text-secondary text-sm mt-1">Tiếp tục hành trình học của bạn</p>
-                        </div>
+    const slideVariants = {
+        enter: (dir: number) => (prefersReduced ? { opacity: 1, x: 0 } : { opacity: 0, x: dir * 48 }),
+        center: { opacity: 1, x: 0 },
+        exit: (dir: number) => (prefersReduced ? { opacity: 1, x: 0 } : { opacity: 0, x: dir * -48 }),
+    };
 
-                        {renderGoogleLoginArea('signin_with')}
+    const renderFormBody = () => {
+        if (isForgotPasswordMode || isResetPasswordMode) {
+            const title = isResetPasswordMode ? 'Đặt lại mật khẩu' : 'Quên mật khẩu';
+            return (
+                <>
+                    <h1 className="text-[1.85rem] font-extrabold tracking-[-0.025em] text-text-primary">{title}</h1>
+                    <p className="mt-1.5 text-sm text-text-muted">
+                        {isForgotPasswordMode
+                            ? 'Nhập email tài khoản, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.'
+                            : 'Tạo mật khẩu mới cho tài khoản của bạn.'}
+                    </p>
 
-                        <div className="space-y-3 w-full">
-                            <input
-                                type="text"
-                                placeholder="Tên đăng nhập hoặc email"
-                                className="auth-input"
-                                value={usernameOrEmail}
-                                onChange={(e) => setUsernameOrEmail(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                            />
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    placeholder="Mật khẩu"
-                                    className="auth-input pr-12"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                    <div className="mt-6 space-y-3.5">
+                        {isForgotPasswordMode ? (
+                            !forgotPasswordSent ? (
+                                <FloatingField
+                                    type="email"
+                                    label="Email"
+                                    value={forgotEmail}
+                                    onChange={setForgotEmail}
+                                    onEnter={handleForgotPasswordSubmit}
+                                    autoComplete="email"
                                 />
-                                <button type="button" className="auth-eye-btn"
-                                    onClick={() => setShowPassword((p) => !p)}
-                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
-                                    {showPassword ? '🙈' : '👁'}
-                                </button>
-                            </div>
-
-                            {errorMessage && isLogin && (
-                                <div className="space-y-2">
-                                    <div className="auth-error !p-2.5 !text-xs leading-snug break-words">{errorMessage}</div>
-                                    {errorMessage === EMAIL_VERIFICATION_REQUIRED_MESSAGE && (
-                                        <button
-                                            type="button"
-                                            className="w-full text-primary text-sm font-semibold py-2 px-4 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
-                                            onClick={handleResendVerification}
-                                            disabled={isResendingVerification}
-                                        >
-                                            {isResendingVerification ? 'Đang gửi...' : 'Gửi lại email xác minh'}
-                                        </button>
-                                    )}
+                            ) : (
+                                <div className="rounded-2xl border-2 border-success-color/30 bg-success-color/10 p-4 text-sm" role="status">
+                                    <p className="flex items-center gap-2 font-semibold text-success-color">
+                                        <CheckCircle2 size={16} aria-hidden /> Đã gửi email
+                                    </p>
+                                    <p className="mt-1.5 text-text-muted">
+                                        {forgotPasswordUsedFallback
+                                            ? 'Môi trường này chưa gửi được email thật. Bạn có thể mở trang đặt lại mật khẩu bằng nút bên dưới.'
+                                            : 'Kiểm tra hộp thư (cả mục Spam hoặc Quảng cáo) của'}
+                                    </p>
+                                    <p className="mt-1 break-all font-medium text-text-primary">{forgotEmail}</p>
                                 </div>
-                            )}
-                            {successMessage && isLogin && <div className="auth-success !p-2.5 !text-xs leading-snug break-words">{successMessage}</div>}
-                            {verificationLink && isLogin && (
-                                <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
-                                    Mở liên kết xác minh
+                            )
+                        ) : hasValidResetLink ? (
+                            <>
+                                <p className="text-sm text-text-muted">
+                                    Tài khoản <span className="break-all font-semibold text-text-primary">{forgotEmail}</span>
+                                </p>
+                                {passwordField({
+                                    label: 'Mật khẩu mới',
+                                    value: newPassword,
+                                    onChange: setNewPassword,
+                                    shown: showNewPassword,
+                                    onToggle: () => setShowNewPassword((p) => !p),
+                                    autoComplete: 'new-password',
+                                })}
+                                {passwordField({
+                                    label: 'Xác nhận mật khẩu',
+                                    value: confirmNewPassword,
+                                    onChange: setConfirmNewPassword,
+                                    shown: showConfirmNewPassword,
+                                    onToggle: () => setShowConfirmNewPassword((p) => !p),
+                                    onEnter: handleResetPasswordSubmit,
+                                    autoComplete: 'new-password',
+                                })}
+                                {renderPasswordPolicyChecklist(resetPasswordPolicy)}
+                            </>
+                        ) : (
+                            notice('error', 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.')
+                        )}
+                        {errorMessage && (!isResetPasswordMode || hasValidResetLink) && notice('error', errorMessage)}
+                        {successMessage && notice('success', successMessage)}
+                    </div>
+
+                    <div className="mt-6 space-y-2.5">
+                        {isForgotPasswordMode ? (
+                            !forgotPasswordSent ? (
+                                <Button fullWidth onClick={handleForgotPasswordSubmit} isLoading={isSubmitting}>
+                                    Gửi liên kết đặt lại
+                                </Button>
+                            ) : (
+                                <a
+                                    href={forgotPasswordUsedFallback && forgotPasswordResetLink ? forgotPasswordResetLink : forgotPasswordInboxUrl}
+                                    {...(forgotPasswordUsedFallback && forgotPasswordResetLink ? {} : { target: '_blank', rel: 'noreferrer' })}
+                                    className="btn-primary w-full"
+                                >
+                                    {forgotPasswordUsedFallback && forgotPasswordResetLink ? 'Mở trang đặt lại mật khẩu' : 'Mở hộp thư'}
                                 </a>
-                            )}
-
-                            <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
-                                {isSubmitting ? 'Đang xử lý...' : 'Vào học ngay'}
+                            )
+                        ) : (
+                            <Button fullWidth onClick={handleResetPasswordSubmit} isLoading={isSubmitting} disabled={!hasValidResetLink}>
+                                {isSubmitting ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
                             </Button>
+                        )}
+                        <Button fullWidth variant="ghost" onClick={goBackToLogin}>
+                            <ArrowLeft size={16} aria-hidden /> Quay lại đăng nhập
+                        </Button>
+                    </div>
+                </>
+            );
+        }
 
+        if (isLogin) {
+            return (
+                <>
+                    <h1 className="text-[1.85rem] font-extrabold tracking-[-0.025em] text-text-primary">Đăng nhập</h1>
+                    <p className="mt-1.5 text-sm text-text-muted">Chào mừng quay lại! Tiếp tục hành trình học từ vựng của bạn.</p>
+
+                    {authRedirectNotice && !errorMessage && !successMessage && (
+                        <div
+                            role="status"
+                            className="mt-4 rounded-2xl border-2 border-primary/25 bg-primary-light px-3.5 py-2.5 text-sm text-text-primary"
+                        >
+                            {authRedirectNotice}
+                        </div>
+                    )}
+
+                    <div className="mt-6 space-y-3.5">
+                        <FloatingField
+                            label="Tên đăng nhập hoặc email"
+                            value={usernameOrEmail}
+                            onChange={setUsernameOrEmail}
+                            onEnter={handleSubmit}
+                            autoComplete="username"
+                        />
+                        {passwordField({
+                            label: 'Mật khẩu',
+                            value: password,
+                            onChange: setPassword,
+                            shown: showPassword,
+                            onToggle: () => setShowPassword((p) => !p),
+                            onEnter: handleSubmit,
+                            autoComplete: 'current-password',
+                        })}
+                        <div className="-mt-0.5 flex justify-end">
                             <button
                                 type="button"
-                                className="w-full text-primary text-sm font-semibold py-2 px-4 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+                                className="text-link text-sm"
                                 onClick={() => {
+                                    setSlideDir(1);
                                     setIsForgotPasswordMode(true);
                                     resetForgotPasswordState();
                                     setForgotEmail(usernameOrEmail.includes('@') ? usernameOrEmail : '');
@@ -720,127 +765,196 @@ const Auth = () => {
                             </button>
                         </div>
 
-                        {/* Mobile-only switch to register */}
-                        <p className="auth-mobile-switch">
-                            Chưa có tài khoản?{' '}
-                            <button type="button" className="text-primary font-bold hover:underline cursor-pointer transition-opacity hover:opacity-75" onClick={switchToRegister}>
-                                Đăng ký ngay
-                            </button>
-                        </p>
-                    </div>
-                </div>
-
-                {/* ── Register panel (RIGHT) ─────────────────────────────── */}
-                <div className="auth-panel auth-panel-register !overflow-visible" data-testid="register-panel">
-                    <div className="auth-panel-content !px-8 !py-6">
-                        <div className="text-center mb-3">
-                            <h2 className="text-3xl font-bold text-text-primary">Đăng ký</h2>
-                            <p className="text-text-secondary text-sm mt-1">Bắt đầu học từ vựng mới</p>
-                        </div>
-
-                        {renderGoogleLoginArea('signup_with')}
-
-                        <div className="space-y-2 w-full">
-                            <input type="text" placeholder="Tên hiển thị"
-                                className="auth-input"
-                                value={name} onChange={(e) => setName(e.target.value)} />
-                            <div className="w-full">
-                                <input
-                                    id="register-email"
-                                    type="email"
-                                    placeholder="Email"
-                                    className="auth-input"
-                                    value={email}
-                                    aria-invalid={Boolean(registerEmailError)}
-                                    aria-describedby={registerEmailError ? 'register-email-error' : undefined}
-                                    onBlur={() => setRegisterEmailTouched(true)}
-                                    onChange={(e) => {
-                                        setEmail(e.target.value);
-                                        if (errorMessage === REGISTER_EMAIL_FORMAT_MESSAGE) {
-                                            setErrorMessage('');
-                                        }
-                                    }}
-                                />
-                                {registerEmailError && (
-                                    <p id="register-email-error" className="mt-1.5 px-1 text-xs font-medium leading-snug text-red-500">
-                                        {registerEmailError}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="relative">
-                                <input type={showPassword ? 'text' : 'password'} placeholder="Mật khẩu"
-                                    className="auth-input pr-12"
-                                    value={password} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setPassword(e.target.value)} />
-                                <button type="button" className="auth-eye-btn"
-                                    onClick={() => setShowPassword((p) => !p)}
-                                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
-                                    {showPassword ? '🙈' : '👁'}
-                                </button>
-                            </div>
-                            <div className="relative">
-                                <input type={showConfirmPassword ? 'text' : 'password'} placeholder="Xác nhận mật khẩu"
-                                    className="auth-input pr-12"
-                                    value={confirmPassword} maxLength={PASSWORD_MAX_LENGTH} onChange={(e) => setConfirmPassword(e.target.value)} />
-                                <button type="button" className="auth-eye-btn"
-                                    onClick={() => setShowConfirmPassword((p) => !p)}
-                                    aria-label={showConfirmPassword ? 'Ẩn xác nhận' : 'Hiện xác nhận'}>
-                                    {showConfirmPassword ? '🙈' : '👁'}
-                                </button>
-                            </div>
-
-                            {renderPasswordPolicyChecklist(passwordPolicy)}
-
-                            {errorMessage && !isLogin && <div className="auth-error !p-2.5 !text-xs leading-snug break-words">{errorMessage}</div>}
-                            {successMessage && !isLogin && <div className="auth-success !p-2.5 !text-xs leading-snug break-words">{successMessage}</div>}
-                            {verificationLink && !isLogin && (
-                                <a className="block text-center text-sm font-semibold text-primary underline" href={verificationLink}>
-                                    Mở liên kết xác minh
-                                </a>
-                            )}
-
-                            <Button variant="primary" className="w-full mt-2" onClick={handleSubmit} disabled={isSubmitting}>
-                                {isSubmitting ? 'Đang xử lý...' : 'Tạo tài khoản'}
+                        {errorMessage && notice('error', errorMessage)}
+                        {EMAIL_VERIFICATION_REQUIRED_MESSAGES.has(errorMessage) && (
+                            <Button fullWidth variant="secondary" onClick={handleResendVerification} isLoading={isResendingVerification}>
+                                Gửi lại email xác minh
                             </Button>
+                        )}
+                        {successMessage && notice('success', successMessage)}
+                        {verificationLink && (
+                            <a className="text-link block text-center text-sm" href={verificationLink}>Mở liên kết xác minh</a>
+                        )}
+
+                        <Button fullWidth onClick={handleSubmit} isLoading={isSubmitting}>
+                            {isSubmitting ? 'Đang xử lý...' : 'Vào học ngay'}
+                        </Button>
+                    </div>
+
+                    {googleClientId && renderGoogleLoginArea('signin_with')}
+
+                    <p className="mt-6 text-center text-sm text-text-muted">
+                        Chưa có tài khoản?
+                        <button
+                            type="button"
+                            className="text-link ml-1.5 font-semibold"
+                            onClick={() => {
+                                setSlideDir(1);
+                                navigate(PATHS.register);
+                            }}
+                        >
+                            Đăng ký
+                        </button>
+                    </p>
+                </>
+            );
+        }
+
+        return (
+            <>
+                <h1 className="text-[1.65rem] font-extrabold leading-tight tracking-[-0.025em] text-text-primary">Đăng ký</h1>
+                <p className="mt-1 text-sm text-text-muted">Miễn phí. Tiến độ và chuỗi học được lưu trên mọi thiết bị.</p>
+
+                <div className="mt-4 space-y-2.5">
+                    <FloatingField
+                        label="Tên hiển thị"
+                        value={name}
+                        onChange={setName}
+                        maxLength={USERNAME_MAX_LENGTH}
+                        autoComplete="nickname"
+                    />
+                    <FloatingField
+                        type="email"
+                        label="Email"
+                        value={email}
+                        maxLength={100}
+                        onBlur={() => setRegisterEmailTouched(true)}
+                        onChange={(next) => {
+                            setEmail(next);
+                            if (errorMessage === REGISTER_EMAIL_FORMAT_MESSAGE) setErrorMessage('');
+                        }}
+                        error={registerEmailError}
+                        autoComplete="email"
+                    />
+                    {passwordField({
+                        label: 'Mật khẩu',
+                        value: password,
+                        onChange: setPassword,
+                        shown: showPassword,
+                        onToggle: () => setShowPassword((p) => !p),
+                        autoComplete: 'new-password',
+                    })}
+                    {passwordField({
+                        label: 'Xác nhận mật khẩu',
+                        value: confirmPassword,
+                        onChange: setConfirmPassword,
+                        shown: showConfirmPassword,
+                        onToggle: () => setShowConfirmPassword((p) => !p),
+                        onEnter: handleSubmit,
+                        autoComplete: 'new-password',
+                    })}
+
+                    {renderPasswordPolicyChecklist(passwordPolicy)}
+
+                    {errorMessage && notice('error', errorMessage)}
+                    {successMessage && notice('success', successMessage)}
+                    {verificationLink && (
+                        <a className="text-link block text-center text-sm" href={verificationLink}>Mở liên kết xác minh</a>
+                    )}
+
+                    <Button fullWidth className="mt-1" onClick={handleSubmit} isLoading={isSubmitting}>
+                        {isSubmitting ? 'Đang xử lý...' : 'Tạo tài khoản'}
+                    </Button>
+                </div>
+
+                {googleClientId && renderGoogleLoginArea('signup_with')}
+
+                <p className="mt-4 text-center text-sm text-text-muted">
+                    Đã có tài khoản?{' '}
+                    <button
+                        type="button"
+                        className="text-link font-semibold"
+                        onClick={() => {
+                            setSlideDir(-1);
+                            navigate(PATHS.login);
+                        }}
+                    >
+                        Đăng nhập
+                    </button>
+                </p>
+                <p className="mt-1.5 text-center text-xs text-text-muted">
+                    Khi tiếp tục, bạn đồng ý với{' '}
+                    <Link to={PATHS.privacy} className="text-link">
+                        Chính sách bảo mật
+                    </Link>{' '}
+                    của VocabLearning.
+                </p>
+            </>
+        );
+    };
+
+    return (
+        <div className="grid min-h-full w-full bg-surface lg:h-full lg:grid-cols-2 lg:overflow-hidden">
+            {/* Stationary Left Illustrated Brand Stage (never slides or remounts on Login <-> Register) */}
+            <aside
+                aria-hidden="true"
+                className="relative hidden flex-col items-center justify-center overflow-hidden rounded-r-[2.5rem] border-r-2 border-border bg-bg-secondary px-10 py-8 lg:flex"
+                style={{
+                    backgroundImage:
+                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='1.1' fill='%236d28d9' fill-opacity='0.14'/%3E%3C/svg%3E\")",
+                    backgroundSize: '24px 24px',
+                }}
+            >
+                <div className="relative flex w-full max-w-[440px] flex-col items-center">
+                    {/* Tactile floating vocab badges around stationary Lumo */}
+                    <div className="relative flex h-[280px] w-full items-center justify-center">
+                        <div className="glass-card absolute left-2 top-5 px-3.5 py-2.5 text-left">
+                            <span className="block font-mono text-[11px] font-bold text-primary">A2 · Flashcard</span>
+                            <strong className="block text-base font-extrabold text-text-primary">journey</strong>
+                            <span className="font-mono text-xs text-text-muted">/ˈdʒɜːni/</span>
                         </div>
 
-                        {/* Mobile-only switch to login */}
-                        <p className="auth-mobile-switch">
-                            Đã có tài khoản?{' '}
-                            <button type="button" className="text-primary font-bold hover:underline cursor-pointer transition-opacity hover:opacity-75" onClick={switchToLogin}>
-                                Đăng nhập
-                            </button>
+                        <div className="glass-card absolute right-3 top-8 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold text-text-primary">
+                            <Flame size={16} className="text-warning-color" />
+                            <span>12 ngày</span>
+                        </div>
+
+                        <motion.img
+                            src="/mascot-lumo-reading.webp"
+                            alt=""
+                            width={220}
+                            height={264}
+                            animate={prefersReduced ? undefined : { y: [0, -8, 0] }}
+                            transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
+                            className="relative z-10 h-auto w-[212px] select-none drop-shadow-[0_18px_20px_rgba(0,0,0,0.18)]"
+                        />
+
+                        <div className="glass-card absolute -right-2 bottom-2 z-20 inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-text-primary">
+                            <Sparkles size={15} className="text-primary" />
+                            <span>SM-2 · +100 XP</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 text-center">
+                        <h2 className="text-[1.65rem] font-extrabold leading-snug tracking-[-0.025em] text-text-primary">
+                            VocabLearning — Học từ vựng
+                            <br />
+                            nhớ lâu mỗi ngày
+                        </h2>
+                        <p className="mt-2.5 text-sm font-medium text-text-muted">
+                            Thẻ 3D lật mượt · Ghép từ · Lịch ôn thông minh theo trí nhớ của bạn
                         </p>
                     </div>
                 </div>
+            </aside>
 
-                {/* ── Front page overlay (RIGHT side, gradient — visible by default) ── */}
-                {/* Flips OUT (rotateY -180°) when .active, flips back IN when .close   */}
-                <div className="auth-page auth-page-front">
-                    <div className="auth-page-content">
-                        <h3 className="text-4xl font-bold text-white mb-3">Xin chào!</h3>
-                        <p className="text-white/90 text-sm leading-relaxed text-center">
-                            Tạo tài khoản để bắt đầu hành trình học từ vựng tiếng Anh của bạn.
-                        </p>
-                        <button type="button" className="auth-page-btn" onClick={switchToRegister}>
-                            Đăng ký <span className="ml-1">→</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* ── Back page overlay (RIGHT side, gradient — hidden behind front) ── */}
-                {/* Flips IN (rotateY -180°) when .active, flips back OUT when .close   */}
-                <div className="auth-page auth-page-back">
-                    <div className="auth-page-content auth-page-back-content">
-                        <h3 className="text-4xl font-bold text-white mb-3">Chào mừng trở lại!</h3>
-                        <p className="text-white/90 text-sm leading-relaxed text-center">
-                            Đăng nhập để tiếp tục bài học và nâng cao kỹ năng của bạn.
-                        </p>
-                        <button type="button" className="auth-page-btn" onClick={switchToLogin}>
-                            <span className="mr-1">←</span> Đăng nhập
-                        </button>
-                    </div>
-                </div>
-
+            {/* Right Sliding Form Stage */}
+            <div className="relative flex flex-col items-center overflow-x-hidden overflow-y-auto no-scrollbar bg-surface px-5 py-4 sm:px-10 lg:px-14 lg:py-4">
+                <AnimatePresence mode="wait" custom={slideDir} initial={false}>
+                    <motion.div
+                        key={activePanelKey}
+                        custom={slideDir}
+                        variants={slideVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                        data-testid={panelTestId}
+                        className="my-auto w-full max-w-[400px]"
+                    >
+                        {renderFormBody()}
+                    </motion.div>
+                </AnimatePresence>
             </div>
         </div>
     );

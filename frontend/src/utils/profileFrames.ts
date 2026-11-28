@@ -9,7 +9,7 @@ export const PROFILE_FRAMES: ProfileFrame[] = [
     { key: 'week-streak', label: 'Bền bỉ', img: '/profile-frames/ben_bi.webp' },
     { key: 'hundred-words', label: '100 từ', img: '/profile-frames/lv100.webp' },
     { key: 'mastery', label: 'Bậc thầy', img: '/profile-frames/bac_thay.webp' },
-    { key: 'xp-1000', label: '1,000 XP', img: '/profile-frames/1000xp.webp' },
+    { key: 'xp-1000', label: '1.000 XP', img: '/profile-frames/1000xp.webp' },
 ];
 
 export const profileFrameStorageKey = (userId: number | string) => `profile_frame_${userId}`;

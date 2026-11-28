@@ -1,5 +1,7 @@
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { MailCheck } from 'lucide-react';
 import { Button } from '../components/ui';
+import { PATHS } from '../routes/paths';
 
 type VerifyEmailSentState = {
     email?: string;
@@ -12,6 +14,7 @@ const readEmailFromState = (state: unknown) => {
 
 const VerifyEmailSent = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const email = readEmailFromState(location.state);
     const displayEmail = email || 'email bạn đã đăng ký';
 
@@ -20,29 +23,25 @@ const VerifyEmailSent = () => {
     };
 
     return (
-        <div className="flex h-[calc(100dvh-65px)] items-center justify-center overflow-hidden bg-bg-light px-4 py-4 text-text-primary sm:py-6">
-            <div className="mx-auto flex w-full max-w-2xl items-center justify-center">
-                <section className="w-full rounded-[28px] border border-border bg-surface px-7 py-8 text-center shadow-[0_24px_70px_-36px_rgba(45,40,70,0.35)] sm:px-10 sm:py-10">
-                    <h1 className="font-display text-4xl font-bold leading-tight tracking-normal text-text-primary md:text-5xl">
-                        Đã gửi email xác nhận
-                    </h1>
-                    <p className="mx-auto mt-5 max-w-[62ch] text-base leading-relaxed text-text-secondary">
-                        Chúng tôi đã gửi liên kết xác minh đến{' '}
-                        <span className="font-bold text-text-primary">{displayEmail}</span>. Vui lòng mở email và bấm Xác minh email để kích hoạt tài khoản.
-                    </p>
-
-                    <div className="mt-8 flex justify-center">
-                        <Button
-                            type="button"
-                            variant="primary"
-                            className="min-h-12 px-7"
-                            onClick={openEmail}
-                        >
-                            Mở email
-                        </Button>
-                    </div>
-                </section>
-            </div>
+        <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-8">
+            <section className="w-full max-w-[460px] rounded-[var(--radius-container)] border-2 border-border bg-surface p-6 text-center sm:p-8">
+                <span className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-primary-light text-primary" aria-hidden>
+                    <MailCheck size={22} />
+                </span>
+                <h1 className="text-2xl font-bold tracking-[-0.02em] text-text-primary">Kiểm tra email của bạn</h1>
+                <p className="mx-auto mt-3 max-w-[40ch] text-sm leading-relaxed text-text-muted">
+                    Chúng tôi đã gửi liên kết xác minh đến{' '}
+                    <span className={`${email ? 'break-all' : 'break-words'} font-semibold text-text-primary`}>{displayEmail}</span>.
+                    Mở email và bấm <span className="font-medium text-text-primary">Xác minh email</span> để kích hoạt tài khoản.
+                </p>
+                <div className="mt-6 space-y-2.5">
+                    <Button fullWidth onClick={openEmail}>Mở Gmail</Button>
+                    <Button fullWidth variant="secondary" onClick={() => navigate(PATHS.login, { state: { verifiedEmail: email } })}>
+                        Về trang đăng nhập
+                    </Button>
+                </div>
+                <p className="mt-4 text-xs text-text-muted">Không thấy email? Hãy xem mục Spam hoặc Quảng cáo.</p>
+            </section>
         </div>
     );
 };

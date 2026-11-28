@@ -36,12 +36,10 @@ export const buildTranslationQuestions = (
     )
     .slice(0, limit);
 
-  return valid.map((item, index) => {
+  return valid.map((item) => {
     const english = normalizeText(item.example);
     const vietnamese = normalizeText(item.translation);
-    const direction: ArrangementDirection = index % 2 === 0 ? 'en-to-vi' : 'vi-to-en';
-    return direction === 'en-to-vi'
-      ? { id: item.id, direction, prompt: english, answer: vietnamese }
-      : { id: item.id, direction, prompt: vietnamese, answer: english };
+    // Always prompt in Vietnamese -> learner assembles the English sentence.
+    return { id: item.id, direction: 'vi-to-en' as ArrangementDirection, prompt: vietnamese, answer: english };
   });
 };
